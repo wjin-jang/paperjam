@@ -17,7 +17,7 @@ try:
     HAS_EPAPER = True
 except ImportError:
     HAS_EPAPER = False
-    print("WARNING: E-Paper drivers not found. Running in headless/text mode.", flush=True)
+    print("WARNING: E-Paper drivers not found. Running in headless/text mode.")
 
 class Launcher:
     def __init__(self):
@@ -71,7 +71,7 @@ class Launcher:
                 epd.Clear(0xFF)
                 return epd
             except Exception as e:
-                print(f"EPD Init Error: {e}", flush=True)
+                print(f"EPD Init Error: {e}")
         return None
 
     def _check_low_battery(self):
@@ -84,7 +84,7 @@ class Launcher:
         battery = get_battery_monitor()
         pct = battery.percentage
         if pct >= 0 and pct <= self._low_battery_threshold and not battery.charging:
-            print(f"LOW BATTERY ({pct}%) - Initiating safe shutdown...", flush=True)
+            print(f"LOW BATTERY ({pct}%) - Initiating safe shutdown...")
             self._perform_low_battery_shutdown()
 
     def _perform_low_battery_shutdown(self):
@@ -104,7 +104,7 @@ class Launcher:
         subprocess.run(["sudo", "shutdown", "now"])
 
     def run(self):
-        print("System Ready. Entering main loop...", flush=True)
+        print("System Ready. Entering main loop...")
         try:
             while True:
                 if not self.inputs.check_inputs(): break
@@ -152,7 +152,7 @@ class Launcher:
                     if frame: self._display(frame, force_full)
 
                 except Exception as e:
-                    print(f"Runtime Error: {e}", flush=True)
+                    print(f"Runtime Error: {e}")
                     traceback.print_exc()
 
                 if self.current_app != self.music_app:
@@ -161,7 +161,7 @@ class Launcher:
                 time.sleep(0.05) 
 
         except KeyboardInterrupt:
-            print("Shutting down...", flush=True)
+            print("Shutting down...")
         finally:
             if self.epd: self.epd.sleep()
 
@@ -196,7 +196,7 @@ class Launcher:
 
     def _launch(self):
         name = self.apps[self.idx]
-        print(f"Launching: {name}", flush=True)
+        print(f"Launching: {name}")
         
         if name == "Music Player":
             self.current_app = self.music_app
@@ -252,7 +252,7 @@ class Launcher:
         subprocess.run(command)
 
     def _perform_shutdown(self):
-        print("Initiating Shutdown Sequence...", flush=True)
+        print("Initiating Shutdown Sequence...")
         cover = self.music_app.lib.get_random_cover()
         frame = self.renderer.render_shutdown(cover)
         self._display(frame, full_refresh=True, skip_battery=True, skip_status=True)
@@ -264,14 +264,14 @@ class Launcher:
 
     def _perform_screen_clear_shutdown(self):
         """Clear the screen and shutdown - useful for screen removal/replacement."""
-        print("Clearing screen and shutting down...", flush=True)
+        print("Clearing screen and shutting down...")
         if self.epd:
             try:
                 self.epd.init()
                 self.epd.Clear(0xFF)  # Clear to white
                 self.epd.sleep()
             except Exception as e:
-                print(f"Screen clear error: {e}", flush=True)
+                print(f"Screen clear error: {e}")
         subprocess.run(["sudo", "shutdown", "now"])
 
     def _is_audio_device_connected(self):
@@ -425,7 +425,7 @@ class Launcher:
                 else:
                     self.epd.displayPartial(buffer)
             except Exception as e:
-                print(f"Display Error: {e}", flush=True)
+                print(f"Display Error: {e}")
 
 if __name__ == "__main__":
     Launcher().run()
