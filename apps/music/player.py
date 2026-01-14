@@ -146,6 +146,10 @@ class MusicPlayerApp:
             self.last_input_time = time.time()
 
         self.state.is_playing = self.audio.toggle_pause()
+        if self.state.is_playing:
+            self.state.set_status_message("PLAYING")
+        else:
+            self.state.set_status_message("PAUSED")
 
     def next_track(self, from_user=True):
         if from_user and not self.state.screensaver_image:
@@ -160,6 +164,8 @@ class MusicPlayerApp:
 
         self.playlist.queue_idx = (self.playlist.queue_idx + 1) % len(self.playlist.queue)
         real_idx = self.playlist.queue[self.playlist.queue_idx]
+        if from_user:
+            self.state.set_status_message("NEXT")
         self._load_track(real_idx)
 
     def prev_track(self):
@@ -175,6 +181,7 @@ class MusicPlayerApp:
 
         self.playlist.queue_idx = (self.playlist.queue_idx - 1) % len(self.playlist.queue)
         real_idx = self.playlist.queue[self.playlist.queue_idx]
+        self.state.set_status_message("PREVIOUS")
         self._load_track(real_idx)
 
     def _load_track(self, real_idx):
@@ -401,13 +408,19 @@ class MusicPlayerApp:
             self.nav_back()
         elif idx == 1:
             self.state.shuffle_active = not self.state.shuffle_active
-            if self.state.shuffle_active and not self.state.playing_path:
-                files = [item for item in self.state.items if item.get('type') == 'file']
-                if files:
-                    target = random.choice(files)
-                    self._play_from_list(target['path'])
+            if self.state.shuffle_active:
+                self.state.set_status_message("SHUFFLE ON")
+                if not self.state.playing_path:
+                    files = [item for item in self.state.items if item.get('type') == 'file']
+                    if files:
+                        target = random.choice(files)
+                        self._play_from_list(target['path'])
+            else:
+                self.state.set_status_message("SHUFFLE OFF")
         elif idx == 2:
             self.state.loop_mode = (self.state.loop_mode + 1) % 3
+            loop_messages = ["LOOP OFF", "LOOP ALL", "LOOP ONE"]
+            self.state.set_status_message(loop_messages[self.state.loop_mode])
         elif idx == 3:
             self.lib.toggle_fav_album(self.state.album)
 

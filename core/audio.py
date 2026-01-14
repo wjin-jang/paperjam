@@ -44,3 +44,25 @@ class AudioEngine:
 
     def has_ended(self):
         return self.player.get_state() == vlc.State.Ended
+
+    def is_paused(self):
+        return self.player.get_state() == vlc.State.Paused
+
+    def is_stopped(self):
+        state = self.player.get_state()
+        return state in (vlc.State.Stopped, vlc.State.NothingSpecial, vlc.State.Ended)
+
+    def get_state(self):
+        """Return the current playback state as a string."""
+        state = self.player.get_state()
+        state_map = {
+            vlc.State.NothingSpecial: 'stopped',
+            vlc.State.Opening: 'loading',
+            vlc.State.Buffering: 'loading',
+            vlc.State.Playing: 'playing',
+            vlc.State.Paused: 'paused',
+            vlc.State.Stopped: 'stopped',
+            vlc.State.Ended: 'ended',
+            vlc.State.Error: 'error'
+        }
+        return state_map.get(state, 'unknown')

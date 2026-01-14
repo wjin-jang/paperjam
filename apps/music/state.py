@@ -1,6 +1,7 @@
 """
 Player state management for the music player application.
 """
+import time
 from dataclasses import dataclass, field
 from typing import List, Optional, Set, Any
 
@@ -34,6 +35,11 @@ class PlayerState:
     total_items: int = 0
     page_size: int = 7
 
+    # Temporary status message
+    status_message: Optional[str] = None
+    status_message_time: float = 0
+    status_message_duration: float = 1.5
+
     # Context menu
     context_menu_active: bool = False
     context_options: List[str] = field(default_factory=list)
@@ -56,3 +62,26 @@ class PlayerState:
         self.year = ""
         self.has_header = False
         self.browsing_cover_s = None
+
+    def set_status_message(self, message: str, duration: float = 1.5):
+        """Set a temporary status message."""
+        self.status_message = message
+        self.status_message_time = time.time()
+        self.status_message_duration = duration
+
+    def get_status_text(self) -> str:
+        """Get the current status text, considering temporary messages."""
+        # Check if temporary message is still active
+        if self.status_message and (time.time() - self.status_message_time) < self.status_message_duration:
+            return self.status_message
+
+        # Clear expired message
+        self.status_message = None
+
+        # Return default status
+        if self.is_playing:
+            return "PLAYING"
+        elif self.playing_path:
+            return "PAUSED"
+        else:
+            return "IDLE"

@@ -95,8 +95,8 @@ class MusicViewRenderer(RenderBase):
         """Render the full music view."""
         self.clear()
 
-        # Album art
-        art = state.playing_cover_s if (state.playing_path and state.is_playing) else state.browsing_cover_s
+        # Album art - show playing cover if track is loaded (playing or paused)
+        art = state.playing_cover_s if state.playing_path else state.browsing_cover_s
         art_size = 84
         art_x, art_y = 8, 8
         self.draw_panel(art_x, art_y, art_size, art_size)
@@ -105,8 +105,22 @@ class MusicViewRenderer(RenderBase):
         else:
             self.draw_text_box("NO IMAGE", art_x + 1, art_y + 35, 82, 12, invert=True, center=True)
 
-        # Status bar
-        status_text = "¦ PLAYING" if state.is_playing else ("¥ PAUSED" if state.playing_path else "¤ IDLE")
+        # Status bar - use state's status text method for temporary messages
+        raw_status = state.get_status_text()
+        status_icons = {
+            'PLAYING': 'Ⓟ',
+            'PAUSED': 'Ⓢ',
+            'IDLE': 'Ⓘ',
+            'NEXT': 'Ⓝ',
+            'PREVIOUS': 'Ⓡ',
+            'SHUFFLE ON': 'Ⓘ',
+            'SHUFFLE OFF': 'Ⓘ',
+            'LOOP ALL': 'Ⓘ',
+            'LOOP ONE': 'Ⓘ',
+            'LOOP OFF': 'Ⓘ',
+        }
+        icon = status_icons.get(raw_status, '¤')
+        status_text = f"{icon} {raw_status}"
         self.draw_panel(8, 100, art_size, cfg.ROW_HEIGHT)
         self.draw_text_box(
             status_text, 8, 100, art_size, cfg.ROW_HEIGHT,
