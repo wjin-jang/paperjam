@@ -19,6 +19,7 @@ class TrackInfo:
     year: str
     track_num: int
     disc_num: int
+    duration: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for compatibility with existing code."""
@@ -29,7 +30,8 @@ class TrackInfo:
             'album': self.album,
             'year': self.year,
             'track': self.track_num,
-            'disc': self.disc_num
+            'disc': self.disc_num,
+            'duration': self.duration
         }
 
 
@@ -50,7 +52,7 @@ def extract_track_info(file_path: Path) -> TrackInfo:
         file_path = Path(file_path)
 
     meta = get_metadata(file_path)
-    # meta structure: (album, artist, title, track_num, disc_num, year)
+    # meta structure: (album, artist, title, track_num, disc_num, year, duration)
 
     return TrackInfo(
         path=file_path,
@@ -59,7 +61,8 @@ def extract_track_info(file_path: Path) -> TrackInfo:
         title=meta[2] if meta[2] else file_path.stem,
         track_num=meta[3] if meta[3] else 0,
         disc_num=meta[4] if meta[4] else 0,
-        year=meta[5] if meta[5] else ""
+        year=meta[5] if meta[5] else "",
+        duration=meta[6] if len(meta) > 6 else 0
     )
 
 

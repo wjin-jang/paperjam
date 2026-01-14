@@ -47,11 +47,12 @@ def load_fonts():
     try:
         main = ImageFont.truetype(str(base_path / "BMmini.ttf"), 9) if (base_path / "BMmini.ttf").exists() else ImageFont.load_default()
         header = ImageFont.truetype(str(base_path / "Nintendo-DS-BIOS.ttf"), 12) if (base_path / "Nintendo-DS-BIOS.ttf").exists() else ImageFont.load_default()
-        return main, header
+        battery = ImageFont.truetype(str(base_path / "BatteryIcons.ttf"), 6) if (base_path / "BatteryIcons.ttf").exists() else None
+        return main, header, battery
     except:
-        return ImageFont.load_default(), ImageFont.load_default()
+        return ImageFont.load_default(), ImageFont.load_default(), None
 
-FONT_MAIN, FONT_HEADER = load_fonts()
+FONT_MAIN, FONT_HEADER, FONT_BATTERY = load_fonts()
 NEEDS_RESCAN = False
 
 # --- Status Icons ---
@@ -66,4 +67,16 @@ STATUS_ICONS = {
     'LOOP ALL': 'Ⓘ',
     'LOOP ONE': 'Ⓘ',
     'LOOP OFF': 'Ⓘ',
+}
+
+# --- Menu Icons ---
+MENU_ICONS = {
+    'artist': 'Ⓐ',
+    'album': 'Ⓑ',
+    'tracks': 'Ⓣ',
+    'playlist': 'Ⓛ',
+    'fav': 'Ⓗ',
+    'recent': 'Ⓡ',
+    'dir': 'Ⓕ',
+    'file_playing': 'Ⓟ',
 }

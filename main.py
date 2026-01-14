@@ -2,10 +2,12 @@ import time
 import sys
 import traceback
 import subprocess
-from PIL import Image, ImageOps # --- ADDED ImageOps
+from PIL import Image, ImageOps, ImageDraw
 
+import config as cfg
 from core.audio import AudioEngine
 from core.inputs import InputHandler
+from core.battery import get_battery_monitor
 from apps.music import MusicPlayerApp  # Now imports from the package
 from apps.settings import SettingsApp
 from ui.renderer import UIRenderer
@@ -24,9 +26,18 @@ class Launcher:
         
         self.music_app = MusicPlayerApp(self.audio, self.inputs)
         self.settings_app = SettingsApp(self.music_app.lib, self.audio, self.inputs)
-        
+
         self.renderer = UIRenderer()
         self.epd = self._init_hardware()
+
+        # Set display callback for loading overlays
+        self.music_app.set_display_callback(lambda img: self._display(img))
+
+        # Set volume callbacks for music player
+        self.music_app.set_volume_callbacks(
+            lambda: self.settings_app.categories['AUDIO'].set_volume(5),
+            lambda: self.settings_app.categories['AUDIO'].set_volume(-5)
+        )
         
         self.apps = ["Music Player", "System Settings", "Reboot", "Shut Down"]
         self.idx = 0
@@ -40,6 +51,10 @@ class Launcher:
         
         self.inputs.set_callbacks(self._get_launcher_cb())
 
+        # Low battery shutdown
+        self._last_battery_check = 0
+        self._low_battery_threshold = 12  # Shutdown at 12% (lowest non-zero level)
+
     def _init_hardware(self):
         if HAS_EPAPER:
             try:
@@ -51,13 +66,41 @@ class Launcher:
                 print(f"EPD Init Error: {e}")
         return None
 
+    def _check_low_battery(self):
+        """Check battery and shutdown if critically low."""
+        now = time.time()
+        if now - self._last_battery_check < 60:  # Check every 60 seconds
+            return
+        self._last_battery_check = now
+
+        battery = get_battery_monitor()
+        pct = battery.percentage
+        if pct >= 0 and pct <= self._low_battery_threshold and not battery.charging:
+            print(f"LOW BATTERY ({pct}%) - Initiating safe shutdown...")
+            self._perform_low_battery_shutdown()
+
+    def _perform_low_battery_shutdown(self):
+        """Perform safe shutdown due to low battery."""
+        frame = self.renderer.render_menu("LOW BATTERY", ["Shutting down..."], 0, 0)
+        self._display(frame, full_refresh=True)
+        time.sleep(2)
+        if self.epd:
+            try:
+                self.epd.init()
+                self.epd.Clear(0xFF)
+                self.epd.sleep()
+            except:
+                pass
+        subprocess.run(["sudo", "shutdown", "now"])
+
     def run(self):
         print("System Ready. Entering main loop...")
         try:
             while True:
-                if not self.inputs.check_inputs(): break 
+                if not self.inputs.check_inputs(): break
+                self._check_low_battery()
                 frame = None
-                
+
                 force_full = False
                 
                 try:
@@ -101,11 +144,21 @@ class Launcher:
         finally:
             if self.epd: self.epd.sleep()
 
+    def _vol_up(self):
+        """Global volume up handler."""
+        self.settings_app.categories['AUDIO'].set_volume(5)
+
+    def _vol_down(self):
+        """Global volume down handler."""
+        self.settings_app.categories['AUDIO'].set_volume(-5)
+
     def _get_launcher_cb(self):
         return {
             'up': lambda: setattr(self, 'idx', (self.idx - 1) % len(self.apps)),
             'down': lambda: setattr(self, 'idx', (self.idx + 1) % len(self.apps)),
-            'enter': self._launch
+            'enter': self._launch,
+            'vol_up': self._vol_up,
+            'vol_down': self._vol_down
         }
 
     def _get_confirm_cb(self):
@@ -113,7 +166,9 @@ class Launcher:
             'up': lambda: setattr(self, 'confirm_idx', 1 - self.confirm_idx),
             'down': lambda: setattr(self, 'confirm_idx', 1 - self.confirm_idx),
             'enter': self._handle_confirm_selection,
-            'back': self._cancel_confirm
+            'back': self._cancel_confirm,
+            'vol_up': self._vol_up,
+            'vol_down': self._vol_down
         }
 
     def _launch(self):
@@ -177,19 +232,59 @@ class Launcher:
         print("Initiating Shutdown Sequence...")
         cover = self.music_app.lib.get_random_cover()
         frame = self.renderer.render_shutdown(cover)
-        self._display(frame, full_refresh=True)
+        self._display(frame, full_refresh=True, skip_battery=True)
         time.sleep(3)
         if self.epd:
             try: self.epd.sleep()
             except: pass
         subprocess.run(["sudo", "shutdown", "now"])
 
-    def _display(self, img, full_refresh=False):
-        # --- FIX: Invert Colors Implementation ---
-        # Check settings_app state and apply inversion if needed
+    def _draw_battery(self, img):
+        """Overlay battery icon on top right corner."""
+        battery = get_battery_monitor()
+        pct = battery.percentage
+        if pct < 0:
+            return img
+
+        # Use battery icon font if available
+        if cfg.FONT_BATTERY:
+            # Map percentage to icon 0-8
+            icon_num = min(8, max(0, round(pct / 12.5)))
+            icon = str(icon_num)
+            if battery.charging:
+                icon = "C" + icon
+
+            draw = ImageDraw.Draw(img)
+            bbox = draw.textbbox((0, 0), icon, font=cfg.FONT_BATTERY)
+            text_w = bbox[2] - bbox[0]
+            x = cfg.SCREEN_WIDTH - text_w - 8
+            y = 0
+
+            draw.text((x, y), icon, font=cfg.FONT_BATTERY, fill=cfg.BLACK)
+        else:
+            # Fallback to text
+            text = battery.get_display_text()
+            if not text:
+                return img
+
+            draw = ImageDraw.Draw(img)
+            bbox = draw.textbbox((0, 0), text, font=cfg.FONT_MAIN)
+            text_w = bbox[2] - bbox[0]
+            x = cfg.SCREEN_WIDTH - text_w - 4
+            y = 0
+
+            draw.text((x, y), text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+
+        return img
+
+    def _display(self, img, full_refresh=False, skip_battery=False):
+        # Overlay battery indicator
+        if not skip_battery:
+            img = self._draw_battery(img)
+
+        # Invert colors if enabled
         if self.settings_app.invert_colors:
-             # Convert to L (Greyscale) -> Invert -> Convert back to 1-bit
-             img = ImageOps.invert(img.convert('L')).convert('1')
+            img = ImageOps.invert(img.convert('L')).convert('1')
 
         if self.epd:
             try:

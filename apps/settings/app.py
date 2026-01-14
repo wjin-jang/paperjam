@@ -48,6 +48,9 @@ class SettingsApp:
         self.bt_devices = []
         self.bt_idx = 0
         self.bt_status = "Idle"
+        self.bt_selected_device = None
+        self.bt_menu_idx = 0
+        self.bt_menu_options = []
 
         # Popup state
         self.popup_msg = ""
@@ -73,7 +76,9 @@ class SettingsApp:
             'left': self.nav_left,
             'right': self.nav_right,
             'enter': self.nav_enter,
-            'back': self.nav_back
+            'back': self.nav_back,
+            'vol_up': lambda: self._audio_category.set_volume(5),
+            'vol_down': lambda: self._audio_category.set_volume(-5)
         }
 
     def update(self):
@@ -98,6 +103,8 @@ class SettingsApp:
             limit = len(self.bt_devices) + (1 if self.view == 'BT_SAVED' else 0)
             if limit > 0:
                 self.bt_idx = nav_index_up(self.bt_idx, limit)
+        elif self.view == 'BT_DEVICE_MENU':
+            self.bt_menu_idx = nav_index_up(self.bt_menu_idx, len(self.bt_menu_options))
 
     def nav_down(self):
         if self.view == 'VOLUME':
@@ -111,6 +118,8 @@ class SettingsApp:
             limit = len(self.bt_devices) + (1 if self.view == 'BT_SAVED' else 0)
             if limit > 0:
                 self.bt_idx = nav_index_down(self.bt_idx, limit)
+        elif self.view == 'BT_DEVICE_MENU':
+            self.bt_menu_idx = nav_index_down(self.bt_menu_idx, len(self.bt_menu_options))
 
     def nav_left(self):
         if self.view == 'VOLUME':
@@ -137,21 +146,23 @@ class SettingsApp:
                 self.bt.start_scan(self._bt_scan_callback)
             else:
                 if self.bt_devices:
-                    dev = self.bt_devices[self.bt_idx]
-                    self.bt_status = f"Connecting to {dev['name']}..."
-                    self.bt.connect_async(dev['mac'], self._bt_connect_callback)
+                    self._enter_bt_device_menu(self.bt_devices[self.bt_idx])
         elif self.view == 'BT_SCAN':
             if self.bt_devices:
                 dev = self.bt_devices[self.bt_idx]
                 self.bt.stop_scan()
                 self.bt_status = f"Pairing {dev['name']}..."
                 self.bt.connect_async(dev['mac'], self._bt_connect_callback)
+        elif self.view == 'BT_DEVICE_MENU':
+            self._handle_bt_device_action()
 
     def nav_back(self):
         if self.view == 'VOLUME':
             self.view = 'SUBMENU'
         elif self.view == 'BT_SCAN':
             self.bt.stop_scan()
+            self._enter_bt_saved_view()
+        elif self.view == 'BT_DEVICE_MENU':
             self._enter_bt_saved_view()
         elif self.view == 'BT_SAVED':
             self.view = 'SUBMENU'
@@ -202,6 +213,46 @@ class SettingsApp:
         self.bt_devices = self.bt.get_paired_devices()
         self.bt_idx = 0
 
+    def _enter_bt_device_menu(self, device):
+        """Enter device options menu."""
+        self.bt_selected_device = device
+        self.bt_menu_idx = 0
+        is_connected = self.bt.is_connected(device['mac'])
+
+        if is_connected:
+            self.bt_menu_options = ["Disconnect", "Forget", "Cancel"]
+        else:
+            self.bt_menu_options = ["Connect", "Forget", "Cancel"]
+
+        self.view = 'BT_DEVICE_MENU'
+        self.bt_status = device['name'][:16]
+
+    def _handle_bt_device_action(self):
+        """Handle action in BT device menu."""
+        if not self.bt_selected_device or not self.bt_menu_options:
+            self._enter_bt_saved_view()
+            return
+
+        action = self.bt_menu_options[self.bt_menu_idx]
+        dev = self.bt_selected_device
+        mac = dev['mac']
+
+        if action == "Connect":
+            self.bt_status = "Connecting..."
+            self.bt.connect_async(mac, self._bt_connect_callback)
+        elif action == "Disconnect":
+            self.bt_status = "Disconnecting..."
+            self.bt.disconnect_device(mac)
+            self.bt_status = "Disconnected"
+            self._enter_bt_saved_view()
+        elif action == "Forget":
+            self.bt_status = "Removing..."
+            self.bt.forget_device(mac)
+            self.bt_status = "Removed"
+            self._enter_bt_saved_view()
+        elif action == "Cancel":
+            self._enter_bt_saved_view()
+
     def _show_popup(self, msg: str):
         self.popup_msg = msg
         self.prev_view = self.view
@@ -213,8 +264,13 @@ class SettingsApp:
 
     def _bt_connect_callback(self, success, msg):
         self.bt_status = msg
-        if success and self.view == 'BT_SCAN':
-            self.bt.stop_scan()
+        if success:
+            if self.view == 'BT_SCAN':
+                self.bt.stop_scan()
+            # Return to device list after connect attempt
+            if self.view in ['BT_DEVICE_MENU', 'BT_SCAN']:
+                self._enter_bt_saved_view()
+                self.bt_status = msg
 
     def get_frame(self):
         if self.view == 'VOLUME':
@@ -251,3 +307,6 @@ class SettingsApp:
                     icon = "P" if d.get('paired') else " "
                     display_list.append(f"{icon} {d['name']}")
             return self.renderer.render_menu(f"BT: {self.bt_status}", display_list, self.bt_idx, 0)
+
+        elif self.view == 'BT_DEVICE_MENU':
+            return self.renderer.render_menu(f"BT: {self.bt_status}", self.bt_menu_options, self.bt_menu_idx, 0)

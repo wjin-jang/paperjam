@@ -121,8 +121,17 @@ class MusicViewRenderer(RenderBase):
 
         info_y = cfg.PANEL_Y + cfg.ROW_HEIGHT
         if state.artist:
-            self.draw_text_box(state.artist, cfg.PANEL_X, info_y, 112, 12)
-            self.draw_text_box(state.year, cfg.PANEL_X + 112, info_y, 28, 12, center=True)
+            # Calculate year/duration box width - expand left in multiples of 4
+            base_year_w = 28
+            year_text = state.year or ""
+            # Estimate width: ~6px per character + padding
+            needed_w = len(year_text) * 6 + 8
+            # Round up to next multiple of 4, minimum base_year_w
+            year_w = max(base_year_w, ((needed_w + 3) // 4) * 4)
+            artist_w = cfg.PANEL_W - year_w
+
+            self.draw_text_box(state.artist, cfg.PANEL_X, info_y, artist_w, 12)
+            self.draw_text_box(year_text, cfg.PANEL_X + artist_w, info_y, year_w, 12, center=True)
             list_start_y = info_y + cfg.ROW_HEIGHT
         else:
             list_start_y = info_y
@@ -146,25 +155,26 @@ class MusicViewRenderer(RenderBase):
                 continue
 
             # Determine icon
+            icons = cfg.MENU_ICONS
             if 'icon' in item and item.get('type') != 'file':
                 icon_str = item['icon']
             else:
                 itype = item.get('type')
                 if itype == 'dir':
-                    icon_str = "Ⓕ"
+                    icon_str = icons.get('dir', 'Ⓕ')
                 elif itype == 'artist':
-                    icon_str = "Ⓐ"
+                    icon_str = icons.get('artist', 'Ⓐ')
                 elif itype == 'album':
-                    icon_str = "Ⓑ"
+                    icon_str = icons.get('album', 'Ⓑ')
                 elif itype == 'recent':
-                    icon_str = "Ⓡ"
+                    icon_str = icons.get('recent', 'Ⓡ')
                 elif itype == 'playlist':
-                    icon_str = "Ⓛ"
+                    icon_str = icons.get('playlist', 'Ⓛ')
                     if "Fav" in item.get('name', ""):
-                        icon_str = "Ⓗ"
+                        icon_str = icons.get('fav', 'Ⓗ')
                 elif itype == 'file':
                     if 'icon' in item and item['icon'] == 'P':
-                        icon_str = "Ⓟ"
+                        icon_str = icons.get('file_playing', 'Ⓟ')
                     else:
                         icon_str = f"{abs_idx}."
                 else:
@@ -180,8 +190,11 @@ class MusicViewRenderer(RenderBase):
                 cfg.PANEL_X + cfg.PANEL_W - 8, list_start_y, avail_h + 1
             )
 
+        # Loading overlay
+        if state.loading_message:
+            self.render_loading(state.loading_message)
         # Context menu overlay
-        if state.context_menu_active:
+        elif state.context_menu_active:
             self.render_context_menu(state)
 
         return self.canvas
@@ -220,3 +233,14 @@ class MusicViewRenderer(RenderBase):
             is_sel = (idx == state.context_index)
 
             self.draw_text_box(opt, x, opt_y, w, item_h, invert=is_sel)
+
+    def render_loading(self, message: str):
+        """Render loading overlay."""
+        w = 100
+        h = cfg.ROW_HEIGHT + 8
+
+        x = (cfg.SCREEN_WIDTH - w) // 2
+        y = (cfg.SCREEN_HEIGHT - h) // 2
+
+        self.draw_panel(x, y, w, h)
+        self.draw_text_box(message, x, y, w, h, center=True, font=cfg.FONT_HEADER)

@@ -62,6 +62,10 @@ class ContextMenuHandler:
         """Get context menu options based on item type."""
         if item.get('type') == 'playlist':
             return ["Delete Playlist", "Cancel"]
+        elif item.get('type') == 'artist':
+            return ["Favourite Artist", "Cancel"]
+        elif item.get('type') == 'album':
+            return ["Favourite Album", "Cancel"]
         elif item.get('type') == 'file':
             opts = ["Favourite Song", "Add to Playlist"]
             if item.get('artist'):
@@ -108,6 +112,20 @@ class ContextMenuHandler:
                 self.lib.toggle_fav_track(str(target['path']))
                 self.close()
                 if current_mode == 'FAV_TRACKS_VIEW':
+                    on_refresh()
+                return None
+
+            elif opt == "Favourite Artist":
+                self.lib.toggle_fav_artist(target['name'])
+                self.close()
+                if current_mode == 'FAV_ARTISTS':
+                    on_refresh()
+                return None
+
+            elif opt == "Favourite Album":
+                self.lib.toggle_fav_album(target['name'])
+                self.close()
+                if current_mode == 'FAV_ALBUMS':
                     on_refresh()
                 return None
 

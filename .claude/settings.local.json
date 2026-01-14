@@ -5,7 +5,9 @@
       "Bash(ls:*)",
       "Bash(wc:*)",
       "Bash(git add:*)",
-      "Bash(python -c:*)"
+      "Bash(python -c:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

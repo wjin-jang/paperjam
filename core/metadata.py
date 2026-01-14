@@ -42,25 +42,29 @@ def parse_num(val):
 def get_metadata(file_path):
     """
     Fast extraction of text-only metadata.
-    Returns: (album, artist, title, track_number, disc_number, year)
+    Returns: (album, artist, title, track_number, disc_number, year, duration)
     """
-    if not os.path.exists(file_path): 
-        return ("Unknown Album", "Unknown Artist", format_track_name(file_path), 0, 0, "")
-    
+    if not os.path.exists(file_path):
+        return ("Unknown Album", "Unknown Artist", format_track_name(file_path), 0, 0, "", 0)
+
     album, album_artist, title, year = None, None, None, None
     track_num, disc_num = 0, 0
+    duration = 0
 
     try:
         audio = File(file_path)
+        if audio and audio.info:
+            duration = int(audio.info.length)
+
         if isinstance(audio, FLAC):
             album = audio.get("album", [None])[0]
             album_artist = audio.get("albumartist", [None])[0]
             if not album_artist: album_artist = audio.get("artist", [None])[0]
             title = audio.get("title", [None])[0]
-            
+
             track_num = parse_num(audio.get("tracknumber", [0])[0])
             disc_num = parse_num(audio.get("discnumber", [1])[0])
-            
+
             date_str = audio.get("date", [None])[0]
             if date_str: year = date_str.split('-')[0]
 
@@ -73,7 +77,7 @@ def get_metadata(file_path):
                 if 'TIT2' in tags: title = tags['TIT2'].text[0]
                 if 'TRCK' in tags: track_num = parse_num(tags['TRCK'].text[0])
                 if 'TPOS' in tags: disc_num = parse_num(tags['TPOS'].text[0])
-                
+
                 if 'TDRC' in tags: year = str(tags['TDRC'].text[0]).split('-')[0]
                 elif 'TYER' in tags: year = str(tags['TYER'].text[0])
 
@@ -84,13 +88,26 @@ def get_metadata(file_path):
     if not title: title = format_track_name(file_path)
 
     return (
-        sanitize_text(album or "Unknown Album"), 
+        sanitize_text(album or "Unknown Album"),
         sanitize_text(album_artist or "Unknown Artist"),
         sanitize_text(title),
         track_num,
         disc_num,
-        str(year) if year else ""
+        str(year) if year else "",
+        duration
     )
+
+
+def format_duration(seconds: int) -> str:
+    """Format seconds as HH:MM:SS or MM:SS."""
+    if seconds <= 0:
+        return ""
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    if hours > 0:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
 
 # get_cover moved to ui.image_utils to fix circular dependency
 # Re-export for backward compatibility

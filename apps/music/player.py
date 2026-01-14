@@ -39,29 +39,69 @@ class MusicPlayerApp:
         self.current_path = cfg.MUSIC_PATH
 
         # Timing
-        self.last_input_time = time.time()
         self.running = True
+
+        # Display callback for immediate updates (set by main.py)
+        self._display_callback = None
+
+        # Volume callbacks (set by main.py)
+        self._vol_up_callback = None
+        self._vol_down_callback = None
 
         self.refresh_list()
 
+        # Reset input time after init to prevent immediate screensaver
+        self.last_input_time = time.time()
+
+    def set_display_callback(self, callback):
+        """Set callback for immediate display updates."""
+        self._display_callback = callback
+
+    def set_volume_callbacks(self, vol_up, vol_down):
+        """Set callbacks for volume control."""
+        self._vol_up_callback = vol_up
+        self._vol_down_callback = vol_down
+
+    def _show_loading(self, message: str = "Loading..."):
+        """Show loading overlay and force display update."""
+        self.state.loading_message = message
+        if self._display_callback:
+            self._display_callback(self.get_frame())
+
+    def _hide_loading(self):
+        """Hide loading overlay."""
+        self.state.loading_message = None
+
     def get_callbacks(self):
         """Return input callbacks for the music player."""
-        return {
+        callbacks = {
             'up': self.nav_up,
             'down': self.nav_down,
             'enter': self.nav_enter,
             'enter_long': self.nav_enter_long,
             'back': self.nav_back,
+            'back_long': self.nav_home,
             'play_pause': self.toggle_play,
             'next': self.next_track,
             'prev': self.prev_track
         }
+        if self._vol_up_callback:
+            callbacks['vol_up'] = self._vol_up_callback
+        if self._vol_down_callback:
+            callbacks['vol_down'] = self._vol_down_callback
+        return callbacks
+
+    def nav_home(self):
+        """Long press back - return to home menu."""
+        self._wake_from_screensaver()
+        self.running = False
 
     def _wake_from_screensaver(self):
         """Wake from screensaver if active. Returns True if was active."""
         was_active = self.state.screensaver_image is not None
         self.last_input_time = time.time()
         self.state.screensaver_image = None
+        self.state.screensaver_album = None
 
         if was_active:
             self.state.needs_refresh = True
@@ -105,10 +145,17 @@ class MusicPlayerApp:
         item = self.state.items[self.state.selection_index]
         if item['type'] in ['playlist', 'dir', 'artist', 'album']:
             self.history.append((self.mode, self.current_path, self.state.selection_index))
-            self.mode = item['mode']
+            new_mode = item['mode']
+
+            # Show loading for potentially large lists
+            if new_mode in ['PLAYLIST_VIEW', 'RECENTS', 'ARTIST_VIEW', 'ALBUM_VIEW', 'FAV_TRACKS_VIEW', 'TRACKS_VIEW']:
+                self._show_loading("Loading...")
+
+            self.mode = new_mode
             self.current_path = item.get('path', item.get('name'))
             self.state.selection_index = 0
             self.refresh_list()
+            self._hide_loading()
         elif item['type'] == 'file':
             self._play_from_list(item['path'])
 
@@ -144,6 +191,11 @@ class MusicPlayerApp:
     def toggle_play(self):
         if not self.state.screensaver_image:
             self.last_input_time = time.time()
+
+        # If on screensaver with no song playing, play the screensaver album
+        if self.state.screensaver_image and not self.state.playing_path and self.state.screensaver_album:
+            self._play_screensaver_album()
+            return
 
         self.state.is_playing = self.audio.toggle_pause()
         if self.state.is_playing:
@@ -213,11 +265,12 @@ class MusicPlayerApp:
 
                 if self.state.is_playing:
                     self.state.screensaver_image = self.state.playing_cover_l or self.state.playing_cover_s
+                    self.state.screensaver_album = None
                 else:
                     if self.state.screensaver_image is None:
-                        self.state.screensaver_image = self.lib.get_random_cover()
-                        if not self.state.screensaver_image:
-                            self.state.screensaver_image = Image.new('1', (1, 1))
+                        cover, album = self.lib.get_random_cover(with_album=True)
+                        self.state.screensaver_image = cover if cover else Image.new('1', (1, 1))
+                        self.state.screensaver_album = album
 
         return self.running
 
@@ -236,46 +289,61 @@ class MusicPlayerApp:
         elif self.mode == 'ALBUMS_ROOT':
             self.state.album, self.state.items = self.browse.get_albums_list()
 
+        elif self.mode == 'FAV_ARTISTS':
+            self.state.album, self.state.items = self.browse.get_fav_artists_list()
+
         elif self.mode == 'FAV_ALBUMS':
             self.state.album, self.state.items = self.browse.get_fav_albums_list()
 
         elif self.mode == 'PLAYLISTS_ROOT':
             self.state.album, self.state.items = self.browse.get_playlists_list()
 
+        elif self.mode == 'TRACKS_VIEW':
+            shuffle = self.state.shuffle_active
+            album, tracks, track_count, duration, cover = self.browse.get_all_tracks(shuffle=shuffle)
+            self.state.album = album
+            if not tracks:
+                self.state.items = [{'name': '(No Tracks)', 'type': 'info'}]
+            else:
+                self._load_tracks(tracks)
+                self.state.browsing_cover_s = cover
+            self.state.artist = track_count
+            self.state.year = duration
+
         elif self.mode == 'FAV_TRACKS_VIEW':
-            album, tracks, artist, year, cover = self.browse.get_fav_tracks()
+            album, tracks, track_count, duration, cover = self.browse.get_fav_tracks()
             self.state.album = album
             if not tracks:
                 self.state.items = [{'name': '(No Fav Songs)', 'type': 'info'}]
             else:
                 self._load_tracks(tracks)
                 self.state.browsing_cover_s = cover
-            self.state.artist = artist
-            self.state.year = year
+            self.state.artist = track_count
+            self.state.year = duration
 
         elif self.mode == 'PLAYLIST_VIEW':
-            album, tracks, artist, year, cover = self.browse.get_playlist_tracks(self.current_path)
+            album, tracks, track_count, duration, cover = self.browse.get_playlist_tracks(self.current_path)
             self.state.album = album
             self._load_tracks(tracks)
             self.state.browsing_cover_s = cover
-            self.state.artist = artist
-            self.state.year = year
+            self.state.artist = track_count
+            self.state.year = duration
 
         elif self.mode == 'RECENTS':
-            album, tracks, artist, year, cover = self.browse.get_recents_tracks()
+            album, tracks, track_count, duration, cover = self.browse.get_recents_tracks()
             self.state.album = album
             self._load_tracks(tracks)
             self.state.browsing_cover_s = cover
-            self.state.artist = ""
-            self.state.year = ""
+            self.state.artist = track_count
+            self.state.year = duration
 
         elif self.mode == 'ARTIST_VIEW':
-            album, tracks, artist, year, cover = self.browse.get_artist_tracks(self.current_path)
+            album, tracks, track_count, duration, cover = self.browse.get_artist_tracks(self.current_path)
             self.state.album = album
             self._load_tracks(tracks)
             self.state.browsing_cover_s = cover
-            self.state.artist = artist
-            self.state.year = year
+            self.state.artist = track_count
+            self.state.year = duration
 
         elif self.mode == 'ALBUM_VIEW':
             album, tracks, artist, year, cover = self.browse.get_album_tracks(self.current_path)
@@ -374,6 +442,27 @@ class MusicPlayerApp:
                 p = cfg.PLAYLIST_DIR / f"{pl_name}.json"
                 self.lib.add_to_playlist(p, target['path'])
             self.state.context_menu_active = False
+
+    def _play_screensaver_album(self):
+        """Play the album shown on the screensaver."""
+        album = self.state.screensaver_album
+        if not album:
+            return
+
+        tracks = self.lib.get_album_tracks(album)
+        if not tracks:
+            return
+
+        # Build playlist from album tracks
+        self.playlist.playlist_source = [str(t['path']) for t in tracks]
+        self.playlist.queue = list(range(len(self.playlist.playlist_source)))
+        if self.state.shuffle_active:
+            random.shuffle(self.playlist.queue)
+        self.playlist.queue_idx = 0
+
+        # Load and play first track
+        self._load_track(self.playlist.queue[0])
+        self.state.set_status_message("PLAYING")
 
     def _play_from_list(self, path):
         """Start playing from the current list."""

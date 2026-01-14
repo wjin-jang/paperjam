@@ -37,9 +37,34 @@ class BluetoothManager:
         info = self._run_cmd(['bluetoothctl', 'info', mac])
         return "Connected: yes" in info
 
+    def _is_audio_device(self, mac):
+        """Check if a device is an audio device based on its icon/class."""
+        info = self._run_cmd(['bluetoothctl', 'info', mac])
+        # Check for audio-related icons
+        audio_icons = ['audio-headset', 'audio-headphones', 'audio-card', 'audio-speakers']
+        for line in info.split('\n'):
+            if 'Icon:' in line:
+                icon = line.split('Icon:')[1].strip().lower()
+                if any(ai in icon for ai in audio_icons):
+                    return True
+            # Also check Class for audio device class codes (0x04 = Audio/Video)
+            if 'Class:' in line:
+                try:
+                    class_hex = line.split('Class:')[1].strip()
+                    class_val = int(class_hex, 16)
+                    # Major device class is bits 8-12, 0x04 = Audio/Video
+                    major_class = (class_val >> 8) & 0x1F
+                    if major_class == 0x04:
+                        return True
+                except:
+                    pass
+        return False
+
     def get_paired_devices(self):
+        """Get only paired devices (not just known/seen devices)."""
         try:
-            output = self._run_cmd(['bluetoothctl', 'devices'])
+            # Use 'devices Paired' to get only actually paired devices
+            output = self._run_cmd(['bluetoothctl', 'devices', 'Paired'])
             devices = []
             for line in output.split('\n'):
                 if not line: continue
@@ -87,10 +112,14 @@ class BluetoothManager:
                             # Filter junk
                             if not name or any(x in name for x in self.ignore_keywords): continue
                             if len(name) < 2: continue
-                            
+
+                            # Filter for audio devices only
+                            if not self._is_audio_device(mac):
+                                continue
+
                             # Update Dict
                             self.found_devices[mac] = {'mac': mac, 'name': name, 'paired': False}
-                            
+
                             # Fire Callback
                             callback(list(self.found_devices.values()))
                         except: pass

@@ -27,6 +27,7 @@ class PlayerState:
     playing_cover_l: Any = None
     browsing_cover_s: Any = None
     screensaver_image: Any = None
+    screensaver_album: Optional[str] = None
 
     # Flags
     needs_refresh: bool = False
@@ -46,6 +47,9 @@ class PlayerState:
     context_index: int = 0
     context_target_item: Optional[dict] = None
     context_layer: int = 0
+
+    # Loading overlay
+    loading_message: Optional[str] = None
 
     def reset_context_menu(self):
         """Reset context menu state."""

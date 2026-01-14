@@ -127,14 +127,44 @@ class DisplayCategory(SettingsCategory):
     def __init__(self, settings_manager):
         super().__init__("DISPLAY", settings_manager)
 
+    def _is_hdmi_enabled(self) -> bool:
+        """Check if HDMI output is enabled."""
+        try:
+            result = subprocess.check_output(
+                ["tvservice", "-s"], text=True, stderr=subprocess.DEVNULL
+            ).strip()
+            # "state 0x120006" means off, other states mean on
+            return "off" not in result.lower() and "0x120006" not in result
+        except:
+            return True
+
+    def _toggle_hdmi(self):
+        """Toggle HDMI output on/off."""
+        try:
+            if self._is_hdmi_enabled():
+                subprocess.run(["tvservice", "-o"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                subprocess.run(["tvservice", "-p"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                # Restore framebuffer after turning on
+                subprocess.run(["fbset", "-depth", "8"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["fbset", "-depth", "16"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except:
+            pass
+
     def build_menu(self) -> List[str]:
         invert = self.settings.get('invert_colors', False)
         state = "ON" if invert else "OFF"
         ss_timeout = self.settings.get('screensaver_timeout', 60)
+        hdmi_state = "ON" if self._is_hdmi_enabled() else "OFF"
 
         return [
             f"Invert Colors: {state}",
-            f"Screensaver: {format_duration(ss_timeout)}"
+            f"Screensaver: {format_duration(ss_timeout)}",
+            f"HDMI Output: {hdmi_state}"
         ]
 
     def handle_action(self, item_index: int) -> Optional[str]:
@@ -146,6 +176,9 @@ class DisplayCategory(SettingsCategory):
         elif "Screensaver" in item_text:
             new_val = self.settings.cycle('screensaver_timeout')
             self.items[item_index] = f"Screensaver: {format_duration(new_val)}"
+        elif "HDMI" in item_text:
+            self._toggle_hdmi()
+            self.refresh()
 
         return None
 
@@ -155,8 +188,61 @@ class NetworkCategory(SettingsCategory):
 
     def __init__(self, settings_manager):
         super().__init__("NETWORK", settings_manager)
+        from core.bluetooth import BluetoothManager
+        self.bt = BluetoothManager()
+
+    def _is_wifi_enabled(self) -> bool:
+        """Check if WiFi is enabled."""
+        try:
+            result = subprocess.check_output(
+                ["rfkill", "list", "wifi"], text=True, stderr=subprocess.DEVNULL
+            )
+            return "Soft blocked: no" in result
+        except:
+            return True
+
+    def _toggle_wifi(self):
+        """Toggle WiFi on/off."""
+        try:
+            if self._is_wifi_enabled():
+                subprocess.run(["sudo", "rfkill", "block", "wifi"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                subprocess.run(["sudo", "rfkill", "unblock", "wifi"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                # Bring interface up and reconnect
+                subprocess.run(["sudo", "ifconfig", "wlan0", "up"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["sudo", "wpa_cli", "-i", "wlan0", "reconnect"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except:
+            pass
+
+    def _is_bt_enabled(self) -> bool:
+        """Check if Bluetooth is enabled."""
+        try:
+            result = subprocess.check_output(
+                ["rfkill", "list", "bluetooth"], text=True, stderr=subprocess.DEVNULL
+            )
+            return "Soft blocked: no" in result
+        except:
+            return True
+
+    def _toggle_bt(self):
+        """Toggle Bluetooth on/off."""
+        try:
+            if self._is_bt_enabled():
+                subprocess.run(["sudo", "rfkill", "block", "bluetooth"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                subprocess.run(["sudo", "rfkill", "unblock", "bluetooth"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except:
+            pass
 
     def _get_wifi_info(self) -> str:
+        if not self._is_wifi_enabled():
+            return "OFF"
         try:
             ssid = subprocess.check_output("iwgetid -r", shell=True, text=True).strip()
             ip = subprocess.check_output(['hostname', '-I'], encoding='utf-8').split()[0]
@@ -164,14 +250,35 @@ class NetworkCategory(SettingsCategory):
         except:
             return "Disconnected"
 
+    def _get_bt_status(self) -> str:
+        if not self._is_bt_enabled():
+            return "OFF"
+        try:
+            paired = self.bt.get_paired_devices()
+            for dev in paired:
+                if self.bt.is_connected(dev['mac']):
+                    return dev['name'][:16]
+            return "Not Connected"
+        except:
+            return "Unavailable"
+
     def build_menu(self) -> List[str]:
+        wifi_state = "ON" if self._is_wifi_enabled() else "OFF"
+        bt_state = "ON" if self._is_bt_enabled() else "OFF"
         return [
-            f"WiFi: {self._get_wifi_info()}",
-            "Bluetooth Status"
+            f"WiFi: {wifi_state}",
+            f"  {self._get_wifi_info()}",
+            f"Bluetooth: {bt_state}",
+            f"  {self._get_bt_status()}"
         ]
 
     def handle_action(self, item_index: int) -> Optional[str]:
-        # Network category is informational only
+        if item_index == 0:
+            self._toggle_wifi()
+            self.refresh()
+        elif item_index == 2:
+            self._toggle_bt()
+            self.refresh()
         return None
 
 
@@ -190,9 +297,39 @@ class SystemCategory(SettingsCategory):
         except:
             return "Unknown"
 
+    def _get_cpu_governor(self) -> str:
+        """Get current CPU governor."""
+        try:
+            result = subprocess.check_output(
+                ["cat", "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"],
+                text=True, stderr=subprocess.DEVNULL
+            ).strip()
+            return result
+        except:
+            return "unknown"
+
+    def _toggle_cpu_powersave(self):
+        """Toggle between performance and powersave CPU governors."""
+        try:
+            current = self._get_cpu_governor()
+            if current == "powersave":
+                new_gov = "ondemand"
+            else:
+                new_gov = "powersave"
+            # Set governor for all CPUs
+            subprocess.run(
+                f"echo {new_gov} | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor",
+                shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+        except:
+            pass
+
     def build_menu(self) -> List[str]:
         long_press = self.settings.get('long_press_duration', 0.5)
+        cpu_gov = self._get_cpu_governor()
+        cpu_mode = "Powersave" if cpu_gov == "powersave" else "Normal"
         return [
+            f"CPU Mode: {cpu_mode}",
             self._get_disk_usage(),
             f"Long Press: {long_press}s",
             "Version 1.5",
@@ -202,7 +339,10 @@ class SystemCategory(SettingsCategory):
     def handle_action(self, item_index: int) -> Optional[str]:
         item_text = self.items[item_index]
 
-        if "Restart" in item_text:
+        if "CPU Mode" in item_text:
+            self._toggle_cpu_powersave()
+            self.refresh()
+        elif "Restart" in item_text:
             subprocess.run(["sudo", "reboot"])
         elif "Long Press" in item_text:
             new_val = self.settings.cycle('long_press_duration')

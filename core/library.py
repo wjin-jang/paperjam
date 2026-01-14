@@ -25,6 +25,7 @@ class LibraryManager:
         self.recents = []
         self.fav_tracks = set()
         self.fav_albums = set()
+        self.fav_artists = set()
         
         self.is_scanning = False
         self._lock = threading.Lock()
@@ -88,7 +89,8 @@ class LibraryManager:
                         'title': track.title,
                         'track': track.track_num,
                         'disc': track.disc_num,
-                        'year': track.year
+                        'year': track.year,
+                        'duration': track.duration
                     }
 
                     temp_artists.setdefault(canonical_artist, []).append(data)
@@ -153,7 +155,8 @@ class LibraryManager:
                             track = extract_track_info(p)
                             tracks.append({
                                 'path': p, 'album': track.album, 'artist': track.artist,
-                                'title': track.title, 'year': track.year
+                                'title': track.title, 'year': track.year,
+                                'duration': track.duration
                             })
             except: pass
         return tracks
@@ -168,17 +171,25 @@ class LibraryManager:
         tracks.sort(key=lambda x: (x.get('disc',0), x.get('track',0)))
         return tracks
 
-    def get_random_cover(self):
-        """Used for screensaver/shutdown. Calls the heavy get_cover explicitly."""
+    def get_random_cover(self, with_album=False):
+        """Used for screensaver/shutdown. Calls the heavy get_cover explicitly.
+
+        Args:
+            with_album: If True, returns (cover, album_name) tuple
+        """
         try:
-            if not self.albums: return None
+            if not self.albums:
+                return (None, None) if with_album else None
             alb = random.choice(list(self.albums.keys()))
             tracks = self.albums[alb]
             if tracks:
                 # Only gets the large cover
                 covers = get_cover(Path(tracks[0]['path']))
+                if with_album:
+                    return covers[1], alb
                 return covers[1] # Return Large
-        except: return None
+        except:
+            return (None, None) if with_album else None
 
     def load_recents(self):
         if cfg.RECENTS_FILE.exists():
@@ -201,9 +212,11 @@ class LibraryManager:
                     if isinstance(d, list):
                         self.fav_tracks = set(d)
                         self.fav_albums = set()
+                        self.fav_artists = set()
                     else:
                         self.fav_tracks = set(d.get('tracks', []))
                         self.fav_albums = set(d.get('albums', []))
+                        self.fav_artists = set(d.get('artists', []))
             except: pass
 
     def toggle_fav_track(self, path_str):
@@ -216,9 +229,18 @@ class LibraryManager:
         else: self.fav_albums.add(album_name)
         self._save_favs()
 
+    def toggle_fav_artist(self, artist_name):
+        if artist_name in self.fav_artists: self.fav_artists.remove(artist_name)
+        else: self.fav_artists.add(artist_name)
+        self._save_favs()
+
     def _save_favs(self):
         with open(cfg.FAVS_FILE, 'w') as f:
-            json.dump({"tracks": list(self.fav_tracks), "albums": list(self.fav_albums)}, f)
+            json.dump({
+                "tracks": list(self.fav_tracks),
+                "albums": list(self.fav_albums),
+                "artists": list(self.fav_artists)
+            }, f)
 
     def get_fav_tracks_list(self):
         tracks = []
@@ -228,7 +250,8 @@ class LibraryManager:
                 track = extract_track_info(p)
                 tracks.append({
                     'path': p, 'album': track.album, 'artist': track.artist,
-                    'title': track.title, 'year': track.year
+                    'title': track.title, 'year': track.year,
+                    'duration': track.duration
                 })
         tracks.sort(key=lambda x: (x['artist'].lower(), x['title'].lower()))
         return tracks
@@ -238,3 +261,36 @@ class LibraryManager:
         for tracks in self.artists.values():
             count += len(tracks)
         return count
+
+    @staticmethod
+    def get_total_duration(tracks) -> int:
+        """Calculate total duration in seconds from a list of tracks."""
+        return sum(t.get('duration', 0) for t in tracks)
+
+    def get_all_tracks(self, shuffle=False):
+        """
+        Get all tracks from the library cache.
+        Uses cached metadata - no file I/O required.
+
+        Args:
+            shuffle: If True, return tracks in random order
+
+        Returns:
+            List of track dicts with path, title, artist, album, year
+        """
+        all_tracks = []
+        for album_tracks in self.albums.values():
+            all_tracks.extend(album_tracks)
+
+        if shuffle:
+            random.shuffle(all_tracks)
+        else:
+            # Sort by artist, then album, then disc/track
+            all_tracks.sort(key=lambda x: (
+                x.get('artist', '').lower(),
+                x.get('album', '').lower(),
+                x.get('disc', 0),
+                x.get('track', 0)
+            ))
+
+        return all_tracks
