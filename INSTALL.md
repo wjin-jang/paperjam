@@ -201,7 +201,46 @@ python main.py
 
 ## 8. Auto-Start on Boot (Optional)
 
-### Create Systemd Service
+### Option A: User Service (Recommended for PulseAudio)
+
+PulseAudio runs as a user service, so paperjam should also run as a user service to access audio:
+
+```bash
+mkdir -p ~/.config/systemd/user
+nano ~/.config/systemd/user/paperjam.service
+```
+
+Add the following:
+```ini
+[Unit]
+Description=PaperJam Music Player
+After=pulseaudio.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/yourusername/paperjam
+ExecStart=/home/yourusername/paperjam/venv/bin/python main.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
+
+Enable and start:
+```bash
+systemctl --user daemon-reload
+systemctl --user enable paperjam
+systemctl --user start paperjam
+
+# Enable user services to start at boot (without login)
+sudo loginctl enable-linger yourusername
+```
+
+### Option B: System Service (Uses ALSA fallback)
+
+If PulseAudio isn't required, you can run as a system service. Audio will fall back to ALSA:
+
 ```bash
 sudo nano /etc/systemd/system/paperjam.service
 ```

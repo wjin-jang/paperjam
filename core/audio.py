@@ -4,23 +4,45 @@ import subprocess
 
 class AudioEngine:
     def __init__(self):
-        self.instance = vlc.Instance()
-        
-        # Try to use PulseAudio, but don't hang if it's broken
-        try:
-            # Run pactl with a 1-second timeout
-            subprocess.run(["pactl", "info"], 
-                         stdout=subprocess.DEVNULL, 
-                         stderr=subprocess.DEVNULL, 
-                         timeout=1)
-            self.instance = vlc.Instance('--aout=pulse')
-            print("Audio: PulseAudio selected")
-        except Exception:
-            print("Audio: Fallback to default")
+        # Try audio outputs in order of preference
+        self.instance = None
+
+        # Try PulseAudio first
+        if self._check_pulseaudio():
+            try:
+                self.instance = vlc.Instance('--aout=pulse')
+                print("Audio: PulseAudio selected")
+            except Exception:
+                pass
+
+        # Try ALSA if PulseAudio failed
+        if self.instance is None:
+            try:
+                self.instance = vlc.Instance('--aout=alsa')
+                print("Audio: ALSA selected")
+            except Exception:
+                pass
+
+        # Fall back to default
+        if self.instance is None:
             self.instance = vlc.Instance()
-             
+            print("Audio: Default output selected")
+
         self.player = self.instance.media_player_new()
         self.current_media_path = None
+
+    def _check_pulseaudio(self):
+        """Check if PulseAudio is available and running."""
+        try:
+            result = subprocess.run(
+                ["pactl", "info"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=1
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
 
     def play(self, path):
         self.current_media_path = path

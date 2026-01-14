@@ -276,8 +276,8 @@ class Launcher:
 
     def _is_audio_device_connected(self):
         """Check if an external audio device (headphones, bluetooth) is connected."""
+        # Try PulseAudio first
         try:
-            # Check PulseAudio for active sinks that aren't the default/internal
             result = subprocess.check_output(
                 ["pactl", "get-default-sink"],
                 text=True, stderr=subprocess.DEVNULL, timeout=1
@@ -291,6 +291,16 @@ class Launcher:
                 text=True, stderr=subprocess.DEVNULL, timeout=1
             )
             if 'bluez' in bt_result.lower():
+                return True
+        except Exception:
+            pass
+        # Fallback: check if any bluetooth audio device is connected via bluetoothctl
+        try:
+            result = subprocess.check_output(
+                ["bluetoothctl", "info"],
+                text=True, stderr=subprocess.DEVNULL, timeout=1
+            )
+            if 'Connected: yes' in result and ('audio' in result.lower() or 'headset' in result.lower()):
                 return True
         except Exception:
             pass

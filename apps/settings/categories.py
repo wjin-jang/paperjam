@@ -46,13 +46,38 @@ class AudioCategory(SettingsCategory):
         self.volume_level = 50
         self._audio_sinks = []
         self._current_sink_index = 0
+        self._mixer_control = self._find_mixer_control()
         self._init_volume()
         self._refresh_audio_sinks()
 
+    def _find_mixer_control(self) -> str:
+        """Find an available mixer control name."""
+        # Common control names in order of preference
+        controls = ['Master', 'PCM', 'Speaker', 'Headphone', 'Digital']
+        try:
+            # Get list of available controls
+            result = subprocess.check_output(
+                ["amixer", "scontrols"],
+                text=True, stderr=subprocess.DEVNULL, timeout=2
+            )
+            for ctrl in controls:
+                if f"'{ctrl}'" in result:
+                    return ctrl
+            # If none found, try to extract first available
+            if "Simple mixer control" in result:
+                # Extract name between quotes
+                import re
+                match = re.search(r"'([^']+)'", result)
+                if match:
+                    return match.group(1)
+        except Exception:
+            pass
+        return 'Master'  # Default fallback
+
     def _init_volume(self):
         try:
-            cmd = "amixer get Master | grep -o '[0-9]*%' | head -1"
-            res = subprocess.check_output(cmd, shell=True, text=True).strip().replace('%', '')
+            cmd = f"amixer get '{self._mixer_control}' | grep -o '[0-9]*%' | head -1"
+            res = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL).strip().replace('%', '')
             self.volume_level = int(res)
         except:
             self.volume_level = 50
@@ -98,7 +123,9 @@ class AudioCategory(SettingsCategory):
                     self._current_sink_index = i
                     break
         except Exception:
-            pass
+            # PulseAudio not available, add a default entry
+            self._audio_sinks = [{'id': '0', 'name': 'default', 'display': 'Default'}]
+            self._current_sink_index = 0
 
     def _get_current_output_name(self) -> str:
         """Get the display name of the current audio output."""
@@ -109,33 +136,37 @@ class AudioCategory(SettingsCategory):
     def _cycle_audio_output(self) -> str:
         """Cycle to the next audio output device."""
         self._refresh_audio_sinks()
-        if not self._audio_sinks:
-            return "No Devices"
+        if not self._audio_sinks or len(self._audio_sinks) <= 1:
+            return self._audio_sinks[0]['display'] if self._audio_sinks else "Default"
 
         # Cycle to next sink
         self._current_sink_index = (self._current_sink_index + 1) % len(self._audio_sinks)
         sink = self._audio_sinks[self._current_sink_index]
 
-        # Set as default sink
-        try:
-            subprocess.run(
-                ["pactl", "set-default-sink", sink['name']],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
-            )
-            # Move currently playing streams to new sink
-            subprocess.run(
-                f"pactl list short sink-inputs | cut -f1 | xargs -I{{}} pactl move-sink-input {{}} {sink['name']}",
-                shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
-            )
-        except Exception:
-            pass
+        # Set as default sink (only if PulseAudio is available)
+        if sink['name'] != 'default':
+            try:
+                subprocess.run(
+                    ["pactl", "set-default-sink", sink['name']],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
+                )
+                # Move currently playing streams to new sink
+                subprocess.run(
+                    f"pactl list short sink-inputs | cut -f1 | xargs -I{{}} pactl move-sink-input {{}} {sink['name']}",
+                    shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
+                )
+            except Exception:
+                pass
 
         return sink['display']
 
     def set_volume(self, change: int):
         self.volume_level = max(0, min(100, self.volume_level + change))
         try:
-            subprocess.run(["amixer", "set", "Master", f"{self.volume_level}%"], stdout=subprocess.DEVNULL)
+            subprocess.run(
+                ["amixer", "set", self._mixer_control, f"{self.volume_level}%"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
         except:
             pass
 
