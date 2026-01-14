@@ -6,6 +6,8 @@ __pycache__/
 # C extensions
 *.so
 
+# Deploy script
+deploy.bat
 # Distribution / packaging
 .Python
 build/
