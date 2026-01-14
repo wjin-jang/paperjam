@@ -2,14 +2,44 @@
 
 Complete installation guide for Raspberry Pi Zero 2 W running Debian Trixie (or Bookworm).
 
-## 1. System Setup
+## Quick Install (Recommended)
 
-### Update System
+For a fresh Raspberry Pi, use the automated install script:
+
+```bash
+# Download and run the install script
+curl -fsSL https://raw.githubusercontent.com/wjin-jang/paperjam/main/install.sh | bash
+```
+
+Or if you prefer to review the script first:
+
+```bash
+# Download the script
+curl -fsSL https://raw.githubusercontent.com/wjin-jang/paperjam/main/install.sh -o install.sh
+
+# Review it
+nano install.sh
+
+# Make executable and run
+chmod +x install.sh && ./install.sh
+```
+
+The script handles all system packages, permissions, Python environment, and service setup automatically. A reboot is required after installation.
+
+---
+
+## Manual Installation
+
+Follow the steps below if you prefer manual installation or need to troubleshoot.
+
+### 1. System Setup
+
+#### Update System
 ```bash
 sudo apt update && sudo apt upgrade -y
 ```
 
-### Install System Dependencies
+#### Install System Dependencies
 ```bash
 sudo apt install -y \
     python3-pip \
@@ -26,7 +56,7 @@ sudo apt install -y \
     alsa-utils
 ```
 
-### PulseAudio Setup
+#### PulseAudio Setup
 
 PulseAudio is required for audio output switching and Bluetooth audio support.
 
@@ -59,9 +89,9 @@ For auto-start on login (if not using systemd user service):
 echo "pulseaudio --start" >> ~/.bashrc
 ```
 
-## 2. Enable Interfaces
+### 2. Enable Interfaces
 
-### Run raspi-config
+##### Run raspi-config
 ```bash
 sudo raspi-config
 ```
@@ -70,7 +100,7 @@ Enable the following under **Interface Options**:
 - **I2C** - For battery monitoring (SugarPi 3)
 - **SPI** - For e-Paper display
 
-### Enable and Unblock Bluetooth
+#### Enable and Unblock Bluetooth
 ```bash
 # Enable bluetooth service
 sudo systemctl enable bluetooth
@@ -83,12 +113,12 @@ sudo rfkill unblock bluetooth
 rfkill list
 ```
 
-### Reboot
+#### Reboot
 ```bash
 sudo reboot
 ```
 
-## 3. User Permissions
+### 3. User Permissions
 
 Add your user to required groups for hardware access:
 
@@ -114,32 +144,32 @@ Log out and back in (or reboot) for group changes to take effect:
 sudo reboot
 ```
 
-## 4. Verify Hardware
+### 4. Verify Hardware
 
-### Check I2C
+#### Check I2C
 ```bash
 sudo i2cdetect -y 1
 ```
 You should see `75` or similar where the SugarPi 3 is detected.
 
-### Check Bluetooth
+#### Check Bluetooth
 ```bash
 bluetoothctl
 # Type 'show' to see adapter info
 # Type 'exit' to quit
 ```
 
-### Check SPI
+#### Check SPI
 ```bash
 ls /dev/spidev*
 ```
 Should show `/dev/spidev0.0` and `/dev/spidev0.1`.
 
-## 5. Python Virtual Environment
+### 5. Python Virtual Environment
 
 Debian Trixie requires virtual environments for pip packages.
 
-### Create Virtual Environment
+#### Create Virtual Environment
 ```bash
 cd ~
 git clone https://github.com/wjin-jang/paperjam.git
@@ -149,7 +179,7 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
-### Install Python Dependencies
+#### Install Python Dependencies
 ```bash
 pip install --upgrade pip
 pip install pillow mutagen python-vlc smbus2 evdev numpy
@@ -163,7 +193,7 @@ Dependencies overview:
 - **evdev** - Linux input device handling (keyboard, remote, buttons)
 - **numpy** - Numerical operations for image dithering
 
-### Install Waveshare e-Paper Driver
+#### Install Waveshare e-Paper Driver
 ```bash
 pip install waveshare-epd
 ```
@@ -174,7 +204,7 @@ git clone https://github.com/waveshare/e-Paper.git
 pip install e-Paper/RaspberryPi_JetsonNano/python/
 ```
 
-## 6. Configure Music Directory
+### 6. Configure Music Directory
 
 Edit `config.py` and set your music path:
 ```python
@@ -186,22 +216,22 @@ Or create a symlink:
 ln -s /path/to/your/music ~/paperjam/music
 ```
 
-## 7. Running PaperJam
+### 7. Running PaperJam
 
-### Activate Virtual Environment
+#### Activate Virtual Environment
 ```bash
 cd ~/paperjam
 source venv/bin/activate
 ```
 
-### Run
+#### Run
 ```bash
 python main.py
 ```
 
-## 8. Auto-Start on Boot (Optional)
+### 8. Auto-Start on Boot (Optional)
 
-### Option A: User Service (Recommended for PulseAudio)
+#### Option A: User Service (Recommended for PulseAudio)
 
 PulseAudio runs as a user service, so paperjam should also run as a user service to access audio:
 
@@ -237,7 +267,7 @@ systemctl --user start paperjam
 sudo loginctl enable-linger yourusername
 ```
 
-### Option B: System Service (Uses ALSA fallback)
+#### Option B: System Service (Uses ALSA fallback)
 
 If PulseAudio isn't required, you can run as a system service. Audio will fall back to ALSA:
 
@@ -263,26 +293,26 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-### Enable Service
+#### Enable Service
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable paperjam
 sudo systemctl start paperjam
 ```
 
-### Check Status
+#### Check Status
 ```bash
 sudo systemctl status paperjam
 ```
 
-### View Logs
+#### View Logs
 ```bash
 journalctl -u paperjam -f
 ```
 
-## Troubleshooting
+### Troubleshooting
 
-### I2C Not Working
+#### I2C Not Working
 ```bash
 # Check if I2C is enabled
 ls /dev/i2c*
@@ -291,7 +321,7 @@ ls /dev/i2c*
 sudo raspi-config
 ```
 
-### Bluetooth Not Finding Devices
+#### Bluetooth Not Finding Devices
 ```bash
 # Check bluetooth status
 systemctl status bluetooth
@@ -304,7 +334,7 @@ rfkill list
 sudo rfkill unblock bluetooth
 ```
 
-### Permission Denied Errors
+#### Permission Denied Errors
 ```bash
 # Re-add to groups
 sudo usermod -aG i2c,gpio,spi,bluetooth,audio $USER
