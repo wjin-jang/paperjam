@@ -72,10 +72,6 @@ sudo usermod -aG bluetooth $USER
 # Audio access
 sudo usermod -aG audio $USER
 ```
-or
-```bash
-sudo usermod -aG i2c, gpio, spi, bluetooth, audio $USER
-```
 
 Log out and back in (or reboot) for group changes to take effect:
 ```bash
