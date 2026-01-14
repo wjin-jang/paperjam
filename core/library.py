@@ -1,0 +1,243 @@
+import json
+import threading
+import random
+import os
+from pathlib import Path
+from dataclasses import dataclass
+import config as cfg
+# Updated import
+from core.metadata import get_metadata, get_cover
+
+@dataclass
+class TrackItem:
+    path: Path
+    title: str
+    album: str
+    artist: str
+    year: str
+    track_num: int
+    disc_num: int
+
+class LibraryManager:
+    def __init__(self):
+        self.artists = {}
+        self.albums = {}
+        self.recents = []
+        self.fav_tracks = set()
+        self.fav_albums = set()
+        
+        self.is_scanning = False
+        self._lock = threading.Lock()
+        
+        cfg.DATA_DIR.mkdir(exist_ok=True)
+        cfg.PLAYLIST_DIR.mkdir(parents=True, exist_ok=True)
+        
+        self.load_recents()
+        self.load_favs()
+        self.load_cache()
+
+    def load_cache(self):
+        if cfg.CACHE_FILE.exists():
+            try:
+                with open(cfg.CACHE_FILE, 'r') as f:
+                    data = json.load(f)
+                    self._deserialize_library(data)
+            except: self.scan_async(force=True)
+        else:
+            self.scan_async(force=True)
+
+    def scan_async(self, force=False):
+        if self.is_scanning: return
+        self.is_scanning = True
+        t = threading.Thread(target=self._scan_worker)
+        t.daemon = True
+        t.start()
+
+    def _scan_worker(self):
+        temp_artists = {}
+        temp_albums = {}
+        
+        artist_case_map = {} 
+        album_case_map = {}
+
+        for ext in cfg.VALID_EXTS:
+            for p in cfg.MUSIC_PATH.rglob(f"*{ext}"):
+                try:
+                    # STRICTLY TEXT ONLY SCAN
+                    meta = get_metadata(p)
+                    # meta structure: (album, artist, title, track, disc, year)
+                    
+                    # 1. Normalize Artist
+                    raw_artist = meta[1] or "Unknown Artist"
+                    art_key = raw_artist.strip().lower()
+                    
+                    if art_key not in artist_case_map:
+                        artist_case_map[art_key] = raw_artist
+                    canonical_artist = artist_case_map[art_key]
+
+                    # 2. Normalize Album
+                    raw_album = meta[0] or "Unknown Album"
+                    alb_key = raw_album.strip().lower()
+                    
+                    if alb_key not in album_case_map:
+                        album_case_map[alb_key] = raw_album
+                    canonical_album = album_case_map[alb_key]
+
+                    data = {
+                        'path': str(p), 
+                        'album': canonical_album, 
+                        'artist': canonical_artist, 
+                        'title': meta[2], 
+                        'track': meta[3], 
+                        'disc': meta[4], 
+                        'year': meta[5]
+                    }
+                    
+                    temp_artists.setdefault(canonical_artist, []).append(data)
+                    temp_albums.setdefault(canonical_album, []).append(data)
+                except: continue
+        
+        with self._lock:
+            self.artists = dict(sorted(temp_artists.items(), key=lambda x: x[0].lower()))
+            self.albums = dict(sorted(temp_albums.items(), key=lambda x: x[0].lower()))
+            self._save_cache()
+            
+        self.is_scanning = False
+
+    def _save_cache(self):
+        try:
+            with open(cfg.CACHE_FILE, 'w') as f:
+                json.dump({'artists': self.artists, 'albums': self.albums}, f)
+        except Exception as e: print(f"Cache Save Error: {e}")
+
+    def _deserialize_library(self, data):
+        self.artists = data.get('artists', {})
+        self.albums = data.get('albums', {})
+
+    def get_playlists(self):
+        return sorted(list(cfg.PLAYLIST_DIR.glob("*.json")))
+
+    def create_playlist(self):
+        i = 1
+        while True:
+            name = f"Playlist {i}"
+            p = cfg.PLAYLIST_DIR / f"{name}.json"
+            if not p.exists():
+                with open(p, 'w') as f: json.dump([], f)
+                return p
+            i += 1
+
+    def delete_playlist(self, path):
+        try:
+            if path.exists(): os.remove(path)
+        except: pass
+
+    def add_to_playlist(self, playlist_path, track_path):
+        try:
+            content = []
+            if playlist_path.exists():
+                with open(playlist_path, 'r') as f: content = json.load(f)
+            str_path = str(track_path)
+            if str_path not in content:
+                content.append(str_path)
+                with open(playlist_path, 'w') as f: json.dump(content, f)
+        except: pass
+
+    def get_playlist_tracks(self, playlist_path):
+        tracks = []
+        if playlist_path.exists():
+            try:
+                with open(playlist_path, 'r') as f:
+                    paths = json.load(f)
+                    for p_str in paths:
+                        p = Path(p_str)
+                        if p.exists():
+                            # Uses fast text extraction
+                            meta = get_metadata(p)
+                            tracks.append({
+                                'path': p, 'album': meta[0], 'artist': meta[1], 
+                                'title': meta[2], 'year': meta[5]
+                            })
+            except: pass
+        return tracks
+
+    def get_artist_tracks(self, artist):
+        tracks = self.artists.get(artist, [])
+        tracks.sort(key=lambda x: (x.get('album','').lower(), x.get('disc',0), x.get('track',0)))
+        return tracks
+
+    def get_album_tracks(self, album):
+        tracks = self.albums.get(album, [])
+        tracks.sort(key=lambda x: (x.get('disc',0), x.get('track',0)))
+        return tracks
+
+    def get_random_cover(self):
+        """Used for screensaver/shutdown. Calls the heavy get_cover explicitly."""
+        try:
+            if not self.albums: return None
+            alb = random.choice(list(self.albums.keys()))
+            tracks = self.albums[alb]
+            if tracks:
+                # Only gets the large cover
+                covers = get_cover(Path(tracks[0]['path']))
+                return covers[1] # Return Large
+        except: return None
+
+    def load_recents(self):
+        if cfg.RECENTS_FILE.exists():
+            try:
+                with open(cfg.RECENTS_FILE, 'r') as f:
+                    self.recents = [Path(p) for p in json.load(f) if Path(p).exists()]
+            except: self.recents = []
+
+    def add_recent(self, path):
+        if path in self.recents: self.recents.remove(path)
+        self.recents.insert(0, path)
+        if len(self.recents) > cfg.RECENTS_LIMIT: self.recents.pop()
+        with open(cfg.RECENTS_FILE, 'w') as f: json.dump([str(p) for p in self.recents], f)
+
+    def load_favs(self):
+        if cfg.FAVS_FILE.exists():
+            try:
+                with open(cfg.FAVS_FILE, 'r') as f:
+                    d = json.load(f)
+                    if isinstance(d, list):
+                        self.fav_tracks = set(d)
+                        self.fav_albums = set()
+                    else:
+                        self.fav_tracks = set(d.get('tracks', []))
+                        self.fav_albums = set(d.get('albums', []))
+            except: pass
+
+    def toggle_fav_track(self, path_str):
+        if path_str in self.fav_tracks: self.fav_tracks.remove(path_str)
+        else: self.fav_tracks.add(path_str)
+        self._save_favs()
+
+    def toggle_fav_album(self, album_name):
+        if album_name in self.fav_albums: self.fav_albums.remove(album_name)
+        else: self.fav_albums.add(album_name)
+        self._save_favs()
+
+    def _save_favs(self):
+        with open(cfg.FAVS_FILE, 'w') as f:
+            json.dump({"tracks": list(self.fav_tracks), "albums": list(self.fav_albums)}, f)
+
+    def get_fav_tracks_list(self):
+        tracks = []
+        for p_str in self.fav_tracks:
+            p = Path(p_str)
+            if p.exists():
+                meta = get_metadata(p)
+                tracks.append({
+                    'path': p, 'album': meta[0], 'artist': meta[1], 
+                    'title': meta[2], 'year': meta[5]
+                })
+        tracks.sort(key=lambda x: (x['artist'].lower(), x['title'].lower()))
+        return tracks
+
+    def get_total_tracks(self):
+        count = 0
+        for tracks in self.artists.values():
+            count += len(tracks)
+        return count

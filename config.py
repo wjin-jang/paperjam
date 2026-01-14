@@ -1,0 +1,55 @@
+import os
+from pathlib import Path
+from PIL import ImageFont
+
+# --- Display ---
+SCREEN_WIDTH = 250
+SCREEN_HEIGHT = 122
+PANEL_X = 100
+PANEL_Y = 8
+PANEL_W = 140
+PANEL_H = 104
+ROW_HEIGHT = 12
+
+# --- Colors ---
+WHITE = 255
+BLACK = 0
+
+# --- Behavior ---
+SCREENSAVER_TIMEOUT = 60 
+SCREENSAVER_OPTIONS = [30, 60, 300, 1800, 0] 
+
+LONG_PRESS_DURATION = 0.5
+LONG_PRESS_OPTIONS = [0.3, 0.5, 0.8, 1.0, 1.5, 2.0]
+
+RECENTS_LIMIT = 50
+RECENTS_LIMIT_OPTIONS = [10, 30, 50, 100]
+
+# --- Paths ---
+MUSIC_PATH = Path("/home/woojin/music_player/music")
+if not MUSIC_PATH.exists():
+    MUSIC_PATH = Path.cwd()
+
+DATA_DIR = Path("data")
+DATA_DIR.mkdir(exist_ok=True)
+
+CACHE_FILE = DATA_DIR / "library_cache.json"
+RECENTS_FILE = DATA_DIR / "recents.json"
+FAVS_FILE = DATA_DIR / "favorites.json"
+PLAYLIST_DIR = DATA_DIR / "playlists"
+PLAYLIST_DIR.mkdir(exist_ok=True)
+
+VALID_EXTS = {'.mp3', '.flac', '.wav', '.m4a'}
+
+# --- Fonts ---
+def load_fonts():
+    base_path = Path(__file__).parent / "assets"
+    try:
+        main = ImageFont.truetype(str(base_path / "BMmini.ttf"), 9) if (base_path / "BMmini.ttf").exists() else ImageFont.load_default()
+        header = ImageFont.truetype(str(base_path / "Nintendo-DS-BIOS.ttf"), 16) if (base_path / "Nintendo-DS-BIOS.ttf").exists() else ImageFont.load_default()
+        return main, header
+    except:
+        return ImageFont.load_default(), ImageFont.load_default()
+
+FONT_MAIN, FONT_HEADER = load_fonts()
+NEEDS_RESCAN = False
