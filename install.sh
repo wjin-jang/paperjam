@@ -29,7 +29,7 @@ echo "Install directory: $INSTALL_DIR"
 echo
 
 # --- System Packages ---
-echo "[1/6] Installing system packages..."
+echo "[1/8] Installing system packages..."
 sudo apt update
 sudo apt install -y \
     python3-pip \
@@ -47,7 +47,7 @@ sudo apt install -y \
 
 # --- Enable Interfaces ---
 echo
-echo "[2/6] Enabling I2C and SPI..."
+echo "[2/8] Enabling I2C and SPI..."
 
 # Enable I2C
 if ! grep -q "^dtparam=i2c_arm=on" /boot/config.txt 2>/dev/null && \
@@ -77,45 +77,59 @@ fi
 
 # --- User Permissions ---
 echo
-echo "[3/6] Setting up user permissions..."
+echo "[3/8] Setting up user permissions..."
 sudo usermod -aG i2c,gpio,spi,bluetooth,audio $USER_NAME 2>/dev/null || true
 echo "  Added $USER_NAME to hardware groups"
 
 # --- Bluetooth ---
 echo
-echo "[4/6] Configuring Bluetooth..."
+echo "[4/8] Configuring Bluetooth..."
 sudo systemctl enable bluetooth 2>/dev/null || true
 sudo systemctl start bluetooth 2>/dev/null || true
 sudo rfkill unblock bluetooth 2>/dev/null || true
 echo "  Bluetooth enabled"
 
 # --- Clone Repository ---
-# The assumption is that this script is being run from within the paperjam
-# repository. If that's not the case, the user should clone it first.
-# This section has been removed:
-# echo
-# echo "[5/8] Cloning PaperJam repository..."
-# if [ -d "$INSTALL_DIR" ]; then
-#     echo "  Directory exists, pulling latest..."
-#     cd "$INSTALL_DIR"
-#     git pull origin main || true
-# else
-#     git clone https://github.com/wjin-jang/paperjam.git "$INSTALL_DIR"
-#     cd "$INSTALL_DIR"
-# fi
+echo
+echo "[5/8] Cloning PaperJam repository..."
+if [ -d "$INSTALL_DIR" ]; then
+    echo "  Directory exists, pulling latest..."
+    cd "$INSTALL_DIR"
+    git pull origin main || true
+else
+    git clone https://github.com/wjin-jang/paperjam.git "$INSTALL_DIR"
+    cd "$INSTALL_DIR"
+fi
 
 # --- Python Virtual Environment ---
 echo
-echo "[5/6] Setting up Python environment..."
+echo "[6/8] Setting up Python environment..."
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
-pip install pillow mutagen python-vlc smbus2 evdev numpy waveshare-epaper
+pip install pillow mutagen python-vlc smbus2 evdev numpy
 echo "  Python dependencies installed"
+
+# --- Waveshare EPD library ---
+echo
+echo "[7/8] Installing Waveshare EPD library..."
+if [ -d "lib/waveshare" ]; then
+    echo "  Directory exists, pulling latest..."
+    cd "lib/waveshare"
+    git pull origin master || true
+    cd "$INSTALL_DIR"
+else
+    mkdir -p lib
+    git clone https://github.com/waveshare/e-Paper.git "lib/waveshare"
+fi
+# A little cursed, but the waveshare library has some weird pathing issues
+# that are easiest to solve by installing it this way.
+# See: https://github.com/waveshare/e-Paper/issues/322
+(cd lib/waveshare/RaspberryPi_JetsonNano/python && pip install .)
 
 # --- Systemd Service ---
 echo
-echo "[6/6] Setting up auto-start service..."
+echo "[8/8] Setting up auto-start service..."
 
 mkdir -p "$HOME_DIR/.config/systemd/user"
 
