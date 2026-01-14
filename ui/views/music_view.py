@@ -29,8 +29,11 @@ class MusicViewRenderer(RenderBase):
                 is_active = True
             if key == 'loop' and state.loop_mode > 0:
                 is_active = True
-            if key == 'fav' and state.album in state.fav_albums:
-                is_active = True
+            if key == 'fav':
+                if state.browse_mode == 'ARTIST_VIEW' and state.fav_artists and state.album in state.fav_artists:
+                    is_active = True
+                elif state.fav_albums and state.album in state.fav_albums:
+                    is_active = True
 
             is_focused = (state.selection_index == state.view_start_index) and (state.top_bar_index == b_i)
 
@@ -150,16 +153,51 @@ class MusicViewRenderer(RenderBase):
             abs_idx = state.view_start_index + i
             is_selected = (abs_idx == state.selection_index)
 
-            if item.get('type') == 'header':
+            itype = item.get('type')
+
+            if itype == 'header':
                 self.render_header_icons(y_pos, state)
                 continue
 
-            # Determine icon
+            # Info items - non-selectable, can have columns
+            if itype == 'info':
+                columns = item.get('columns', [])
+                if columns:
+                    # Render columns evenly distributed
+                    col_w = item_w // len(columns)
+                    for col_i, col_text in enumerate(columns):
+                        col_x = cfg.PANEL_X + 12 + (col_i * col_w)
+                        self.draw_text_box(sanitize_text(str(col_text)), col_x, y_pos, col_w, draw_h)
+                else:
+                    # Single text info item
+                    name_str = sanitize_text(item.get('name', ''))
+                    self.draw_text_box(name_str, cfg.PANEL_X, y_pos, item_w + 12, draw_h)
+                continue
+
+            # Heading items - uppercase, white on black, inner box when selected
+            if itype == 'heading':
+                name_str = sanitize_text(item.get('name', '')).upper()
+                # Draw black background
+                self.draw.rectangle(
+                    (cfg.PANEL_X, y_pos, cfg.PANEL_X + item_w + 12, y_pos + draw_h - 1),
+                    fill=cfg.BLACK
+                )
+                # Draw white text
+                self.draw_text_box(name_str, cfg.PANEL_X, y_pos, item_w + 12, draw_h,
+                                   invert=True, center=False, font=cfg.FONT_MAIN)
+                # Draw inner box when selected
+                if is_selected:
+                    self.draw.rectangle(
+                        (cfg.PANEL_X + 2, y_pos + 2, cfg.PANEL_X + item_w + 10, y_pos + draw_h - 2),
+                        outline=cfg.WHITE
+                    )
+                continue
+
+            # Determine icon for other item types
             icons = cfg.MENU_ICONS
-            if 'icon' in item and item.get('type') != 'file':
+            if 'icon' in item and itype != 'file':
                 icon_str = item['icon']
             else:
-                itype = item.get('type')
                 if itype == 'dir':
                     icon_str = icons.get('dir', 'Ⓕ')
                 elif itype == 'artist':
@@ -174,7 +212,7 @@ class MusicViewRenderer(RenderBase):
                         icon_str = icons.get('fav', 'Ⓗ')
                 elif itype == 'file':
                     if 'icon' in item and item['icon'] == 'P':
-                        icon_str = icons.get('file_playing', 'Ⓟ')
+                        icon_str = icons.get('playing', 'Ⓟ')
                     else:
                         icon_str = f"{abs_idx}."
                 else:

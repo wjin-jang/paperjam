@@ -48,13 +48,13 @@ class ScreensaverRenderer(RenderBase):
             self.canvas.paste(image, (x, y))
 
         # Draw '0' battery icon in top right corner
-        if cfg.FONT_BATTERY:
+        if cfg.FONT_ICONS:
             icon = "0"
-            bbox = self.draw.textbbox((0, 0), icon, font=cfg.FONT_BATTERY)
+            bbox = self.draw.textbbox((0, 0), icon, font=cfg.FONT_ICONS)
             text_w = bbox[2] - bbox[0]
             bx = cfg.SCREEN_WIDTH - text_w - 8
             by = 0
-            self.draw.text((bx, by), icon, font=cfg.FONT_BATTERY, fill=cfg.BLACK)
+            self.draw.text((bx, by), icon, font=cfg.FONT_ICONS, fill=cfg.BLACK)
 
         # Draw "power off" text
         text = "power off"

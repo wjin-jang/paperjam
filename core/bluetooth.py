@@ -17,10 +17,16 @@ class BluetoothManager:
             "RSSI", "TxPower", "ManufacturerData", "ServiceData", "AdvertisingData",
             "AddressType", "Class", "Icon", "UUID", "Modalias", "Appearance",
             "Connected", "Bonded", "Paired", "LegacyPairing", "Trusted", "Blocked",
-            "Controller", "[CHG]", "[NEW]", "[DEL]", "Transport", "Simulated", 
+            "Controller", "[CHG]", "[NEW]", "[DEL]", "Transport", "Simulated",
             "Type", "Alias", "Discoverable", "Pairable", "Power", "Advertisingflags",
-            "light"
+            "light", "Agent", "registered", "Default", "agent", "RequestConfirmation",
+            "Authorize", "Passkey", "PIN", "org.bluez", "SetDiscoveryFilter",
+            "Discovery", "started", "stopped", "Attempting", "Request", "successful",
+            "failed", "error", "yes", "no"
         ]
+
+        # Regex pattern for valid MAC address
+        self.mac_pattern = re.compile(r'^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$')
 
     def _run_cmd(self, cmd):
         try:
@@ -31,6 +37,25 @@ class BluetoothManager:
     def _clean_ansi(self, text):
         ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
         return ansi_escape.sub('', text)
+
+    def _is_valid_mac(self, mac):
+        """Check if string is a valid MAC address."""
+        return bool(self.mac_pattern.match(mac))
+
+    def _is_valid_device_name(self, name):
+        """Check if a name is a valid device name (not a bluetoothctl message)."""
+        if not name or len(name) < 2:
+            return False
+        # Filter keywords
+        if any(x.lower() in name.lower() for x in self.ignore_keywords):
+            return False
+        # Filter names that look like status messages
+        if name.startswith('[') or name.endswith(']'):
+            return False
+        if ':' in name and len(name.split(':')) > 2:
+            # Might be a MAC address or path, not a name
+            return False
+        return True
 
     def is_connected(self, mac):
         """Checks if a specific device is currently connected."""
@@ -67,12 +92,24 @@ class BluetoothManager:
             output = self._run_cmd(['bluetoothctl', 'devices', 'Paired'])
             devices = []
             for line in output.split('\n'):
-                if not line: continue
+                if not line:
+                    continue
                 parts = line.split(' ', 2)
                 if len(parts) >= 3:
-                    devices.append({'mac': parts[1], 'name': parts[2], 'paired': True})
+                    mac = parts[1]
+                    name = parts[2]
+                    # Validate MAC address and device name
+                    if not self._is_valid_mac(mac):
+                        continue
+                    if not self._is_valid_device_name(name):
+                        # If name looks invalid, try to use a cleaned version
+                        name = name.strip()
+                        if not name:
+                            continue
+                    devices.append({'mac': mac, 'name': name, 'paired': True})
             return devices
-        except: return []
+        except:
+            return []
 
     def start_scan(self, callback):
         if self.is_scanning: return
@@ -106,12 +143,17 @@ class BluetoothManager:
                         try:
                             mac_idx = parts.index("Device") + 1
                             mac = parts[mac_idx]
+
+                            # Validate MAC address format
+                            if not self._is_valid_mac(mac):
+                                continue
+
                             # Grab name (everything after MAC)
                             name = " ".join(parts[mac_idx+1:])
-                            
-                            # Filter junk
-                            if not name or any(x in name for x in self.ignore_keywords): continue
-                            if len(name) < 2: continue
+
+                            # Filter junk names
+                            if not self._is_valid_device_name(name):
+                                continue
 
                             # Filter for audio devices only
                             if not self._is_audio_device(mac):

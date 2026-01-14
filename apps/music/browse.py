@@ -39,8 +39,19 @@ class BrowseHandler:
         ]
 
     def get_artists_list(self) -> Tuple[str, List[dict]]:
-        """Get list of all artists."""
-        items = [{'name': k, 'type': 'artist', 'mode': 'ARTIST_VIEW'} for k in self.lib.artists.keys()]
+        """Get list of all artists, organized alphabetically with headings."""
+        items = []
+        current_letter = None
+        for k in self.lib.artists.keys():
+            # Get first letter (uppercase)
+            first_char = k[0].upper() if k else '#'
+            if not first_char.isalpha():
+                first_char = '#'
+            # Add heading when letter changes
+            if first_char != current_letter:
+                current_letter = first_char
+                items.append({'name': first_char, 'type': 'heading'})
+            items.append({'name': k, 'type': 'artist', 'mode': 'ARTIST_VIEW'})
         return "ARTISTS", items
 
     def get_albums_list(self) -> Tuple[str, List[dict]]:
@@ -154,15 +165,31 @@ class BrowseHandler:
         return playlist_path.stem, tracks, track_count, duration, cover
 
     def get_artist_tracks(self, artist: str) -> Tuple[str, List[dict], str, str, Optional[object]]:
-        """Get tracks by an artist."""
+        """Get tracks by an artist, organized by album with headings."""
         tracks = self.lib.get_artist_tracks(artist)
         cover = None
         if tracks:
             covers = get_cover(Path(tracks[0]['path']))
             cover = covers[0] if covers else None
 
-        track_count = f"{len(tracks)} tracks"
-        duration = format_duration(LibraryManager.get_total_duration(tracks))
+            # Group tracks by album and insert headings
+            tracks_with_headings = []
+            current_album = None
+            for t in tracks:
+                album = t.get('album', 'Unknown')
+                if album != current_album:
+                    current_album = album
+                    tracks_with_headings.append({
+                        'type': 'heading',
+                        'name': album
+                    })
+                tracks_with_headings.append(t)
+            tracks = tracks_with_headings
+
+        # Count only actual tracks (not headings)
+        actual_tracks = [t for t in tracks if t.get('type') != 'heading']
+        track_count = f"{len(actual_tracks)} tracks"
+        duration = format_duration(LibraryManager.get_total_duration(actual_tracks))
         return str(artist), tracks, track_count, duration, cover
 
     def get_album_tracks(self, album: str) -> Tuple[str, List[dict], str, str, Optional[object]]:
@@ -176,6 +203,23 @@ class BrowseHandler:
             cover = covers[0] if covers else None
             artist = tracks[0].get('artist', '')
             year = str(tracks[0].get('year', ''))
+
+            # Check if album has multiple discs
+            discs = set(t.get('disc', 1) for t in tracks)
+            if len(discs) > 1:
+                # Insert disc headings
+                tracks_with_headings = []
+                current_disc = None
+                for t in tracks:
+                    disc = t.get('disc', 1)
+                    if disc != current_disc:
+                        current_disc = disc
+                        tracks_with_headings.append({
+                            'type': 'heading',
+                            'name': f'Disc {disc}'
+                        })
+                    tracks_with_headings.append(t)
+                tracks = tracks_with_headings
 
         return str(album), tracks, artist, year, cover
 

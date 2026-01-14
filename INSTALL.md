@@ -20,7 +20,43 @@ sudo apt install -y \
     zlib1g-dev \
     libfreetype6-dev \
     vlc \
-    git
+    git \
+    pulseaudio \
+    pulseaudio-module-bluetooth \
+    alsa-utils
+```
+
+### PulseAudio Setup
+
+PulseAudio is required for audio output switching and Bluetooth audio support.
+
+```bash
+# Enable and start PulseAudio as user service
+systemctl --user enable pulseaudio
+systemctl --user start pulseaudio
+
+# Verify PulseAudio is running
+pactl info
+```
+
+For Bluetooth audio support, ensure the bluetooth module is loaded:
+```bash
+# Check if bluetooth module is loaded
+pactl list modules | grep bluetooth
+
+# If not present, add to PulseAudio config
+echo "load-module module-bluetooth-discover" >> ~/.config/pulse/default.pa
+echo "load-module module-bluetooth-policy" >> ~/.config/pulse/default.pa
+
+# Restart PulseAudio
+pulseaudio -k
+pulseaudio --start
+```
+
+For auto-start on login (if not using systemd user service):
+```bash
+# Add to ~/.bashrc or ~/.profile
+echo "pulseaudio --start" >> ~/.bashrc
 ```
 
 ## 2. Enable Interfaces
@@ -106,7 +142,7 @@ Debian Trixie requires virtual environments for pip packages.
 ### Create Virtual Environment
 ```bash
 cd ~
-git clone https://github.com/yourusername/paperjam.git
+git clone https://github.com/wjin-jang/paperjam.git
 cd paperjam
 
 python3 -m venv venv
@@ -116,8 +152,16 @@ source venv/bin/activate
 ### Install Python Dependencies
 ```bash
 pip install --upgrade pip
-pip install pillow mutagen python-vlc smbus2
+pip install pillow mutagen python-vlc smbus2 evdev numpy
 ```
+
+Dependencies overview:
+- **pillow** - Image processing for album art and display rendering
+- **mutagen** - Audio file metadata extraction (MP3, FLAC, etc.)
+- **python-vlc** - VLC media player bindings for audio playback
+- **smbus2** - I2C communication for battery monitoring (SugarPi 3)
+- **evdev** - Linux input device handling (keyboard, remote, buttons)
+- **numpy** - Numerical operations for image dithering
 
 ### Install Waveshare e-Paper Driver
 ```bash

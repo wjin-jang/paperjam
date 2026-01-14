@@ -52,6 +52,9 @@ class SettingsApp:
         self.bt_menu_idx = 0
         self.bt_menu_options = []
 
+        # WiFi state
+        self.wifi_status = "Select Network"
+
         # Popup state
         self.popup_msg = ""
         self.prev_view = ""
@@ -105,6 +108,12 @@ class SettingsApp:
                 self.bt_idx = nav_index_up(self.bt_idx, limit)
         elif self.view == 'BT_DEVICE_MENU':
             self.bt_menu_idx = nav_index_up(self.bt_menu_idx, len(self.bt_menu_options))
+        elif self.view == 'WIFI_NETWORKS':
+            networks = self.categories['NETWORK'].wifi_networks
+            if networks:
+                self.categories['NETWORK'].wifi_idx = nav_index_up(
+                    self.categories['NETWORK'].wifi_idx, len(networks)
+                )
 
     def nav_down(self):
         if self.view == 'VOLUME':
@@ -120,6 +129,12 @@ class SettingsApp:
                 self.bt_idx = nav_index_down(self.bt_idx, limit)
         elif self.view == 'BT_DEVICE_MENU':
             self.bt_menu_idx = nav_index_down(self.bt_menu_idx, len(self.bt_menu_options))
+        elif self.view == 'WIFI_NETWORKS':
+            networks = self.categories['NETWORK'].wifi_networks
+            if networks:
+                self.categories['NETWORK'].wifi_idx = nav_index_down(
+                    self.categories['NETWORK'].wifi_idx, len(networks)
+                )
 
     def nav_left(self):
         if self.view == 'VOLUME':
@@ -155,6 +170,17 @@ class SettingsApp:
                 self.bt.connect_async(dev['mac'], self._bt_connect_callback)
         elif self.view == 'BT_DEVICE_MENU':
             self._handle_bt_device_action()
+        elif self.view == 'WIFI_NETWORKS':
+            net_cat = self.categories['NETWORK']
+            if net_cat.wifi_networks:
+                network = net_cat.wifi_networks[net_cat.wifi_idx]
+                self.wifi_status = "Connecting..."
+                if net_cat.connect_to_wifi(network['id']):
+                    self.wifi_status = "Connected"
+                else:
+                    self.wifi_status = "Failed"
+                # Refresh network list
+                net_cat.wifi_networks = net_cat.get_known_wifi_networks()
 
     def nav_back(self):
         if self.view == 'VOLUME':
@@ -166,6 +192,9 @@ class SettingsApp:
             self._enter_bt_saved_view()
         elif self.view == 'BT_SAVED':
             self.view = 'SUBMENU'
+        elif self.view == 'WIFI_NETWORKS':
+            self.view = 'SUBMENU'
+            self.wifi_status = "Select Network"
         elif self.view == 'SUBMENU':
             self.view = 'MAIN'
             self.submenu_idx = 0
@@ -202,6 +231,9 @@ class SettingsApp:
             self.view = 'VOLUME'
         elif result == 'BT_SAVED':
             self._enter_bt_saved_view()
+        elif result == 'WIFI_NETWORKS':
+            self.view = 'WIFI_NETWORKS'
+            self.wifi_status = "Select Network"
 
         # Sync settings to config
         self.settings.sync_to_config()
@@ -310,3 +342,14 @@ class SettingsApp:
 
         elif self.view == 'BT_DEVICE_MENU':
             return self.renderer.render_menu(f"BT: {self.bt_status}", self.bt_menu_options, self.bt_menu_idx, 0)
+
+        elif self.view == 'WIFI_NETWORKS':
+            net_cat = self.categories['NETWORK']
+            display_list = []
+            if not net_cat.wifi_networks:
+                display_list = ["(No networks)"]
+            else:
+                for net in net_cat.wifi_networks:
+                    prefix = "C" if net['current'] else " "
+                    display_list.append(f"{prefix} {net['ssid']}")
+            return self.renderer.render_menu(f"WiFi: {self.wifi_status}", display_list, net_cat.wifi_idx, 0)

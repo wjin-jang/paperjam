@@ -44,7 +44,10 @@ class AudioCategory(SettingsCategory):
         super().__init__("AUDIO", settings_manager)
         self.audio = audio_engine
         self.volume_level = 50
+        self._audio_sinks = []
+        self._current_sink_index = 0
         self._init_volume()
+        self._refresh_audio_sinks()
 
     def _init_volume(self):
         try:
@@ -54,6 +57,81 @@ class AudioCategory(SettingsCategory):
         except:
             self.volume_level = 50
 
+    def _refresh_audio_sinks(self):
+        """Get list of available PulseAudio sinks (audio output devices)."""
+        self._audio_sinks = []
+        try:
+            result = subprocess.check_output(
+                ["pactl", "list", "short", "sinks"],
+                text=True, stderr=subprocess.DEVNULL, timeout=2
+            )
+            for line in result.strip().split('\n'):
+                if line:
+                    parts = line.split('\t')
+                    if len(parts) >= 2:
+                        sink_id = parts[0]
+                        sink_name = parts[1]
+                        # Create a friendly display name
+                        if 'bluez' in sink_name.lower():
+                            display = 'Bluetooth'
+                        elif 'hdmi' in sink_name.lower():
+                            display = 'HDMI'
+                        elif 'usb' in sink_name.lower():
+                            display = 'USB'
+                        elif 'headphone' in sink_name.lower():
+                            display = 'Headphones'
+                        else:
+                            # Use last part of name for display
+                            display = sink_name.split('.')[-1][:12]
+                        self._audio_sinks.append({
+                            'id': sink_id,
+                            'name': sink_name,
+                            'display': display
+                        })
+            # Find current default sink
+            default = subprocess.check_output(
+                ["pactl", "get-default-sink"],
+                text=True, stderr=subprocess.DEVNULL, timeout=2
+            ).strip()
+            for i, sink in enumerate(self._audio_sinks):
+                if sink['name'] == default:
+                    self._current_sink_index = i
+                    break
+        except Exception:
+            pass
+
+    def _get_current_output_name(self) -> str:
+        """Get the display name of the current audio output."""
+        if self._audio_sinks and 0 <= self._current_sink_index < len(self._audio_sinks):
+            return self._audio_sinks[self._current_sink_index]['display']
+        return "Default"
+
+    def _cycle_audio_output(self) -> str:
+        """Cycle to the next audio output device."""
+        self._refresh_audio_sinks()
+        if not self._audio_sinks:
+            return "No Devices"
+
+        # Cycle to next sink
+        self._current_sink_index = (self._current_sink_index + 1) % len(self._audio_sinks)
+        sink = self._audio_sinks[self._current_sink_index]
+
+        # Set as default sink
+        try:
+            subprocess.run(
+                ["pactl", "set-default-sink", sink['name']],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
+            )
+            # Move currently playing streams to new sink
+            subprocess.run(
+                f"pactl list short sink-inputs | cut -f1 | xargs -I{{}} pactl move-sink-input {{}} {sink['name']}",
+                shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
+            )
+        except Exception:
+            pass
+
+        return sink['display']
+
     def set_volume(self, change: int):
         self.volume_level = max(0, min(100, self.volume_level + change))
         try:
@@ -62,10 +140,14 @@ class AudioCategory(SettingsCategory):
             pass
 
     def build_menu(self) -> List[str]:
-        audio_output = self.settings.get('audio_output', 'Auto')
+        self._refresh_audio_sinks()
+        output_name = self._get_current_output_name()
+        endless = self.settings.get('endless_playback', False)
+        endless_state = "ON" if endless else "OFF"
         return [
-            f"Output: {audio_output}",
+            f"Output: {output_name}",
             "Volume",
+            f"Endless Play: {endless_state}",
             "Bluetooth Manager"
         ]
 
@@ -78,8 +160,12 @@ class AudioCategory(SettingsCategory):
             self._init_volume()
             return 'VOLUME'
         elif "Output" in item_text:
-            new_val = self.settings.cycle('audio_output')
-            self.items[item_index] = f"Output: {new_val}"
+            new_output = self._cycle_audio_output()
+            self.items[item_index] = f"Output: {new_output}"
+            return None
+        elif "Endless" in item_text:
+            new_val = self.settings.toggle('endless_playback')
+            self.items[item_index] = f"Endless Play: {'ON' if new_val else 'OFF'}"
             return None
 
         return None
@@ -190,6 +276,13 @@ class NetworkCategory(SettingsCategory):
         super().__init__("NETWORK", settings_manager)
         from core.bluetooth import BluetoothManager
         self.bt = BluetoothManager()
+        self.wifi_view_callback = None
+        self.wifi_networks = []
+        self.wifi_idx = 0
+
+    def set_wifi_view_callback(self, callback):
+        """Set callback to enter WiFi view."""
+        self.wifi_view_callback = callback
 
     def _is_wifi_enabled(self) -> bool:
         """Check if WiFi is enabled."""
@@ -262,12 +355,57 @@ class NetworkCategory(SettingsCategory):
         except:
             return "Unavailable"
 
+    def get_known_wifi_networks(self) -> List[dict]:
+        """Get list of known WiFi networks from wpa_supplicant."""
+        networks = []
+        try:
+            # Get list of configured networks from wpa_cli
+            result = subprocess.check_output(
+                ["sudo", "wpa_cli", "-i", "wlan0", "list_networks"],
+                text=True, stderr=subprocess.DEVNULL, timeout=5
+            )
+            # Skip header line and parse rest
+            lines = result.strip().split('\n')[1:]
+            for line in lines:
+                parts = line.split('\t')
+                if len(parts) >= 4:
+                    network_id = parts[0]
+                    ssid = parts[1]
+                    flags = parts[3] if len(parts) > 3 else ""
+                    is_current = "CURRENT" in flags
+                    networks.append({
+                        'id': network_id,
+                        'ssid': ssid,
+                        'current': is_current
+                    })
+        except Exception:
+            pass
+        return networks
+
+    def connect_to_wifi(self, network_id: str) -> bool:
+        """Connect to a specific WiFi network by ID."""
+        try:
+            # Select the network
+            subprocess.run(
+                ["sudo", "wpa_cli", "-i", "wlan0", "select_network", network_id],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+            # Force reconnection
+            subprocess.run(
+                ["sudo", "wpa_cli", "-i", "wlan0", "reconnect"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+            return True
+        except Exception:
+            return False
+
     def build_menu(self) -> List[str]:
         wifi_state = "ON" if self._is_wifi_enabled() else "OFF"
         bt_state = "ON" if self._is_bt_enabled() else "OFF"
         return [
             f"WiFi: {wifi_state}",
             f"  {self._get_wifi_info()}",
+            "WiFi Networks",
             f"Bluetooth: {bt_state}",
             f"  {self._get_bt_status()}"
         ]
@@ -277,6 +415,11 @@ class NetworkCategory(SettingsCategory):
             self._toggle_wifi()
             self.refresh()
         elif item_index == 2:
+            # WiFi Networks menu
+            self.wifi_networks = self.get_known_wifi_networks()
+            self.wifi_idx = 0
+            return 'WIFI_NETWORKS'
+        elif item_index == 3:
             self._toggle_bt()
             self.refresh()
         return None
@@ -287,6 +430,11 @@ class SystemCategory(SettingsCategory):
 
     def __init__(self, settings_manager):
         super().__init__("SYSTEM", settings_manager)
+        self._screen_clear_callback = None
+
+    def set_screen_clear_callback(self, callback):
+        """Set callback for screen clear shutdown."""
+        self._screen_clear_callback = callback
 
     def _get_disk_usage(self) -> str:
         try:
@@ -332,8 +480,9 @@ class SystemCategory(SettingsCategory):
             f"CPU Mode: {cpu_mode}",
             self._get_disk_usage(),
             f"Long Press: {long_press}s",
-            "Version 1.5",
-            "Restart System"
+            f"Version {cfg.VERSION}",
+            "Restart System",
+            "Clear Screen + Shut Down"
         ]
 
     def handle_action(self, item_index: int) -> Optional[str]:
@@ -347,5 +496,8 @@ class SystemCategory(SettingsCategory):
         elif "Long Press" in item_text:
             new_val = self.settings.cycle('long_press_duration')
             self.items[item_index] = f"Long Press: {new_val}s"
+        elif "Clear Screen" in item_text:
+            if self._screen_clear_callback:
+                self._screen_clear_callback()
 
         return None

@@ -8,7 +8,7 @@ from PIL import Image
 
 from core.library import LibraryManager
 from core.metadata import get_cover
-from core.navigation import nav_index_up, nav_index_down
+from core.navigation import nav_index_up, nav_index_down, nav_skip_info_up, nav_skip_info_down, find_next_heading
 from ui.renderer import UIRenderer
 import config as cfg
 
@@ -26,9 +26,10 @@ class MusicPlayerApp:
         self.input = input_handler
         self.lib = LibraryManager()
         self.renderer = UIRenderer()
+        self._settings = None
 
         # Initialize components
-        self.state = PlayerState(items=[], fav_albums=self.lib.fav_albums)
+        self.state = PlayerState(items=[], fav_albums=self.lib.fav_albums, fav_artists=self.lib.fav_artists)
         self.playlist = PlaylistManager()
         self.context_menu = ContextMenuHandler(self.lib)
         self.browse = BrowseHandler(self.lib)
@@ -61,6 +62,10 @@ class MusicPlayerApp:
         """Set callbacks for volume control."""
         self._vol_up_callback = vol_up
         self._vol_down_callback = vol_down
+
+    def set_settings(self, settings_manager):
+        """Set settings manager reference for features like endless playback."""
+        self._settings = settings_manager
 
     def _show_loading(self, message: str = "Loading..."):
         """Show loading overlay and force display update."""
@@ -118,7 +123,7 @@ class MusicPlayerApp:
         else:
             if not self.state.items:
                 return
-            self.state.selection_index = nav_index_up(self.state.selection_index, len(self.state.items))
+            self.state.selection_index = nav_skip_info_up(self.state.selection_index, self.state.items)
 
     def nav_down(self):
         if self._wake_from_screensaver():
@@ -129,7 +134,7 @@ class MusicPlayerApp:
         else:
             if not self.state.items:
                 return
-            self.state.selection_index = nav_index_down(self.state.selection_index, len(self.state.items))
+            self.state.selection_index = nav_skip_info_down(self.state.selection_index, self.state.items)
 
     def nav_enter(self):
         if self._wake_from_screensaver():
@@ -143,6 +148,16 @@ class MusicPlayerApp:
             return
 
         item = self.state.items[self.state.selection_index]
+
+        # Clicking a heading jumps to the next heading
+        if item.get('type') == 'heading':
+            self.state.selection_index = find_next_heading(self.state.selection_index, self.state.items)
+            return
+
+        # Info items are non-interactive
+        if item.get('type') == 'info':
+            return
+
         if item['type'] in ['playlist', 'dir', 'artist', 'album']:
             self.history.append((self.mode, self.current_path, self.state.selection_index))
             new_mode = item['mode']
@@ -214,7 +229,16 @@ class MusicPlayerApp:
         if not self.playlist.has_queue:
             return
 
-        self.playlist.queue_idx = (self.playlist.queue_idx + 1) % len(self.playlist.queue)
+        # Check if we're about to wrap around to the beginning
+        next_idx = (self.playlist.queue_idx + 1) % len(self.playlist.queue)
+        at_end = next_idx == 0 and not from_user
+
+        # If endless playback is enabled and we've reached the end, play a random album
+        if at_end and self._settings and self._settings.get('endless_playback', False):
+            self._play_random_album()
+            return
+
+        self.playlist.queue_idx = next_idx
         real_idx = self.playlist.queue[self.playlist.queue_idx]
         if from_user:
             self.state.set_status_message("NEXT")
@@ -263,10 +287,12 @@ class MusicPlayerApp:
                 if self.state.screensaver_image is None:
                     self.state.needs_refresh = True
 
-                if self.state.is_playing:
+                # Show playing track's cover if a track is loaded (playing or paused)
+                if self.state.playing_path:
                     self.state.screensaver_image = self.state.playing_cover_l or self.state.playing_cover_s
                     self.state.screensaver_album = None
                 else:
+                    # Only show random cover if no track is loaded (IDLE state)
                     if self.state.screensaver_image is None:
                         cover, album = self.lib.get_random_cover(with_album=True)
                         self.state.screensaver_image = cover if cover else Image.new('1', (1, 1))
@@ -278,6 +304,7 @@ class MusicPlayerApp:
         """Refresh the current list based on mode."""
         self.running = True
         self.state.is_scanning = self.lib.is_scanning
+        self.state.browse_mode = self.mode
         self.state.reset_browsing_state()
 
         if self.mode == 'ROOT':
@@ -366,11 +393,16 @@ class MusicPlayerApp:
         self.state.has_header = True
         self.state.items = [{'type': 'header'}]
         for t in tracks:
-            icon = 'P' if self.state.playing_path == str(t['path']) else 'S'
+            # Pass through heading items as-is
+            if t.get('type') == 'heading':
+                self.state.items.append(t)
+                continue
+            # Convert track dicts to item format
+            icon = 'P' if self.state.playing_path == str(t.get('path', '')) else 'S'
             self.state.items.append({
                 'name': t.get('title', ''),
                 'type': 'file',
-                'path': t['path'],
+                'path': t.get('path'),
                 'icon': icon,
                 'artist': t.get('artist'),
                 'album': t.get('album')
@@ -464,6 +496,28 @@ class MusicPlayerApp:
         self._load_track(self.playlist.queue[0])
         self.state.set_status_message("PLAYING")
 
+    def _play_random_album(self):
+        """Play a random album (used for endless playback)."""
+        if not self.lib.albums:
+            return
+
+        # Pick a random album
+        album = random.choice(list(self.lib.albums.keys()))
+        tracks = self.lib.get_album_tracks(album)
+        if not tracks:
+            return
+
+        # Build playlist from album tracks
+        self.playlist.playlist_source = [str(t['path']) for t in tracks]
+        self.playlist.queue = list(range(len(self.playlist.playlist_source)))
+        if self.state.shuffle_active:
+            random.shuffle(self.playlist.queue)
+        self.playlist.queue_idx = 0
+
+        # Load and play first track
+        self._load_track(self.playlist.queue[0])
+        self.state.set_status_message("ENDLESS")
+
     def _play_from_list(self, path):
         """Start playing from the current list."""
         self.playlist.playlist_source = [str(i['path']) for i in self.state.items if i['type'] == 'file']
@@ -511,7 +565,10 @@ class MusicPlayerApp:
             loop_messages = ["LOOP OFF", "LOOP ALL", "LOOP ONE"]
             self.state.set_status_message(loop_messages[self.state.loop_mode])
         elif idx == 3:
-            self.lib.toggle_fav_album(self.state.album)
+            if self.mode == 'ARTIST_VIEW':
+                self.lib.toggle_fav_artist(self.state.album)
+            else:
+                self.lib.toggle_fav_album(self.state.album)
 
     def get_frame(self):
         """Render and return current frame."""

@@ -2,6 +2,9 @@ import os
 from pathlib import Path
 from PIL import ImageFont
 
+# --- Version ---
+VERSION = "1.0"
+
 # --- Display ---
 SCREEN_WIDTH = 250
 SCREEN_HEIGHT = 122
@@ -26,7 +29,7 @@ RECENTS_LIMIT = 50
 RECENTS_LIMIT_OPTIONS = [10, 30, 50, 100]
 
 # --- Paths ---
-MUSIC_PATH = Path("/home/woojin/music_player/music")
+MUSIC_PATH = Path("/home/yourusername/music")
 if not MUSIC_PATH.exists():
     MUSIC_PATH = Path.cwd()
 
@@ -47,12 +50,14 @@ def load_fonts():
     try:
         main = ImageFont.truetype(str(base_path / "BMmini.ttf"), 9) if (base_path / "BMmini.ttf").exists() else ImageFont.load_default()
         header = ImageFont.truetype(str(base_path / "Nintendo-DS-BIOS.ttf"), 12) if (base_path / "Nintendo-DS-BIOS.ttf").exists() else ImageFont.load_default()
-        battery = ImageFont.truetype(str(base_path / "BatteryIcons.ttf"), 6) if (base_path / "BatteryIcons.ttf").exists() else None
-        return main, header, battery
+        # Icons font includes battery (0-8, C), headphones (H), bluetooth (B), wifi (W)
+        icons_path = base_path / "Icons.ttf"
+        icons = ImageFont.truetype(str(icons_path), 6) if icons_path.exists() else None
+        return main, header, icons
     except:
         return ImageFont.load_default(), ImageFont.load_default(), None
 
-FONT_MAIN, FONT_HEADER, FONT_BATTERY = load_fonts()
+FONT_MAIN, FONT_HEADER, FONT_ICONS = load_fonts()
 NEEDS_RESCAN = False
 
 # --- Status Icons ---
@@ -67,6 +72,7 @@ STATUS_ICONS = {
     'LOOP ALL': 'Ⓘ',
     'LOOP ONE': 'Ⓘ',
     'LOOP OFF': 'Ⓘ',
+    'ENDLESS': 'Ⓔ',
 }
 
 # --- Menu Icons ---
@@ -78,5 +84,6 @@ MENU_ICONS = {
     'fav': 'Ⓗ',
     'recent': 'Ⓡ',
     'dir': 'Ⓕ',
-    'file_playing': 'Ⓟ',
+    'playing': 'Ⓟ',
+    'paused': 'Ⓢ'
 }

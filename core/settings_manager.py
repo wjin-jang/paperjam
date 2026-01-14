@@ -67,6 +67,10 @@ class SettingsManager:
             key='audio_output',
             default='Auto',
             options=['Auto', 'Headphones', 'HDMI', 'USB']
+        ),
+        'endless_playback': SettingDefinition(
+            key='endless_playback',
+            default=False
         )
     }
 

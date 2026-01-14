@@ -32,6 +32,8 @@ class PlayerState:
     # Flags
     needs_refresh: bool = False
     fav_albums: Optional[Set[str]] = None
+    fav_artists: Optional[Set[str]] = None
+    browse_mode: str = 'ROOT'
     is_scanning: bool = False
     total_items: int = 0
     page_size: int = 7
