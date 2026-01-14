@@ -107,7 +107,7 @@ echo "[6/7] Setting up Python environment..."
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
-pip install pillow mutagen python-vlc smbus2 evdev numpy waveshare-epd
+pip install pillow mutagen python-vlc smbus2 evdev numpy epd-library
 echo "  Python dependencies installed"
 
 # --- Systemd Service ---
