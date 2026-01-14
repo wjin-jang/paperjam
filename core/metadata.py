@@ -1,9 +1,7 @@
-import os, io
+import os
 from mutagen import File
 from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
-from PIL import Image
-from ui.graphics import dither_image
 
 try:
     from korean_romanizer.romanizer import Romanizer
@@ -94,36 +92,6 @@ def get_metadata(file_path):
         str(year) if year else ""
     )
 
-def get_cover(file_path):
-    """
-    Image-only extraction. Heavy operation.
-    Returns: (small_dithered_image, large_dithered_image) or (None, None)
-    """
-    if not os.path.exists(file_path): return (None, None)
-    
-    cover_bytes = None
-    
-    try:
-        audio = File(file_path)
-        if isinstance(audio, FLAC):
-            if audio.pictures: 
-                cover_bytes = audio.pictures[0].data
-        elif isinstance(audio, MP3):
-            if audio.tags:
-                for key in audio.tags.keys():
-                    if key.startswith('APIC'):
-                        cover_bytes = audio.tags[key].data
-                        break
-    except: pass
-
-    final_small = None
-    final_large = None
-    
-    if cover_bytes:
-        try:
-            img_obj = Image.open(io.BytesIO(cover_bytes))
-            final_small = dither_image(img_obj.copy(), target_size=(83, 83))
-            final_large = dither_image(img_obj.copy(), target_size=(111, 111))
-        except: pass
-
-    return (final_small, final_large)
+# get_cover moved to ui.image_utils to fix circular dependency
+# Re-export for backward compatibility
+from ui.image_utils import get_cover

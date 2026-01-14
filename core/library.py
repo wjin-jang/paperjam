@@ -5,8 +5,8 @@ import os
 from pathlib import Path
 from dataclasses import dataclass
 import config as cfg
-# Updated import
-from core.metadata import get_metadata, get_cover
+from core.metadata import get_cover
+from core.track_info import extract_track_info
 
 @dataclass
 class TrackItem:
@@ -56,43 +56,41 @@ class LibraryManager:
     def _scan_worker(self):
         temp_artists = {}
         temp_albums = {}
-        
-        artist_case_map = {} 
+
+        artist_case_map = {}
         album_case_map = {}
 
         for ext in cfg.VALID_EXTS:
             for p in cfg.MUSIC_PATH.rglob(f"*{ext}"):
                 try:
-                    # STRICTLY TEXT ONLY SCAN
-                    meta = get_metadata(p)
-                    # meta structure: (album, artist, title, track, disc, year)
-                    
+                    track = extract_track_info(p)
+
                     # 1. Normalize Artist
-                    raw_artist = meta[1] or "Unknown Artist"
+                    raw_artist = track.artist
                     art_key = raw_artist.strip().lower()
-                    
+
                     if art_key not in artist_case_map:
                         artist_case_map[art_key] = raw_artist
                     canonical_artist = artist_case_map[art_key]
 
                     # 2. Normalize Album
-                    raw_album = meta[0] or "Unknown Album"
+                    raw_album = track.album
                     alb_key = raw_album.strip().lower()
-                    
+
                     if alb_key not in album_case_map:
                         album_case_map[alb_key] = raw_album
                     canonical_album = album_case_map[alb_key]
 
                     data = {
-                        'path': str(p), 
-                        'album': canonical_album, 
-                        'artist': canonical_artist, 
-                        'title': meta[2], 
-                        'track': meta[3], 
-                        'disc': meta[4], 
-                        'year': meta[5]
+                        'path': str(p),
+                        'album': canonical_album,
+                        'artist': canonical_artist,
+                        'title': track.title,
+                        'track': track.track_num,
+                        'disc': track.disc_num,
+                        'year': track.year
                     }
-                    
+
                     temp_artists.setdefault(canonical_artist, []).append(data)
                     temp_albums.setdefault(canonical_album, []).append(data)
                 except: continue
@@ -152,11 +150,10 @@ class LibraryManager:
                     for p_str in paths:
                         p = Path(p_str)
                         if p.exists():
-                            # Uses fast text extraction
-                            meta = get_metadata(p)
+                            track = extract_track_info(p)
                             tracks.append({
-                                'path': p, 'album': meta[0], 'artist': meta[1], 
-                                'title': meta[2], 'year': meta[5]
+                                'path': p, 'album': track.album, 'artist': track.artist,
+                                'title': track.title, 'year': track.year
                             })
             except: pass
         return tracks
@@ -228,10 +225,10 @@ class LibraryManager:
         for p_str in self.fav_tracks:
             p = Path(p_str)
             if p.exists():
-                meta = get_metadata(p)
+                track = extract_track_info(p)
                 tracks.append({
-                    'path': p, 'album': meta[0], 'artist': meta[1], 
-                    'title': meta[2], 'year': meta[5]
+                    'path': p, 'album': track.album, 'artist': track.artist,
+                    'title': track.title, 'year': track.year
                 })
         tracks.sort(key=lambda x: (x['artist'].lower(), x['title'].lower()))
         return tracks

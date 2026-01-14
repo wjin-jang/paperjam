@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from ui.renderer import UIRenderer
 from core.bluetooth import BluetoothManager
+from core.navigation import nav_index_up, nav_index_down
+from core.settings_manager import get_settings_manager
 import config as cfg
 
 class SettingsApp:
@@ -13,73 +15,36 @@ class SettingsApp:
         self.audio = audio_engine
         self.bt = BluetoothManager()
         self.input = input_handler
-        
+        self.settings = get_settings_manager()
+
         self.main_menu = ["Audio", "Library", "Network", "System", "Display"]
-        
+
         self.view = 'MAIN'
         self.idx = 0
         self.submenu_idx = 0
         self.current_category = ""
         self.current_submenu = []
-        
+
         self.running = True
-        
-        # Defaults (will be overwritten by load_settings)
-        self.invert_colors = False
-        self.audio_output = "Auto"
-        
-        # Load saved preferences immediately
-        self._load_settings()
-        
+
+        # Load settings from manager
+        self.invert_colors = self.settings.get('invert_colors', False)
+        self.audio_output = self.settings.get('audio_output', 'Auto')
+
+        # Sync to config globals for backward compatibility
+        self.settings.sync_to_config()
+
         self.volume_level = 50
         self._init_volume()
-        
+
         self.bt_devices = []
         self.bt_idx = 0
         self.bt_status = "Idle"
 
-    def _get_settings_file(self):
-        # Ensure DATA_DIR exists (it's created in library.py, but safe to check)
-        cfg.DATA_DIR.mkdir(parents=True, exist_ok=True)
-        return cfg.DATA_DIR / "settings.json"
-
-    def _load_settings(self):
-        """Loads settings from JSON and updates config.py globals."""
-        settings_path = self._get_settings_file()
-        if settings_path.exists():
-            try:
-                with open(settings_path, 'r') as f:
-                    data = json.load(f)
-                    
-                    # App State
-                    self.invert_colors = data.get('invert_colors', False)
-                    self.audio_output = data.get('audio_output', 'Auto')
-                    
-                    # Config Globals
-                    if 'recents_limit' in data:
-                        cfg.RECENTS_LIMIT = data['recents_limit']
-                    if 'screensaver_timeout' in data:
-                        cfg.SCREENSAVER_TIMEOUT = data['screensaver_timeout']
-                    if 'long_press_duration' in data:
-                        cfg.LONG_PRESS_DURATION = data['long_press_duration']
-                        
-            except Exception as e:
-                print(f"Error loading settings: {e}")
-
-    def _save_settings(self):
-        """Saves current settings to JSON."""
-        data = {
-            'invert_colors': self.invert_colors,
-            'audio_output': self.audio_output,
-            'recents_limit': cfg.RECENTS_LIMIT,
-            'screensaver_timeout': cfg.SCREENSAVER_TIMEOUT,
-            'long_press_duration': cfg.LONG_PRESS_DURATION
-        }
-        try:
-            with open(self._get_settings_file(), 'w') as f:
-                json.dump(data, f)
-        except Exception as e:
-            print(f"Error saving settings: {e}")
+    def _save_setting(self, key: str, value):
+        """Save a setting using the settings manager."""
+        self.settings.set(key, value)
+        self.settings.sync_to_config()
 
     def _init_volume(self):
         try:
@@ -127,24 +92,26 @@ class SettingsApp:
             self._set_volume(5)
             return
         if self.view == 'MAIN':
-            self.idx = (self.idx - 1) % len(self.main_menu)
+            self.idx = nav_index_up(self.idx, len(self.main_menu))
         elif self.view == 'SUBMENU':
-            self.submenu_idx = (self.submenu_idx - 1) % len(self.current_submenu)
+            self.submenu_idx = nav_index_up(self.submenu_idx, len(self.current_submenu))
         elif self.view in ['BT_SAVED', 'BT_SCAN']:
             limit = len(self.bt_devices) + (1 if self.view == 'BT_SAVED' else 0)
-            if limit > 0: self.bt_idx = (self.bt_idx - 1) % limit
+            if limit > 0:
+                self.bt_idx = nav_index_up(self.bt_idx, limit)
 
     def nav_down(self):
         if self.view == 'VOLUME':
             self._set_volume(-5)
             return
         if self.view == 'MAIN':
-            self.idx = (self.idx + 1) % len(self.main_menu)
+            self.idx = nav_index_down(self.idx, len(self.main_menu))
         elif self.view == 'SUBMENU':
-            self.submenu_idx = (self.submenu_idx + 1) % len(self.current_submenu)
+            self.submenu_idx = nav_index_down(self.submenu_idx, len(self.current_submenu))
         elif self.view in ['BT_SAVED', 'BT_SCAN']:
             limit = len(self.bt_devices) + (1 if self.view == 'BT_SAVED' else 0)
-            if limit > 0: self.bt_idx = (self.bt_idx + 1) % limit
+            if limit > 0:
+                self.bt_idx = nav_index_down(self.bt_idx, limit)
 
     def nav_left(self):
         if self.view == 'VOLUME': self._set_volume(-5)
@@ -217,18 +184,20 @@ class SettingsApp:
             
         elif category == "Display":
             state = "ON" if self.invert_colors else "OFF"
-            ss_timeout = "OFF" if cfg.SCREENSAVER_TIMEOUT == 0 else f"{cfg.SCREENSAVER_TIMEOUT}s"
-            
+            ss_timeout = self.settings.get('screensaver_timeout', 60)
+            ss_str = "OFF" if ss_timeout == 0 else f"{ss_timeout}s"
+
             self.current_submenu = [
                 f"Invert Colors: {state}",
-                f"Screensaver: {ss_timeout}"
+                f"Screensaver: {ss_str}"
             ]
             self.view = 'SUBMENU'
-            
+
         elif category == "System":
+            long_press = self.settings.get('long_press_duration', 0.5)
             self.current_submenu = [
                 self._get_disk_usage(),
-                f"Long Press: {cfg.LONG_PRESS_DURATION}s",
+                f"Long Press: {long_press}s",
                 "Version 1.5",
                 "Restart System"
             ]
@@ -236,9 +205,10 @@ class SettingsApp:
 
     def _update_library_submenu(self):
         status = " (Scanning...)" if self.lib.is_scanning else ""
+        recents_limit = self.settings.get('recents_limit', 50)
         self.current_submenu = [
             "Reload Library",
-            f"Recents Limit: {cfg.RECENTS_LIMIT}",
+            f"Recents Limit: {recents_limit}",
             f"Tracks: {self.lib.get_total_tracks()}{status}",
             f"Albums: {len(self.lib.albums)}",
             f"Artists: {len(self.lib.artists)}"
@@ -259,9 +229,6 @@ class SettingsApp:
     def _handle_submenu_action(self):
         cat = self.current_category
         item_text = self.current_submenu[self.submenu_idx]
-        
-        # Flag to trigger save
-        should_save = False
 
         if cat == "AUDIO":
             if "Bluetooth" in item_text:
@@ -270,47 +237,35 @@ class SettingsApp:
                 self.view = 'VOLUME'
                 self._init_volume()
             elif "Output" in item_text:
-                modes = ["Auto", "Headphones", "HDMI"]
-                try: curr_i = modes.index(self.audio_output)
-                except: curr_i = 0
-                self.audio_output = modes[(curr_i + 1) % len(modes)]
+                self.audio_output = self.settings.cycle('audio_output')
                 self.current_submenu[self.submenu_idx] = f"Output: {self.audio_output}"
-                should_save = True
 
         elif cat == "LIBRARY":
             if "Reload Library" in item_text:
                 self.lib.scan_async(force=True)
                 self._show_popup("Rescanning...")
             elif "Recents Limit" in item_text:
-                new_val = self._cycle_val(cfg.RECENTS_LIMIT, cfg.RECENTS_OPTIONS)
-                cfg.RECENTS_LIMIT = new_val
+                new_val = self.settings.cycle('recents_limit')
                 self._update_library_submenu()
-                should_save = True
 
         elif cat == "DISPLAY":
             if "Invert Colors" in item_text:
-                self.invert_colors = not self.invert_colors
+                self.invert_colors = self.settings.toggle('invert_colors')
                 self.current_submenu[self.submenu_idx] = f"Invert Colors: {'ON' if self.invert_colors else 'OFF'}"
-                should_save = True
             elif "Screensaver" in item_text:
-                new_val = self._cycle_val(cfg.SCREENSAVER_TIMEOUT, cfg.SCREENSAVER_OPTIONS)
-                cfg.SCREENSAVER_TIMEOUT = new_val
+                new_val = self.settings.cycle('screensaver_timeout')
                 val_str = "OFF" if new_val == 0 else f"{new_val}s"
                 self.current_submenu[self.submenu_idx] = f"Screensaver: {val_str}"
-                should_save = True
 
         elif cat == "SYSTEM":
             if "Restart" in item_text:
                 subprocess.run(["sudo", "reboot"])
             elif "Long Press" in item_text:
-                new_val = self._cycle_val(cfg.LONG_PRESS_DURATION, cfg.LONG_PRESS_OPTIONS)
-                cfg.LONG_PRESS_DURATION = new_val
+                new_val = self.settings.cycle('long_press_duration')
                 self.current_submenu[self.submenu_idx] = f"Long Press: {new_val}s"
-                should_save = True
-        
-        # Save immediately if a setting changed
-        if should_save:
-            self._save_settings()
+
+        # Sync to config globals for backward compatibility
+        self.settings.sync_to_config()
 
     def _show_popup(self, msg):
         self.popup_msg = msg

@@ -6,7 +6,7 @@ from PIL import Image, ImageOps # --- ADDED ImageOps
 
 from core.audio import AudioEngine
 from core.inputs import InputHandler
-from apps.music import MusicPlayerApp
+from apps.music import MusicPlayerApp  # Now imports from the package
 from apps.settings import SettingsApp
 from ui.renderer import UIRenderer
 
