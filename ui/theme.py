@@ -42,21 +42,27 @@ class FontConfig:
     def _load_fonts(self):
         """Load fonts from assets directory."""
         base_path = Path(__file__).parent.parent / "assets"
+        self.main_font = ImageFont.load_default()
+        self.header_font = ImageFont.load_default()
+
+        main_path = base_path / "BMmini.ttf"
+        header_path = base_path / "Nintendo-DS-BIOS.ttf"
+
         try:
-            main_path = base_path / "BMmini.ttf"
             if main_path.exists():
                 self.main_font = ImageFont.truetype(str(main_path), 9)
             else:
-                self.main_font = ImageFont.load_default()
+                print(f"Font not found: {main_path}")
+        except Exception as e:
+            print(f"Failed to load font '{main_path.name}': {e}")
 
-            header_path = base_path / "Nintendo-DS-BIOS.ttf"
+        try:
             if header_path.exists():
-                self.header_font = ImageFont.truetype(str(header_path), 16)
+                self.header_font = ImageFont.truetype(str(header_path), 12)
             else:
-                self.header_font = ImageFont.load_default()
-        except Exception:
-            self.main_font = ImageFont.load_default()
-            self.header_font = ImageFont.load_default()
+                print(f"Font not found: {header_path}")
+        except Exception as e:
+            print(f"Failed to load font '{header_path.name}': {e}")
 
 
 @dataclass

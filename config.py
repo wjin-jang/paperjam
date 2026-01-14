@@ -17,7 +17,7 @@ BLACK = 0
 
 # --- Behavior ---
 SCREENSAVER_TIMEOUT = 60 
-SCREENSAVER_OPTIONS = [30, 60, 300, 1800, 0] 
+SCREENSAVER_OPTIONS = [10, 30, 60, 300, 1800, 0] 
 
 LONG_PRESS_DURATION = 0.5
 LONG_PRESS_OPTIONS = [0.3, 0.5, 0.8, 1.0, 1.5, 2.0]
@@ -46,10 +46,24 @@ def load_fonts():
     base_path = Path(__file__).parent / "assets"
     try:
         main = ImageFont.truetype(str(base_path / "BMmini.ttf"), 9) if (base_path / "BMmini.ttf").exists() else ImageFont.load_default()
-        header = ImageFont.truetype(str(base_path / "Nintendo-DS-BIOS.ttf"), 16) if (base_path / "Nintendo-DS-BIOS.ttf").exists() else ImageFont.load_default()
+        header = ImageFont.truetype(str(base_path / "Nintendo-DS-BIOS.ttf"), 12) if (base_path / "Nintendo-DS-BIOS.ttf").exists() else ImageFont.load_default()
         return main, header
     except:
         return ImageFont.load_default(), ImageFont.load_default()
 
 FONT_MAIN, FONT_HEADER = load_fonts()
 NEEDS_RESCAN = False
+
+# --- Status Icons ---
+STATUS_ICONS = {
+    'PLAYING': 'Ⓟ',
+    'PAUSED': 'Ⓢ',
+    'IDLE': 'Ⓘ',
+    'NEXT': 'Ⓝ',
+    'PREVIOUS': 'Ⓡ',
+    'SHUFFLE ON': 'Ⓘ',
+    'SHUFFLE OFF': 'Ⓘ',
+    'LOOP ALL': 'Ⓘ',
+    'LOOP ONE': 'Ⓘ',
+    'LOOP OFF': 'Ⓘ',
+}

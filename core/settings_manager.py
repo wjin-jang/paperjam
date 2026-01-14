@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 from dataclasses import dataclass, field
 
+import config as cfg
+
 
 @dataclass
 class SettingDefinition:
@@ -16,6 +18,20 @@ class SettingDefinition:
     options: Optional[List[Any]] = None
     min_val: Optional[float] = None
     max_val: Optional[float] = None
+
+
+def format_duration(seconds: int) -> str:
+    """Format seconds as human-readable duration."""
+    if seconds == 0:
+        return "OFF"
+    elif seconds < 60:
+        return f"{seconds}s"
+    elif seconds < 3600:
+        mins = seconds // 60
+        return f"{mins}m"
+    else:
+        hours = seconds // 3600
+        return f"{hours}h"
 
 
 class SettingsManager:
@@ -30,18 +46,18 @@ class SettingsManager:
     SETTING_DEFINITIONS = {
         'screensaver_timeout': SettingDefinition(
             key='screensaver_timeout',
-            default=60,
-            options=[30, 60, 300, 1800, 0]
+            default=cfg.SCREENSAVER_TIMEOUT,
+            options=cfg.SCREENSAVER_OPTIONS
         ),
         'long_press_duration': SettingDefinition(
             key='long_press_duration',
-            default=0.5,
-            options=[0.3, 0.5, 0.8, 1.0, 1.5, 2.0]
+            default=cfg.LONG_PRESS_DURATION,
+            options=cfg.LONG_PRESS_OPTIONS
         ),
         'recents_limit': SettingDefinition(
             key='recents_limit',
-            default=50,
-            options=[10, 30, 50, 100]
+            default=cfg.RECENTS_LIMIT,
+            options=cfg.RECENTS_LIMIT_OPTIONS
         ),
         'invert_colors': SettingDefinition(
             key='invert_colors',

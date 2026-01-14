@@ -107,19 +107,7 @@ class MusicViewRenderer(RenderBase):
 
         # Status bar - use state's status text method for temporary messages
         raw_status = state.get_status_text()
-        status_icons = {
-            'PLAYING': 'Ⓟ',
-            'PAUSED': 'Ⓢ',
-            'IDLE': 'Ⓘ',
-            'NEXT': 'Ⓝ',
-            'PREVIOUS': 'Ⓡ',
-            'SHUFFLE ON': 'Ⓘ',
-            'SHUFFLE OFF': 'Ⓘ',
-            'LOOP ALL': 'Ⓘ',
-            'LOOP ONE': 'Ⓘ',
-            'LOOP OFF': 'Ⓘ',
-        }
-        icon = status_icons.get(raw_status, '¤')
+        icon = cfg.STATUS_ICONS.get(raw_status, 'Ⓘ')
         status_text = f"{icon} {raw_status}"
         self.draw_panel(8, 100, art_size, cfg.ROW_HEIGHT)
         self.draw_text_box(

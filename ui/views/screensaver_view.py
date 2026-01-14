@@ -21,14 +21,18 @@ class ScreensaverRenderer(RenderBase):
             self.draw_panel(x - 1, y - 1, img.width + 1, img.height + 1)
             self.canvas.paste(img, (x, y))
 
-            if not state.is_playing:
-                # Draw pause indicator
-                pw, ph = cfg.ROW_HEIGHT, cfg.ROW_HEIGHT
-                px = x + img.width + 8
-                py = y + img.height - ph
+            # Draw status indicator with icon
+            raw_status = state.get_status_text()
+            icon = cfg.STATUS_ICONS.get(raw_status, 'Ⓘ')
+            status_text = f"{icon}"
 
-                self.draw_panel(px, py, pw, ph)
-                self.draw_text_box("¥", px, py, pw, ph, invert=False, padding=(2, 0), font=cfg.FONT_HEADER)
+            pw = cfg.ROW_HEIGHT
+            ph = cfg.ROW_HEIGHT
+            px = x + img.width + 8
+            py = y + img.height - ph
+
+            self.draw_panel(px, py, pw, ph)
+            self.draw_text_box(status_text, px, py, pw, ph, invert=False, padding=(2, 0), font=cfg.FONT_HEADER)
 
         return self.canvas
 

@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional, Callable
 
 import config as cfg
+from core.settings_manager import format_duration
 
 
 class SettingsCategory(ABC):
@@ -130,11 +131,10 @@ class DisplayCategory(SettingsCategory):
         invert = self.settings.get('invert_colors', False)
         state = "ON" if invert else "OFF"
         ss_timeout = self.settings.get('screensaver_timeout', 60)
-        ss_str = "OFF" if ss_timeout == 0 else f"{ss_timeout}s"
 
         return [
             f"Invert Colors: {state}",
-            f"Screensaver: {ss_str}"
+            f"Screensaver: {format_duration(ss_timeout)}"
         ]
 
     def handle_action(self, item_index: int) -> Optional[str]:
@@ -145,8 +145,7 @@ class DisplayCategory(SettingsCategory):
             self.items[item_index] = f"Invert Colors: {'ON' if new_val else 'OFF'}"
         elif "Screensaver" in item_text:
             new_val = self.settings.cycle('screensaver_timeout')
-            val_str = "OFF" if new_val == 0 else f"{new_val}s"
-            self.items[item_index] = f"Screensaver: {val_str}"
+            self.items[item_index] = f"Screensaver: {format_duration(new_val)}"
 
         return None
 
