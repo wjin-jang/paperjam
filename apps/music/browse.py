@@ -42,21 +42,36 @@ class BrowseHandler:
         """Get list of all artists, organized alphabetically with headings."""
         items = []
         current_letter = None
+        use_headings = len(self.lib.artists) > 24
+
         for k in self.lib.artists.keys():
-            # Get first letter (uppercase)
-            first_char = k[0].upper() if k else '#'
-            if not first_char.isalpha():
-                first_char = '#'
-            # Add heading when letter changes
-            if first_char != current_letter:
-                current_letter = first_char
-                items.append({'name': first_char, 'type': 'heading'})
+            if use_headings:
+                # Get first letter (uppercase)
+                first_char = k[0].upper() if k else '#'
+                if not first_char.isalpha():
+                    first_char = '#'
+                # Add heading when letter changes
+                if first_char != current_letter:
+                    current_letter = first_char
+                    items.append({'name': first_char, 'type': 'heading'})
             items.append({'name': k, 'type': 'artist', 'mode': 'ARTIST_VIEW'})
         return "ARTISTS", items
 
     def get_albums_list(self) -> Tuple[str, List[dict]]:
         """Get list of all albums."""
-        items = [{'name': k, 'type': 'album', 'mode': 'ALBUM_VIEW'} for k in self.lib.albums.keys()]
+        items = []
+        current_letter = None
+        use_headings = len(self.lib.albums) > 24
+
+        for k in self.lib.albums.keys():
+            if use_headings:
+                first_char = k[0].upper() if k else '#'
+                if not first_char.isalpha():
+                    first_char = '#'
+                if first_char != current_letter:
+                    current_letter = first_char
+                    items.append({'name': first_char, 'type': 'heading'})
+            items.append({'name': k, 'type': 'album', 'mode': 'ALBUM_VIEW'})
         return "ALBUMS", items
 
     def get_fav_artists_list(self) -> Tuple[str, List[dict]]:

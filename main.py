@@ -2,9 +2,34 @@ import time
 import sys
 import traceback
 import subprocess
+import os
 from PIL import Image, ImageOps, ImageDraw
 
 import config as cfg
+
+
+def _git_pull_on_startup():
+    """Pull latest changes from git on startup."""
+    try:
+        # Get the directory where main.py is located
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        result = subprocess.run(
+            ["git", "pull", "--ff-only"],
+            cwd=script_dir,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        if result.returncode == 0:
+            output = result.stdout.strip()
+            if "Already up to date" not in output:
+                print(f"Git pull: {output}")
+        else:
+            print(f"Git pull failed: {result.stderr.strip()}")
+    except Exception as e:
+        print(f"Git pull error: {e}")
+
+
 from core.audio import AudioEngine
 from core.inputs import InputHandler
 from core.battery import get_battery_monitor
@@ -478,4 +503,5 @@ class Launcher:
                 print(f"Display Error: {e}")
 
 if __name__ == "__main__":
+    _git_pull_on_startup()
     Launcher().run()
