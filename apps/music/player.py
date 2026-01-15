@@ -184,7 +184,7 @@ class MusicPlayerApp:
             new_mode = item['mode']
 
             # Show loading for potentially large lists
-            if new_mode in ['PLAYLIST_VIEW', 'RECENTS', 'ARTIST_VIEW', 'ALBUM_VIEW', 'FAV_TRACKS_VIEW', 'TRACKS_VIEW']:
+            if new_mode in ['PLAYLIST_VIEW', 'RECENTS', 'ARTIST_VIEW', 'ALBUM_VIEW', 'FAV_TRACKS_VIEW', 'TRACKS_VIEW', 'ARTISTS_ROOT', 'ALBUMS_ROOT']:
                 self._show_loading("Loading...")
 
             self.mode = new_mode
@@ -336,21 +336,27 @@ class MusicPlayerApp:
 
         if self.mode == 'ROOT':
             self.state.album, self.state.items = self.browse.get_root_menu()
+            self.state.scrollable_items = self.state.items
 
         elif self.mode == 'ARTISTS_ROOT':
             self.state.album, self.state.items = self.browse.get_artists_list()
+            self.state.scrollable_items = self.state.items
 
         elif self.mode == 'ALBUMS_ROOT':
             self.state.album, self.state.items = self.browse.get_albums_list()
+            self.state.scrollable_items = self.state.items
 
         elif self.mode == 'FAV_ARTISTS':
             self.state.album, self.state.items = self.browse.get_fav_artists_list()
+            self.state.scrollable_items = self.state.items
 
         elif self.mode == 'FAV_ALBUMS':
             self.state.album, self.state.items = self.browse.get_fav_albums_list()
+            self.state.scrollable_items = self.state.items
 
         elif self.mode == 'PLAYLISTS_ROOT':
             self.state.album, self.state.items = self.browse.get_playlists_list()
+            self.state.scrollable_items = self.state.items
 
         elif self.mode == 'TRACKS_VIEW':
             shuffle = self.state.shuffle_active
@@ -358,6 +364,7 @@ class MusicPlayerApp:
             self.state.album = album
             if not tracks:
                 self.state.items = [{'name': '(No Tracks)', 'type': 'info'}]
+                self.state.scrollable_items = self.state.items
             else:
                 self._load_tracks(tracks)
                 self.state.browsing_cover_s = cover
@@ -369,6 +376,7 @@ class MusicPlayerApp:
             self.state.album = album
             if not tracks:
                 self.state.items = [{'name': '(No Fav Songs)', 'type': 'info'}]
+                self.state.scrollable_items = self.state.items
             else:
                 self._load_tracks(tracks)
                 self.state.browsing_cover_s = cover
@@ -411,6 +419,7 @@ class MusicPlayerApp:
             album, items, cover = self.browse.get_files_list(self.current_path, self.state.playing_path)
             self.state.album = album
             self.state.items = items
+            self.state.scrollable_items = items
             self.state.browsing_cover_s = cover
 
         self.state.total_items = len(self.state.items)
@@ -423,8 +432,11 @@ class MusicPlayerApp:
 
         # Build items: pinned first, then controls bar
         self.state.items = list(pinned_items)
+        self.state.pinned_items = list(pinned_items)
+        
         controls_idx = len(self.state.items)
         self.state.items.append({'type': 'controls'})
+        self.state.pinned_items.append({'type': 'controls'})
 
         # Set initial selection to controls bar
         self.state.selection_index = controls_idx
@@ -448,6 +460,7 @@ class MusicPlayerApp:
         ]
         
         self.state.items.extend(processed_items)
+        self.state.scrollable_items = processed_items
 
     def _play_screensaver_album(self):
         """Play the album shown on the screensaver."""
@@ -549,9 +562,9 @@ class MusicPlayerApp:
         if self.state.screensaver_image:
             return self.renderer.render_screensaver(self.state)
 
-        # Separate pinned items and scrollable items
-        pinned_items = [item for item in self.state.items if item.get('pinned')]
-        scrollable_items = [item for item in self.state.items if not item.get('pinned')]
+        # Use pre-calculated item lists
+        pinned_items = self.state.pinned_items
+        scrollable_items = self.state.scrollable_items
 
         pinned_count = len(pinned_items)
 

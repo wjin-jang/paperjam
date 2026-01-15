@@ -22,6 +22,13 @@ class BrowseHandler:
             library_manager: Library manager instance
         """
         self.lib = library_manager
+        self._artist_list_cache = None
+        self._album_list_cache = None
+
+    def clear_cache(self):
+        """Clear the browse cache."""
+        self._artist_list_cache = None
+        self._album_list_cache = None
 
     def get_root_menu(self) -> Tuple[str, List[dict]]:
         """Get the root menu items."""
@@ -68,11 +75,15 @@ class BrowseHandler:
 
     def get_artists_list(self) -> Tuple[str, List[dict]]:
         """Get list of all artists, organized alphabetically with headings."""
-        return "ARTISTS", self._create_alphabetical_list(self.lib.artists, 'artist', 'ARTIST_VIEW')
+        if self._artist_list_cache is None:
+            self._artist_list_cache = self._create_alphabetical_list(self.lib.artists, 'artist', 'ARTIST_VIEW')
+        return "ARTISTS", self._artist_list_cache
 
     def get_albums_list(self) -> Tuple[str, List[dict]]:
         """Get list of all albums."""
-        return "ALBUMS", self._create_alphabetical_list(self.lib.albums, 'album', 'ALBUM_VIEW')
+        if self._album_list_cache is None:
+            self._album_list_cache = self._create_alphabetical_list(self.lib.albums, 'album', 'ALBUM_VIEW')
+        return "ALBUMS", self._album_list_cache
 
     def get_fav_artists_list(self) -> Tuple[str, List[dict]]:
         """Get list of favorite artists."""

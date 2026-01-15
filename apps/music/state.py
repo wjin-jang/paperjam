@@ -10,6 +10,8 @@ from typing import List, Optional, Set, Any
 class PlayerState:
     """State container for the music player."""
     items: List[dict] = field(default_factory=list)
+    pinned_items: List[dict] = field(default_factory=list)
+    scrollable_items: List[dict] = field(default_factory=list)
     selection_index: int = 0
     view_start_index: int = 0
     controls_index: int = 0  # Selected button in controls bar (0=back, 1=shuffle, 2=loop, 3=fav)
@@ -63,6 +65,8 @@ class PlayerState:
     def reset_browsing_state(self):
         """Reset browsing-related state."""
         self.items = []
+        self.pinned_items = []
+        self.scrollable_items = []
         self.artist = ""
         self.year = ""
         self.controls_index = 0
