@@ -145,6 +145,72 @@ class MusicViewRenderer(RenderBase):
             fill=cfg.WHITE, outline=cfg.BLACK
         )
 
+    def _render_item(self, item, x, y, w, h, is_selected, display_idx, state):
+        """Helper to render a single list item."""
+        itype = item.get('type')
+
+        # Controls bar
+        if itype == 'controls':
+            self.render_controls(y, w + 8, state, is_selected)
+            return
+
+        # Info items
+        if itype == 'info':
+            self._render_info_columns(item, x, y, w + 8, h)
+            return
+
+        # Heading items
+        if itype == 'heading':
+            name_str = sanitize_text(item.get('name', '')).upper()
+            self.draw.rectangle((x, y, x + w + 8, y + h - 1), fill=cfg.BLACK)
+            self.draw_text_box(name_str, x, y, w + 8, h, invert=True, font=cfg.FONT_MAIN)
+            if is_selected:
+                self.draw.rectangle((x + 1, y + 1, x + w + 7, y + h - 1), outline=cfg.WHITE)
+            return
+
+        # Regular items with icons
+        icons = cfg.MENU_ICONS
+        current_status_icon = icons.get('playing', 'Ⓟ') if state.is_playing else icons.get('paused', 'Ⓢ')
+        is_active_item = False
+        
+        if itype == 'file':
+            if state.playing_path and str(item.get('path')) == str(state.playing_path):
+                is_active_item = True
+        elif itype == 'album':
+            if state.playing_album and item.get('name') == state.playing_album:
+                is_active_item = True
+        elif itype == 'artist':
+            if state.playing_artist and item.get('name') == state.playing_artist:
+                is_active_item = True
+
+        if is_active_item:
+            icon_str = current_status_icon
+        elif itype == 'file':
+            if 'icon' in item and item['icon'] == 'P':
+                icon_str = current_status_icon
+            elif 'icon' in item and item['icon'] not in ('S', ''):
+                icon_str = item['icon']
+                if not icon_str.endswith('.'): icon_str += "."
+            else:
+                track_num = item.get('track', 0)
+                icon_val = track_num if track_num else display_idx
+                icon_str = f"{icon_val}." if icon_val else ""
+        else:
+            if 'icon' in item:
+                icon_str = item['icon']
+            elif itype == 'dir': icon_str = icons.get('dir', 'Ⓕ')
+            elif itype == 'artist': icon_str = icons.get('artist', 'Ⓐ')
+            elif itype == 'album': icon_str = icons.get('album', 'Ⓑ')
+            elif itype == 'recent': icon_str = icons.get('recent', 'Ⓡ')
+            elif itype == 'playlist':
+                icon_str = icons.get('playlist', 'Ⓛ')
+                if "Fav" in item.get('name', ""): icon_str = icons.get('fav', 'Ⓗ')
+            else: icon_str = item.get('icon', '★')
+
+        self.draw_text_box(icon_str, x, y, 12, h, invert=is_selected, center=True)
+        name_str = sanitize_text(item.get('title', item.get('name', '')))
+        self.draw_text_box(name_str, x + 12, y, w - 4, h, invert=is_selected)
+
     def render(self, state, view_items):
         """Render the full music view."""
         self.clear()
@@ -181,9 +247,10 @@ class MusicViewRenderer(RenderBase):
 
         pinned_count = len(pinned_items)
 
-        # Render pinned info items (always visible at top)
-        for item in pinned_items:
-            self._render_info_columns(item, cfg.PANEL_X, list_start_y, cfg.PANEL_W, cfg.ROW_HEIGHT)
+        # Render pinned items (always visible at top)
+        for i, item in enumerate(pinned_items):
+            is_selected = (i == state.selection_index)
+            self._render_item(item, cfg.PANEL_X, list_start_y, cfg.PANEL_W - 8, cfg.ROW_HEIGHT, is_selected, None, state)
             list_start_y += cfg.ROW_HEIGHT
 
         avail_h = (cfg.PANEL_Y + cfg.PANEL_H) - list_start_y
@@ -192,7 +259,7 @@ class MusicViewRenderer(RenderBase):
         has_scrollbar = scrollable_total * cfg.ROW_HEIGHT > avail_h
         item_w = cfg.PANEL_W - 16 if has_scrollbar else cfg.PANEL_W - 8
 
-        # Calculate how many headings/info items are before the current view slice to keep index consistent
+        # Calculate how many tracks are before the current view slice to keep index consistent
         track_offset = 0
         for j in range(state.view_start_index):
             itype = state.items[j + pinned_count].get('type')
@@ -206,101 +273,34 @@ class MusicViewRenderer(RenderBase):
                 break
             draw_h = min(cfg.ROW_HEIGHT, remaining_h)
 
-            # Index for selection
             abs_idx = state.view_start_index + i + pinned_count
             is_selected = (abs_idx == state.selection_index)
 
-            itype = item.get('type')
-            
             # Track index for display (skipping headings/info)
+            itype = item.get('type')
+            display_idx = None
             if itype not in ('heading', 'info', 'controls'):
                 track_offset += 1
                 display_idx = track_offset
-            else:
-                display_idx = None
 
-            # Controls bar - scrollable row with icons
-            if itype == 'controls':
-                self.render_controls(y_pos, item_w + 8, state, is_selected)
-                continue
+            self._render_item(item, cfg.PANEL_X, y_pos, item_w, draw_h, is_selected, display_idx, state)
 
-            # Info items - non-selectable, can have columns
-            if itype == 'info':
-                self._render_info_columns(item, cfg.PANEL_X, y_pos, item_w + 8, draw_h)
-                continue
+        if has_scrollbar:
+            # Adjust scrollbar for pinned items
+            adjusted_selection = max(0, state.selection_index - pinned_count)
+            self.render_scrollbar(
+                scrollable_total, adjusted_selection, state.page_size,
+                cfg.PANEL_X + cfg.PANEL_W - 8, list_start_y, avail_h + 1
+            )
 
-            # Heading items - uppercase, white on black, inner box when selected
-            if itype == 'heading':
-                name_str = sanitize_text(item.get('name', '')).upper()
-                # Draw black background
-                self.draw.rectangle(
-                    (cfg.PANEL_X, y_pos, cfg.PANEL_X + item_w + 8, y_pos + draw_h - 1),
-                    fill=cfg.BLACK
-                )
-                # Draw white text
-                self.draw_text_box(name_str, cfg.PANEL_X, y_pos, item_w + 8, draw_h,
-                                   invert=True, center=False, font=cfg.FONT_MAIN)
-                # Draw inner box when selected
-                if is_selected:
-                    self.draw.rectangle(
-                        (cfg.PANEL_X + 1, y_pos + 1, cfg.PANEL_X + item_w + 7, y_pos + draw_h - 1),
-                        outline=cfg.WHITE
-                    )
-                continue
+        # Loading overlay
+        if state.loading_message:
+            self.render_loading(state.loading_message)
+        # Context menu overlay
+        elif state.context_menu_active:
+            self.render_context_menu(state)
 
-            # Determine icon for other item types
-            icons = cfg.MENU_ICONS
-            
-            # Check if this item is currently playing/paused
-            current_status_icon = icons.get('playing', 'Ⓟ') if state.is_playing else icons.get('paused', 'Ⓢ')
-            is_active_item = False
-            
-            if itype == 'file':
-                if state.playing_path and str(item.get('path')) == str(state.playing_path):
-                    is_active_item = True
-            elif itype == 'album':
-                if state.playing_album and item.get('name') == state.playing_album:
-                    is_active_item = True
-            elif itype == 'artist':
-                if state.playing_artist and item.get('name') == state.playing_artist:
-                    is_active_item = True
-
-            if is_active_item:
-                icon_str = current_status_icon
-            elif itype == 'file':
-                if 'icon' in item and item['icon'] == 'P':
-                    # Fallback for old logic if needed, though active_item should catch it
-                    icon_str = current_status_icon
-                elif 'icon' in item and item['icon'] not in ('S', ''):
-                    # Use provided icon if it's not the default 'S'
-                    icon_str = item['icon']
-                    if not icon_str.endswith('.'): icon_str += "."
-                else:
-                    # Use track number if available, otherwise use calculated display index
-                    track_num = item.get('track', 0)
-                    icon_val = track_num if track_num else display_idx
-                    icon_str = f"{icon_val}."
-            else:
-                if 'icon' in item:
-                    icon_str = item['icon']
-                elif itype == 'dir':
-                    icon_str = icons.get('dir', 'Ⓕ')
-                elif itype == 'artist':
-                    icon_str = icons.get('artist', 'Ⓐ')
-                elif itype == 'album':
-                    icon_str = icons.get('album', 'Ⓑ')
-                elif itype == 'recent':
-                    icon_str = icons.get('recent', 'Ⓡ')
-                elif itype == 'playlist':
-                    icon_str = icons.get('playlist', 'Ⓛ')
-                    if "Fav" in item.get('name', ""):
-                        icon_str = icons.get('fav', 'Ⓗ')
-                else:
-                    icon_str = item.get('icon', '★')
-
-            self.draw_text_box(icon_str, cfg.PANEL_X, y_pos, 12, draw_h, invert=is_selected, center=True)
-            name_str = sanitize_text(item.get('title', item.get('name', '')))
-            self.draw_text_box(name_str, cfg.PANEL_X + 12, y_pos, item_w - 4, draw_h, invert=is_selected)
+        return self.canvas
 
         if has_scrollbar:
             # Adjust scrollbar for pinned items

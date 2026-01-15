@@ -489,84 +489,12 @@ class MusicPlayerApp:
             self.state.browsing_cover_s = cover
 
         elif self.mode == 'QUEUE_VIEW':
-            self.state.pinned_items = []
-            
-            # Manual Queue
-            manual_items = []
-            if self.playlist.manual_queue:
-                manual_items.append({'name': 'MANUAL QUEUE', 'type': 'heading'})
-                for p_str in self.playlist.manual_queue:
-                    p = Path(p_str)
-                    try:
-                        name = extract_track_info(p).title
-                    except:
-                        name = p.stem
-                    manual_items.append({
-                        'name': name, 'type': 'file', 'path': p, 'icon': 'Q'
-                    })
-
-            # Auto Queue
-            auto_items = []
-            if self.playlist.has_queue:
-                auto_items.append({'name': 'AUTO QUEUE', 'type': 'heading'})
-                # Show next 20 items from auto queue
-                # Include current playing track in search range to pin it
-                start_idx = self.playlist.queue_idx
-                count = 0
-                idx = start_idx
-                while count < 20:
-                    real_idx = self.playlist.queue[idx]
-                    path_str = self.playlist.playlist_source[real_idx]
-                    p = Path(path_str)
-                    try:
-                        name = extract_track_info(p).title
-                    except:
-                        name = p.stem
-                    
-                    # Distinguish icon based on queue position relative to playing
-                    icon = str(count) if count > 0 else "P"
-                    
-                    auto_items.append({
-                        'name': name, 'type': 'file', 'path': p, 'icon': icon
-                    })
-                    
-                    idx = (idx + 1) % len(self.playlist.queue)
-                    if idx == start_idx: break
-                    count += 1
-            
-            all_items = manual_items + auto_items
-            
-            # Find and pin playing item
-            playing_item = None
-            if self.state.playing_path:
-                for i, item in enumerate(all_items):
-                    if item.get('type') == 'file' and str(item.get('path')) == str(self.state.playing_path):
-                        playing_item = item
-                        del all_items[i]
-                        break
-                
-                # If not found in list (e.g. playing from outside queue or list truncated), create it
-                if not playing_item:
-                    p = Path(self.state.playing_path)
-                    try:
-                        name = extract_track_info(p).title
-                    except:
-                        name = p.stem
-                    playing_item = {'name': name, 'type': 'file', 'path': p}
-
-                playing_item['pinned'] = True
-                self.state.pinned_items.append(playing_item)
-
-            controls_item = {'type': 'controls'}
-            if not all_items and not self.state.pinned_items:
-                self.state.scrollable_items = [controls_item, {'name': '(Queue Empty)', 'type': 'info'}]
-            else:
-                self.state.scrollable_items = [controls_item] + all_items
-            
-            self.state.items = self.state.pinned_items + self.state.scrollable_items
-            
-            self.state.album = "QUEUE"
-            self.state.browsing_cover_s = self.state.playing_cover_s
+            title, pinned, scrollable, cover = self.browse.get_queue_view(self.playlist, self.state.playing_path)
+            self.state.album = title
+            self.state.pinned_items = pinned
+            self.state.scrollable_items = scrollable
+            self.state.items = pinned + scrollable
+            self.state.browsing_cover_s = cover
 
         self.state.total_items = len(self.state.items)
 

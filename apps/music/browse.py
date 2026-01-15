@@ -311,3 +311,92 @@ class BrowseHandler:
             pass
 
         return current_path.name, items, cover
+
+    def get_queue_view(self, playlist, playing_path: Optional[str]) -> Tuple[str, List[dict], List[dict], Optional[object]]:
+        """
+        Get items for Queue View.
+
+        Returns:
+            Tuple of (title, pinned_items, scrollable_items, cover)
+        """
+        pinned_items = []
+        
+        # Manual Queue
+        manual_items = []
+        if playlist.manual_queue:
+            manual_items.append({'name': 'MANUAL QUEUE', 'type': 'heading'})
+            for p_str in playlist.manual_queue:
+                p = Path(p_str)
+                try:
+                    name = extract_track_info(p).title
+                except:
+                    name = p.stem
+                manual_items.append({
+                    'name': name, 'type': 'file', 'path': p, 'icon': 'Q'
+                })
+
+        # Auto Queue
+        auto_items = []
+        if playlist.has_queue:
+            auto_items.append({'name': 'AUTO QUEUE', 'type': 'heading'})
+            start_idx = playlist.queue_idx
+            count = 0
+            idx = start_idx
+            while count < 20:
+                real_idx = playlist.queue[idx]
+                path_str = playlist.playlist_source[real_idx]
+                p = Path(path_str)
+                try:
+                    name = extract_track_info(p).title
+                except:
+                    name = p.stem
+                
+                # Distinguish icon based on queue position relative to playing
+                icon = str(count) if count > 0 else "P"
+                
+                auto_items.append({
+                    'name': name, 'type': 'file', 'path': p, 'icon': icon
+                })
+                
+                idx = (idx + 1) % len(playlist.queue)
+                if idx == start_idx: break
+                count += 1
+        
+        all_items = manual_items + auto_items
+        
+        # Find and pin playing item
+        playing_item = None
+        if playing_path:
+            for i, item in enumerate(all_items):
+                if item.get('type') == 'file' and str(item.get('path')) == str(playing_path):
+                    playing_item = item
+                    del all_items[i]
+                    break
+            
+            # If not found in list (e.g. playing from outside queue or list truncated), create it
+            if not playing_item:
+                p = Path(playing_path)
+                try:
+                    name = extract_track_info(p).title
+                except:
+                    name = p.stem
+                playing_item = {'name': name, 'type': 'file', 'path': p, 'icon': 'P'}
+
+            playing_item['pinned'] = True
+            pinned_items.append(playing_item)
+
+        controls_item = {'type': 'controls', 'pinned': True}
+        pinned_items.append(controls_item)
+        
+        scrollable_items = []
+        if not all_items and not pinned_items:
+            scrollable_items = [{'name': '(Queue Empty)', 'type': 'info'}]
+        else:
+            scrollable_items = all_items
+
+        cover = None
+        if playing_path:
+            covers = get_cover(Path(playing_path))
+            cover = covers[0] if covers else None
+
+        return "QUEUE", pinned_items, scrollable_items, cover
