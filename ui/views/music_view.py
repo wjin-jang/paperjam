@@ -68,7 +68,7 @@ class MusicViewRenderer(RenderBase):
             )
 
             ix = bx + (btn_w - icon.width) // 2
-            iy = y_pos + (12 - icon.height) // 2
+            iy = y_pos + (cfg.ROW_HEIGHT - icon.height) // 2 + 1
             self.canvas.paste(icon, (ix, iy), mask=icon if not icon_inverted else None)
 
             if key == 'loop' and state.loop_mode == 2:
