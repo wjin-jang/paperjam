@@ -33,9 +33,9 @@ class UIRenderer:
         """Render music player view."""
         return self._music_view.render(state, view_items)
 
-    def render_menu(self, title, items, sel_idx, scroll_idx) -> Image.Image:
+    def render_menu(self, title, items, sel_idx, scroll_idx, info_indices=None) -> Image.Image:
         """Render menu view."""
-        return self._menu_view.render_menu(title, items, sel_idx, scroll_idx)
+        return self._menu_view.render_menu(title, items, sel_idx, scroll_idx, info_indices=info_indices)
 
     def render_shutdown(self, image=None) -> Image.Image:
         """Render shutdown screen."""
