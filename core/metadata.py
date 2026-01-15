@@ -17,7 +17,8 @@ def sanitize_text(text):
         try:
             text = Romanizer(text).romanize()
             text = ''.join([item['hepburn'] for item in kks.convert(text)])
-        except: pass 
+        except (ValueError, KeyError, AttributeError):
+            pass
     return text.encode('ascii', 'ignore').decode().strip()
 
 def format_track_name(file_path):
@@ -37,7 +38,8 @@ def parse_num(val):
     try:
         if isinstance(val, str): return int(val.split('/')[0])
         return int(val)
-    except: return 0
+    except (ValueError, TypeError, IndexError):
+        return 0
 
 def get_metadata(file_path):
     """
@@ -81,7 +83,8 @@ def get_metadata(file_path):
                 if 'TDRC' in tags: year = str(tags['TDRC'].text[0]).split('-')[0]
                 elif 'TYER' in tags: year = str(tags['TYER'].text[0])
 
-    except: pass
+    except (OSError, ValueError, KeyError, AttributeError):
+        pass
 
     album = clean_tag(album)
     album_artist = clean_tag(album_artist)

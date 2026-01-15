@@ -298,24 +298,37 @@ class MainApp:
         # This could be moved to SystemManager too
         import subprocess
         try:
-            r = subprocess.check_output(["pactl", "get-default-sink"], text=True, stderr=subprocess.DEVNULL).strip()
-            if any(x in r.lower() for x in ['bluez', 'usb', 'headphone']): return True
-        except: pass
+            r = subprocess.check_output(
+                ["pactl", "get-default-sink"],
+                text=True, stderr=subprocess.DEVNULL, timeout=2
+            ).strip()
+            if any(x in r.lower() for x in ['bluez', 'usb', 'headphone']):
+                return True
+        except (subprocess.SubprocessError, OSError):
+            pass
         return False
 
     def _check_wifi(self):
         import subprocess
         try:
-            r = subprocess.check_output(["iwgetid", "-r"], text=True, stderr=subprocess.DEVNULL).strip()
+            r = subprocess.check_output(
+                ["iwgetid", "-r"],
+                text=True, stderr=subprocess.DEVNULL, timeout=2
+            ).strip()
             return len(r) > 0
-        except: return False
+        except (subprocess.SubprocessError, OSError):
+            return False
 
     def _check_bluetooth(self):
         import subprocess
         try:
-            r = subprocess.check_output(["rfkill", "list", "bluetooth"], text=True, stderr=subprocess.DEVNULL)
+            r = subprocess.check_output(
+                ["rfkill", "list", "bluetooth"],
+                text=True, stderr=subprocess.DEVNULL, timeout=2
+            )
             return "Soft blocked: no" in r
-        except: return False
+        except (subprocess.SubprocessError, OSError):
+            return False
 
 if __name__ == "__main__":
     app = MainApp()

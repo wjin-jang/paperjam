@@ -49,7 +49,7 @@ class BrowseHandler:
         """Create a list with alphabetical headings if needed."""
         items = []
         current_letter = None
-        use_headings = len(data_dict) > 24
+        use_headings = len(data_dict) > cfg.ALPHABETICAL_HEADING_THRESHOLD
 
         for k in data_dict.keys():
             if use_headings:
@@ -144,7 +144,7 @@ class BrowseHandler:
                         'year': track.year, 'album': track.album,
                         'duration': track.duration
                     })
-                except:
+                except (OSError, ValueError, AttributeError):
                     tracks.append({
                         'path': p, 'title': p.stem, 'artist': None,
                         'year': None, 'album': None, 'duration': 0
@@ -250,11 +250,19 @@ class BrowseHandler:
         items = []
 
         # Add parent directory link if not at root
+        # Path traversal protection: ensure parent is within MUSIC_PATH
         if current_path != cfg.MUSIC_PATH:
-            items.append({
-                'name': '..', 'type': 'dir', 'mode': 'FILES',
-                'path': current_path.parent, 'icon': 'Ⓕ'
-            })
+            parent = current_path.parent
+            try:
+                # Resolve paths to handle symlinks and ensure parent is within music path
+                if parent.resolve().is_relative_to(cfg.MUSIC_PATH.resolve()):
+                    items.append({
+                        'name': '..', 'type': 'dir', 'mode': 'FILES',
+                        'path': parent, 'icon': 'Ⓕ'
+                    })
+            except (ValueError, OSError):
+                # is_relative_to may raise ValueError on older Python, OSError on bad paths
+                pass
 
         cover = None
         try:
@@ -281,7 +289,7 @@ class BrowseHandler:
                         album = track.album
                         disc = track.disc_num
                         track_num = track.track_num
-                    except:
+                    except (OSError, ValueError, AttributeError):
                         title = p.stem
                         artist = None
                         album = None
@@ -329,7 +337,7 @@ class BrowseHandler:
                 p = Path(p_str)
                 try:
                     name = extract_track_info(p).title
-                except:
+                except (OSError, ValueError, AttributeError):
                     name = p.stem
                 manual_items.append({
                     'name': name, 'type': 'file', 'path': p, 'icon': 'Q'
@@ -342,13 +350,20 @@ class BrowseHandler:
             start_idx = playlist.queue_idx
             count = 0
             idx = start_idx
-            while count < 20:
+            # Bounds check to prevent IndexError
+            if not playlist.queue or idx >= len(playlist.queue):
+                idx = 0
+            while count < cfg.QUEUE_VIEW_MAX_ITEMS and playlist.queue:
+                if idx >= len(playlist.queue):
+                    break
                 real_idx = playlist.queue[idx]
+                if real_idx >= len(playlist.playlist_source):
+                    break
                 path_str = playlist.playlist_source[real_idx]
                 p = Path(path_str)
                 try:
                     name = extract_track_info(p).title
-                except:
+                except (OSError, ValueError, AttributeError):
                     name = p.stem
                 
                 # Distinguish icon based on queue position relative to playing
@@ -383,7 +398,7 @@ class BrowseHandler:
                 p = Path(playing_path)
                 try:
                     name = extract_track_info(p).title
-                except:
+                except (OSError, ValueError, AttributeError):
                     name = p.stem
                 playing_item = {'name': name, 'type': 'file', 'path': p, 'icon': 'P'}
 

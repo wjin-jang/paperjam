@@ -29,13 +29,14 @@ class LibraryManager:
 
         self.is_scanning = False
         self._lock = threading.Lock()
+        self._scan_lock = threading.Lock()  # Separate lock for scan progress
         self._all_tracks_cache = None
 
-        # Scan progress tracking
-        self.scan_current_file = ""
-        self.scan_track_count = 0
-        self.scan_album_count = 0
-        self.scan_artist_count = 0
+        # Scan progress tracking (protected by _scan_lock)
+        self._scan_current_file = ""
+        self._scan_track_count = 0
+        self._scan_album_count = 0
+        self._scan_artist_count = 0
 
         cfg.DATA_DIR.mkdir(exist_ok=True)
         cfg.PLAYLIST_DIR.mkdir(parents=True, exist_ok=True)
@@ -58,14 +59,35 @@ class LibraryManager:
                 print(f"Cache load error: {e}")
         # Don't auto-scan here - let main.py handle welcome screen
 
+    @property
+    def scan_current_file(self):
+        with self._scan_lock:
+            return self._scan_current_file
+
+    @property
+    def scan_track_count(self):
+        with self._scan_lock:
+            return self._scan_track_count
+
+    @property
+    def scan_album_count(self):
+        with self._scan_lock:
+            return self._scan_album_count
+
+    @property
+    def scan_artist_count(self):
+        with self._scan_lock:
+            return self._scan_artist_count
+
     def scan_async(self, force=False):
         if self.is_scanning: return
         self.is_scanning = True
         # Reset progress tracking
-        self.scan_current_file = ""
-        self.scan_track_count = 0
-        self.scan_album_count = 0
-        self.scan_artist_count = 0
+        with self._scan_lock:
+            self._scan_current_file = ""
+            self._scan_track_count = 0
+            self._scan_album_count = 0
+            self._scan_artist_count = 0
         t = threading.Thread(target=self._scan_worker)
         t.daemon = True
         t.start()
@@ -87,8 +109,9 @@ class LibraryManager:
         for ext in cfg.VALID_EXTS:
             for p in cfg.MUSIC_PATH.rglob(f"*{ext}"):
                 try:
-                    # Update progress
-                    self.scan_current_file = p.name[:30]
+                    # Update progress with lock
+                    with self._scan_lock:
+                        self._scan_current_file = p.name[:30]
 
                     track = extract_track_info(p)
 
@@ -110,10 +133,11 @@ class LibraryManager:
                     temp_artists.setdefault(canonical_artist, []).append(data)
                     temp_albums.setdefault(canonical_album, []).append(data)
 
-                    # Update counts
-                    self.scan_track_count += 1
-                    self.scan_album_count = len(temp_albums)
-                    self.scan_artist_count = len(temp_artists)
+                    # Update counts with lock
+                    with self._scan_lock:
+                        self._scan_track_count += 1
+                        self._scan_album_count = len(temp_albums)
+                        self._scan_artist_count = len(temp_artists)
                 except Exception as e:
                     print(f"Scan error processing {p}: {e}")
                     continue
@@ -124,7 +148,8 @@ class LibraryManager:
             self._all_tracks_cache = None
             self._save_cache()
 
-        self.scan_current_file = ""
+        with self._scan_lock:
+            self._scan_current_file = ""
         self.is_scanning = False
 
     def _save_cache(self):
@@ -214,7 +239,7 @@ class LibraryManager:
                 if with_album:
                     return covers[1], alb
                 return covers[1] # Return Large
-        except:
+        except (OSError, KeyError, IndexError):
             return (None, None) if with_album else None
 
     def load_recents(self):

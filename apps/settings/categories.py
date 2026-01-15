@@ -1,8 +1,10 @@
 """
 Settings category handlers for modular settings management.
 """
+import re
 import subprocess
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import List, Optional, Callable
 
 import config as cfg
@@ -81,10 +83,18 @@ class AudioCategory(SettingsCategory):
 
     def _init_volume(self):
         try:
-            cmd = f"amixer get '{self._mixer_control}' | grep -o '[0-9]*%' | head -1"
-            res = subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL).strip().replace('%', '')
-            self.volume_level = int(res)
-        except:
+            # Avoid shell=True to prevent shell injection
+            result = subprocess.check_output(
+                ["amixer", "get", self._mixer_control],
+                text=True, stderr=subprocess.DEVNULL, timeout=2
+            )
+            # Parse percentage from output
+            match = re.search(r'\[(\d+)%\]', result)
+            if match:
+                self.volume_level = int(match.group(1))
+            else:
+                self.volume_level = 50
+        except (subprocess.SubprocessError, ValueError, OSError):
             self.volume_level = 50
 
     def _refresh_audio_sinks(self):
@@ -169,9 +179,9 @@ class AudioCategory(SettingsCategory):
         try:
             subprocess.run(
                 ["amixer", "set", self._mixer_control, f"{self.volume_level}%"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
             )
-        except:
+        except (subprocess.SubprocessError, OSError):
             pass
 
     def build_menu(self) -> List[str]:
@@ -266,11 +276,11 @@ class DisplayCategory(SettingsCategory):
         """Check if HDMI output is enabled."""
         try:
             result = subprocess.check_output(
-                ["tvservice", "-s"], text=True, stderr=subprocess.DEVNULL
+                ["tvservice", "-s"], text=True, stderr=subprocess.DEVNULL, timeout=2
             ).strip()
             # "state 0x120006" means off, other states mean on
             return "off" not in result.lower() and "0x120006" not in result
-        except:
+        except (subprocess.SubprocessError, OSError):
             return True
 
     def _toggle_hdmi(self):
@@ -278,16 +288,16 @@ class DisplayCategory(SettingsCategory):
         try:
             if self._is_hdmi_enabled():
                 subprocess.run(["tvservice", "-o"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
             else:
                 subprocess.run(["tvservice", "-p"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
                 # Restore framebuffer after turning on
                 subprocess.run(["fbset", "-depth", "8"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
                 subprocess.run(["fbset", "-depth", "16"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except:
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+        except (subprocess.SubprocessError, OSError):
             pass
 
     def build_menu(self) -> List[str]:
@@ -337,10 +347,10 @@ class NetworkCategory(SettingsCategory):
         """Check if WiFi is enabled."""
         try:
             result = subprocess.check_output(
-                ["rfkill", "list", "wifi"], text=True, stderr=subprocess.DEVNULL
+                ["rfkill", "list", "wifi"], text=True, stderr=subprocess.DEVNULL, timeout=2
             )
             return "Soft blocked: no" in result
-        except:
+        except (subprocess.SubprocessError, OSError):
             return True
 
     def _toggle_wifi(self):
@@ -348,26 +358,26 @@ class NetworkCategory(SettingsCategory):
         try:
             if self._is_wifi_enabled():
                 subprocess.run(["sudo", "rfkill", "block", "wifi"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
             else:
                 subprocess.run(["sudo", "rfkill", "unblock", "wifi"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
                 # Bring interface up and reconnect
                 subprocess.run(["sudo", "ifconfig", "wlan0", "up"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
                 subprocess.run(["sudo", "wpa_cli", "-i", "wlan0", "reconnect"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except:
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+        except (subprocess.SubprocessError, OSError):
             pass
 
     def _is_bt_enabled(self) -> bool:
         """Check if Bluetooth is enabled."""
         try:
             result = subprocess.check_output(
-                ["rfkill", "list", "bluetooth"], text=True, stderr=subprocess.DEVNULL
+                ["rfkill", "list", "bluetooth"], text=True, stderr=subprocess.DEVNULL, timeout=2
             )
             return "Soft blocked: no" in result
-        except:
+        except (subprocess.SubprocessError, OSError):
             return True
 
     def _toggle_bt(self):
@@ -375,21 +385,25 @@ class NetworkCategory(SettingsCategory):
         try:
             if self._is_bt_enabled():
                 subprocess.run(["sudo", "rfkill", "block", "bluetooth"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
             else:
                 subprocess.run(["sudo", "rfkill", "unblock", "bluetooth"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except:
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+        except (subprocess.SubprocessError, OSError):
             pass
 
     def _get_wifi_info(self) -> str:
         if not self._is_wifi_enabled():
             return "OFF"
         try:
-            ssid = subprocess.check_output("iwgetid -r", shell=True, text=True).strip()
-            ip = subprocess.check_output(['hostname', '-I'], encoding='utf-8').split()[0]
+            ssid = subprocess.check_output(
+                ["iwgetid", "-r"], text=True, stderr=subprocess.DEVNULL, timeout=2
+            ).strip()
+            ip = subprocess.check_output(
+                ['hostname', '-I'], encoding='utf-8', timeout=2
+            ).split()[0]
             return f"{ssid} ({ip})"
-        except:
+        except (subprocess.SubprocessError, OSError, IndexError):
             return "Disconnected"
 
     def _get_bt_status(self) -> str:
@@ -401,7 +415,7 @@ class NetworkCategory(SettingsCategory):
                 if self.bt.is_connected(dev['mac']):
                     return dev['name'][:16]
             return "Not Connected"
-        except:
+        except (subprocess.SubprocessError, OSError, KeyError):
             return "Unavailable"
 
     def get_known_wifi_networks(self) -> List[dict]:
@@ -493,22 +507,28 @@ class SystemCategory(SettingsCategory):
 
     def _get_disk_usage(self) -> str:
         try:
-            return subprocess.check_output(
-                "df -h / | grep / | awk '{print $4}'",
-                shell=True, text=True
-            ).strip() + " Free"
-        except:
+            # Avoid shell=True - use Python to parse
+            result = subprocess.check_output(
+                ["df", "-h", "/"], text=True, timeout=2
+            )
+            # Parse the output: second line, fourth column
+            lines = result.strip().split('\n')
+            if len(lines) >= 2:
+                parts = lines[1].split()
+                if len(parts) >= 4:
+                    return parts[3] + " Free"
+            return "Unknown"
+        except (subprocess.SubprocessError, OSError, IndexError):
             return "Unknown"
 
     def _get_cpu_governor(self) -> str:
         """Get current CPU governor."""
         try:
-            result = subprocess.check_output(
-                ["cat", "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"],
-                text=True, stderr=subprocess.DEVNULL
-            ).strip()
-            return result
-        except:
+            # Read file directly instead of using cat subprocess
+            governor_path = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+            with open(governor_path, 'r') as f:
+                return f.read().strip()
+        except (OSError, IOError):
             return "unknown"
 
     def _toggle_cpu_powersave(self):
@@ -519,12 +539,13 @@ class SystemCategory(SettingsCategory):
                 new_gov = "ondemand"
             else:
                 new_gov = "powersave"
-            # Set governor for all CPUs
+            # Set governor for all CPUs using sudo tee
+            # Shell is needed here for glob pattern, but new_gov is controlled
             subprocess.run(
-                f"echo {new_gov} | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor",
-                shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                ["sudo", "tee"] + list(Path("/sys/devices/system/cpu/").glob("cpu*/cpufreq/scaling_governor")),
+                input=new_gov, text=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
             )
-        except:
+        except (subprocess.SubprocessError, OSError):
             pass
 
     def build_menu(self) -> List[str]:

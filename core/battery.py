@@ -14,6 +14,7 @@ class BatteryMonitor:
         self._percentage = -1
         self._charging = False
         self._lock = threading.Lock()
+        self._i2c_lock = threading.Lock()  # Separate lock for I2C operations
         self._running = False
         self._bus = None
         self._init_i2c()
@@ -33,19 +34,21 @@ class BatteryMonitor:
         if not self._bus:
             return -1, False
 
-        try:
-            # Read battery percentage from 0x2A
-            pct = self._bus.read_byte_data(I2C_ADDR, 0x2A)
-            pct = max(0, min(100, pct))
+        # Use I2C lock to prevent concurrent I2C access
+        with self._i2c_lock:
+            try:
+                # Read battery percentage from 0x2A
+                pct = self._bus.read_byte_data(I2C_ADDR, 0x2A)
+                pct = max(0, min(100, pct))
 
-            # Read charging status from register 0x02
-            # Bit 7 (0x80) indicates external power connected
-            status = self._bus.read_byte_data(I2C_ADDR, 0x02)
-            charging = bool(status & 0x80)
+                # Read charging status from register 0x02
+                # Bit 7 (0x80) indicates external power connected
+                status = self._bus.read_byte_data(I2C_ADDR, 0x02)
+                charging = bool(status & 0x80)
 
-            return pct, charging
-        except Exception:
-            return -1, False
+                return pct, charging
+            except Exception:
+                return -1, False
 
     def start(self):
         """Start background battery monitoring."""

@@ -2,6 +2,7 @@
 Playlist and queue management for the music player.
 """
 import random
+import threading
 from collections import deque
 from pathlib import Path
 from typing import List, Optional, Callable
@@ -19,6 +20,7 @@ class PlaylistManager:
         Args:
             on_track_change: Callback when track changes, receives (path, covers)
         """
+        self._lock = threading.Lock()  # Lock for thread-safe queue operations
         self.playlist_source: List[str] = []
         self.queue: List[int] = []
         self.queue_idx: int = 0
@@ -68,12 +70,14 @@ class PlaylistManager:
         return self.playlist_source[real_idx]
 
     def add_to_manual_queue(self, path: str):
-        """Add a track to the manual queue."""
-        self.manual_queue.append(path)
+        """Add a track to the manual queue (thread-safe)."""
+        with self._lock:
+            self.manual_queue.append(path)
 
     def clear_manual_queue(self):
-        """Clear the manual queue."""
-        self.manual_queue.clear()
+        """Clear the manual queue (thread-safe)."""
+        with self._lock:
+            self.manual_queue.clear()
 
     def next_track(self, auto_advance=False) -> Optional[str]:
         """

@@ -72,6 +72,11 @@ ROW_HEIGHT = 12
 WHITE = 255
 BLACK = 0
 
+# --- UI Constants ---
+CONTROLS_BUTTON_COUNT = 4  # Number of buttons in controls bar (back, shuffle, loop, action)
+ALPHABETICAL_HEADING_THRESHOLD = 24  # Min items before showing alphabetical headings
+QUEUE_VIEW_MAX_ITEMS = 20  # Max items to show in queue view
+
 # --- Behavior ---
 SCREENSAVER_OPTIONS = [10, 30, 60, 300, 1800, 0] 
 LONG_PRESS_OPTIONS = [0.3, 0.5, 0.8, 1.0, 1.5, 2.0]

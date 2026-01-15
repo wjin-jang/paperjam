@@ -59,11 +59,15 @@ class BluetoothManager:
 
     def is_connected(self, mac):
         """Checks if a specific device is currently connected."""
+        if not self._is_valid_mac(mac):
+            return False
         info = self._run_cmd(['bluetoothctl', 'info', mac])
         return "Connected: yes" in info
 
     def _is_audio_device(self, mac):
         """Check if a device is an audio device based on its icon/class."""
+        if not self._is_valid_mac(mac):
+            return False
         info = self._run_cmd(['bluetoothctl', 'info', mac])
         # Check for audio-related icons
         audio_icons = ['audio-headset', 'audio-headphones', 'audio-card', 'audio-speakers']
@@ -81,7 +85,7 @@ class BluetoothManager:
                     major_class = (class_val >> 8) & 0x1F
                     if major_class == 0x04:
                         return True
-                except:
+                except (ValueError, IndexError):
                     pass
         return False
 
@@ -108,13 +112,16 @@ class BluetoothManager:
                             continue
                     devices.append({'mac': mac, 'name': name, 'paired': True})
             return devices
-        except:
+        except (subprocess.SubprocessError, OSError):
             return []
 
     def start_scan(self, callback):
-        if self.is_scanning: return
-        self.is_scanning = True
-        self.found_devices = {}
+        # Use lock to prevent race condition on is_scanning check
+        with self._lock:
+            if self.is_scanning:
+                return
+            self.is_scanning = True
+            self.found_devices = {}
         
         def scan_worker():
             # Start bluetoothctl scan in background
@@ -164,8 +171,10 @@ class BluetoothManager:
 
                             # Fire Callback
                             callback(list(self.found_devices.values()))
-                        except: pass
-            except: pass
+                        except (ValueError, IndexError):
+                            pass
+            except (OSError, IOError):
+                pass
             finally:
                 self._stop_scan_process()
 
@@ -185,10 +194,15 @@ class BluetoothManager:
                 self.scan_process.stdin.flush()
                 time.sleep(0.1)
                 self.scan_process.terminate()
-            except: pass
+                self.scan_process.wait(timeout=2)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
             self.scan_process = None
 
     def connect_async(self, mac, callback):
+        if not self._is_valid_mac(mac):
+            callback(False, "INVALID MAC")
+            return
         t = threading.Thread(target=self._connect_worker, args=(mac, callback))
         t.daemon = True
         t.start()
@@ -211,7 +225,8 @@ class BluetoothManager:
             try:
                 proc.stdin.write(cmd + "\n")
                 proc.stdin.flush()
-            except: pass
+            except (OSError, IOError):
+                pass
 
         # Trust and Pair first (good practice)
         send(f'trust {mac}')
@@ -258,8 +273,11 @@ class BluetoothManager:
                 time.sleep(2)
                 send(f'connect {mac}')
 
-        try: proc.terminate()
-        except: pass
+        try:
+            proc.terminate()
+            proc.wait(timeout=2)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
         
         # Final safety check
         if not success and self.is_connected(mac):
@@ -269,7 +287,11 @@ class BluetoothManager:
         callback(success, msg)
 
     def forget_device(self, mac):
+        if not self._is_valid_mac(mac):
+            return
         self._run_cmd(['bluetoothctl', 'remove', mac])
 
     def disconnect_device(self, mac):
+        if not self._is_valid_mac(mac):
+            return
         self._run_cmd(['bluetoothctl', 'disconnect', mac])

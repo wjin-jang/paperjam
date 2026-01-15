@@ -165,7 +165,7 @@ class MusicPlayerApp:
         if self.state.context_menu_active:
             nav_req = self.context_menu.execute_action(self.mode, self.refresh_list)
             self._sync_context_state()
-            
+
             if nav_req:
                 self.history.append((self.mode, self.current_path, self.state.selection_index))
                 self.mode = nav_req['mode']
@@ -174,6 +174,9 @@ class MusicPlayerApp:
                 self.refresh_list()
             return
 
+        # Bounds check before accessing items
+        if not self.state.items or not (0 <= self.state.selection_index < len(self.state.items)):
+            return
         item = self.state.items[self.state.selection_index]
         item_type = item.get('type')
 
@@ -230,6 +233,9 @@ class MusicPlayerApp:
         if self.state.context_menu_active:
             return
 
+        # Bounds check before accessing items
+        if not self.state.items or not (0 <= self.state.selection_index < len(self.state.items)):
+            return
         item = self.state.items[self.state.selection_index]
         # Allow context menu for artists and albums too now
         if item['type'] in ['file', 'playlist', 'artist', 'album']:
@@ -245,7 +251,7 @@ class MusicPlayerApp:
             info = extract_track_info(Path(path))
             self.state.playing_artist = info.artist
             self.state.playing_album = info.album
-        except:
+        except (OSError, ValueError, AttributeError):
             self.state.playing_artist = None
             self.state.playing_album = None
 
@@ -292,7 +298,7 @@ class MusicPlayerApp:
         if from_user and not self.state.screensaver_image:
             item = self.state.items[self.state.selection_index] if self.state.items else None
             if item and item.get('type') == 'controls':
-                self.state.controls_index = min(3, self.state.controls_index + 1)
+                self.state.controls_index = min(cfg.CONTROLS_BUTTON_COUNT - 1, self.state.controls_index + 1)
                 return
 
         # Handle Loop One (Auto-advance only)
@@ -344,7 +350,7 @@ class MusicPlayerApp:
             info = extract_track_info(Path(path))
             self.state.playing_artist = info.artist
             self.state.playing_album = info.album
-        except:
+        except (OSError, ValueError, AttributeError):
             self.state.playing_artist = None
             self.state.playing_album = None
 
