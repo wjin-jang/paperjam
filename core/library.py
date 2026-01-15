@@ -29,6 +29,7 @@ class LibraryManager:
 
         self.is_scanning = False
         self._lock = threading.Lock()
+        self._all_tracks_cache = None
 
         # Scan progress tracking
         self.scan_current_file = ""
@@ -117,6 +118,7 @@ class LibraryManager:
         with self._lock:
             self.artists = dict(sorted(temp_artists.items(), key=lambda x: x[0].lower()))
             self.albums = dict(sorted(temp_albums.items(), key=lambda x: x[0].lower()))
+            self._all_tracks_cache = None
             self._save_cache()
 
         self.scan_current_file = ""
@@ -296,13 +298,16 @@ class LibraryManager:
         Returns:
             List of track dicts with path, title, artist, album, year
         """
-        all_tracks = []
-        for album_tracks in self.albums.values():
-            all_tracks.extend(album_tracks)
+        # Return cached list if available and no shuffle
+        if not shuffle and self._all_tracks_cache is not None:
+            return self._all_tracks_cache
 
-        if shuffle:
-            random.shuffle(all_tracks)
-        else:
+        # If we need to rebuild the list (first run or cache cleared)
+        if self._all_tracks_cache is None:
+            all_tracks = []
+            for album_tracks in self.albums.values():
+                all_tracks.extend(album_tracks)
+
             # Sort by artist, then album, then disc/track
             all_tracks.sort(key=lambda x: (
                 x.get('artist', '').lower(),
@@ -310,5 +315,12 @@ class LibraryManager:
                 x.get('disc', 0),
                 x.get('track', 0)
             ))
+            self._all_tracks_cache = all_tracks
 
-        return all_tracks
+        # If shuffle is requested, return a shuffled copy of the cache
+        if shuffle:
+            shuffled = list(self._all_tracks_cache)
+            random.shuffle(shuffled)
+            return shuffled
+        
+        return self._all_tracks_cache

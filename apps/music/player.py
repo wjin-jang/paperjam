@@ -421,31 +421,33 @@ class MusicPlayerApp:
         pinned_items = [t for t in tracks if t.get('pinned')]
         other_items = [t for t in tracks if not t.get('pinned')]
 
-        # Build items: pinned first, then controls bar, then tracks
+        # Build items: pinned first, then controls bar
         self.state.items = list(pinned_items)
-        controls_idx = len(self.state.items)  # Index of controls bar
+        controls_idx = len(self.state.items)
         self.state.items.append({'type': 'controls'})
 
-        # Set initial selection to controls bar (first selectable item)
+        # Set initial selection to controls bar
         self.state.selection_index = controls_idx
 
-        for t in other_items:
-            item_type = t.get('type')
-            # Pass through heading and info items as-is
-            if item_type in ('heading', 'info'):
-                self.state.items.append(t)
-                continue
-            # Convert track dicts to item format
-            icon = 'P' if self.state.playing_path == str(t.get('path', '')) else 'S'
-            self.state.items.append({
+        # Optimized list construction
+        playing_path = self.state.playing_path
+        
+        # Pre-process items that don't need conversion (heading, info)
+        # and convert track items in one pass using list comprehension
+        processed_items = [
+            t if t.get('type') in ('heading', 'info') else {
                 'name': t.get('title', ''),
                 'type': 'file',
                 'path': t.get('path'),
-                'icon': icon,
+                'icon': 'P' if playing_path == str(t.get('path', '')) else 'S',
                 'artist': t.get('artist'),
                 'album': t.get('album'),
                 'track': t.get('track', 0)
-            })
+            }
+            for t in other_items
+        ]
+        
+        self.state.items.extend(processed_items)
 
     def _play_screensaver_album(self):
         """Play the album shown on the screensaver."""
