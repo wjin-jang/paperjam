@@ -187,7 +187,11 @@ class MusicViewRenderer(RenderBase):
             icon_str = current_status_icon
         elif itype == 'file':
             if 'icon' in item and item['icon'] == 'P':
-                icon_str = current_status_icon
+                # Stale 'P' icon from previous state (list wasn't refreshed)
+                # Revert to track number or index
+                track_num = item.get('track', 0)
+                icon_val = track_num if track_num else display_idx
+                icon_str = f"{icon_val}." if icon_val else ""
             elif 'icon' in item and item['icon'] not in ('S', ''):
                 icon_str = item['icon']
                 if not icon_str.endswith('.'): icon_str += "."

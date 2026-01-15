@@ -166,13 +166,13 @@ class InputHandler:
             action = 'up'
         elif code == ecodes.KEY_KP2 or code == ecodes.KEY_DOWN:
             action = 'down'
-        elif code == ecodes.KEY_KPDOT or code == ecodes.KEY_BACKSPACE:
+        elif code == ecodes.KEY_KP0 or code == ecodes.KEY_BACKSPACE:
             action = 'back_long' if is_long else 'back'
         elif code == ecodes.KEY_KPENTER or code == ecodes.KEY_ENTER:
             action = 'enter_long' if is_long else 'enter'
 
         # Play/pause keys
-        elif code in (ecodes.KEY_KP0, ecodes.KEY_P, ecodes.KEY_PLAYPAUSE,
+        elif code in (ecodes.KEY_KP5, ecodes.KEY_P, ecodes.KEY_PLAYPAUSE,
                       ecodes.KEY_PLAYCD, ecodes.KEY_PAUSECD):
             action = 'play_pause_long' if is_long else 'play_pause'
 
