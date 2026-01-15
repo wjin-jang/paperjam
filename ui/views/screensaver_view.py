@@ -50,15 +50,19 @@ class ScreensaverRenderer:
             raw_status = state.get_status_text()
             icon = cfg.STATUS_ICONS.get(raw_status, 'Ⓘ')
 
-            pw = cfg.ROW_HEIGHT
-            ph = cfg.ROW_HEIGHT
+            pw = cfg.ROW_HEIGHT + 2  # Add 2 for borders
+            ph = cfg.ROW_HEIGHT + 2
             px = x + img.width + 8
             py = y + img.height - ph
 
-            status_panel = Panel(px, py, pw, ph)
-            status_menu = status_panel.create_menu()
-            status_menu.items = [TextItem(icon, selectable=False)]
-            status_panel.render(self.canvas)
+            # Draw panel manually for this small indicator
+            self.draw.rectangle((px + 1, py + 1, px + pw + 1, py + ph + 1), outline=cfg.BLACK)
+            self.draw.rectangle((px, py, px + pw, py + ph), fill=cfg.WHITE, outline=cfg.BLACK)
+            # Center the icon text
+            bbox = self.draw.textbbox((0, 0), icon, font=cfg.FONT_HEADER)
+            text_w = bbox[2] - bbox[0]
+            text_x = px + (pw - text_w) // 2
+            self.draw.text((text_x, py + 2), icon, font=cfg.FONT_HEADER, fill=cfg.BLACK)
 
         return self.canvas
 
