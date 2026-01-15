@@ -316,12 +316,7 @@ class MusicPlayerApp:
             self.audio.stop()
             self.state.is_playing = False
             self.state.set_status_message("IDLE")
-            # Ensure we load the first track (reset) so user can play again
-            if self.playlist.queue:
-                # PlaylistManager.next_track already reset queue_idx to 0 if it returned None
-                path = self.playlist.get_current_path()
-                if path:
-                    self._play_media(path, play=False)
+            # Don't auto-reset to the first track; stay on the current (last) track
 
     def prev_track(self):
         if not self.state.screensaver_image:
