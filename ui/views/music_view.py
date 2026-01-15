@@ -28,6 +28,10 @@ class MusicViewRenderer(RenderBase):
         )
         btn_w = w // 4
         icon_keys = ['back', 'shuffle', 'loop', 'fav']
+        
+        # Swap fav for clear in queue view
+        if state.browse_mode == 'QUEUE_VIEW':
+            icon_keys = ['back', 'shuffle', 'loop', 'clear']
 
         for b_i, key in enumerate(icon_keys):
             bx = cfg.PANEL_X + (b_i * btn_w)
@@ -42,6 +46,7 @@ class MusicViewRenderer(RenderBase):
                     is_active = True
                 elif state.fav_albums and state.album in state.fav_albums:
                     is_active = True
+            # clear button is never 'active' state, just a trigger
 
             # Button is focused when controls bar is selected AND this button is active
             is_focused = is_selected and (state.controls_index == b_i)

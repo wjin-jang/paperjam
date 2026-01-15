@@ -2,6 +2,7 @@
 Playlist and queue management for the music player.
 """
 import random
+from collections import deque
 from pathlib import Path
 from typing import List, Optional, Callable
 
@@ -21,6 +22,7 @@ class PlaylistManager:
         self.playlist_source: List[str] = []
         self.queue: List[int] = []
         self.queue_idx: int = 0
+        self.manual_queue: deque = deque()  # Queue for manually added tracks
         self.shuffle_active: bool = False
         self.loop_mode: int = 0  # 0=off, 1=all, 2=one
         self._on_track_change = on_track_change
@@ -65,8 +67,21 @@ class PlaylistManager:
         real_idx = self.queue[self.queue_idx]
         return self.playlist_source[real_idx]
 
+    def add_to_manual_queue(self, path: str):
+        """Add a track to the manual queue."""
+        self.manual_queue.append(path)
+
+    def clear_manual_queue(self):
+        """Clear the manual queue."""
+        self.manual_queue.clear()
+
     def next_track(self) -> Optional[str]:
         """Move to next track and return its path."""
+        # Priority 1: Manual Queue
+        if self.manual_queue:
+            return self.manual_queue.popleft()
+
+        # Priority 2: Auto Queue (Playlist/Album)
         if not self.queue:
             return None
 
@@ -75,6 +90,7 @@ class PlaylistManager:
 
         self.queue_idx = (self.queue_idx + 1) % len(self.queue)
         return self.get_current_path()
+
 
     def prev_track(self) -> Optional[str]:
         """Move to previous track and return its path."""

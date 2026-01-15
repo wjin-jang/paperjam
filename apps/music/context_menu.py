@@ -10,15 +10,17 @@ import config as cfg
 class ContextMenuHandler:
     """Handles context menu display and actions."""
 
-    def __init__(self, library_manager, on_navigate: Optional[Callable] = None):
+    def __init__(self, library_manager, playlist_manager, on_navigate: Optional[Callable] = None):
         """
         Initialize context menu handler.
 
         Args:
             library_manager: Library manager instance
+            playlist_manager: Playlist manager instance
             on_navigate: Callback for navigation actions
         """
         self.lib = library_manager
+        self.playlist = playlist_manager
         self._on_navigate = on_navigate
 
         self.active = False
@@ -61,13 +63,13 @@ class ContextMenuHandler:
     def _get_options_for_item(self, item: dict) -> List[str]:
         """Get context menu options based on item type."""
         if item.get('type') == 'playlist':
-            return ["Delete Playlist", "Cancel"]
+            return ["Add to Queue", "Delete Playlist", "Cancel"]
         elif item.get('type') == 'artist':
-            return ["Favourite Artist", "Cancel"]
+            return ["Add to Queue", "Favourite Artist", "Cancel"]
         elif item.get('type') == 'album':
-            return ["Favourite Album", "Cancel"]
+            return ["Add to Queue", "Favourite Album", "Cancel"]
         elif item.get('type') == 'file':
-            opts = ["Favourite Song", "Add to Playlist"]
+            opts = ["Add to Queue", "Favourite Song", "Add to Playlist"]
             if item.get('artist'):
                 opts.append("Go to Artist")
             if item.get('album'):
@@ -105,6 +107,28 @@ class ContextMenuHandler:
 
         if self.layer == 0:
             if opt == "Cancel":
+                self.close()
+                return None
+
+            elif opt == "Add to Queue":
+                if target['type'] == 'file':
+                    self.playlist.add_to_manual_queue(str(target['path']))
+                
+                elif target['type'] == 'album':
+                    tracks = self.lib.get_album_tracks(target['name'])
+                    for t in tracks:
+                        self.playlist.add_to_manual_queue(str(t['path']))
+                        
+                elif target['type'] == 'artist':
+                    tracks = self.lib.get_artist_tracks(target['name'])
+                    for t in tracks:
+                        self.playlist.add_to_manual_queue(str(t['path']))
+                        
+                elif target['type'] == 'playlist':
+                    tracks = self.lib.get_playlist_tracks(Path(target['path']))
+                    for t in tracks:
+                        self.playlist.add_to_manual_queue(str(t['path']))
+                        
                 self.close()
                 return None
 

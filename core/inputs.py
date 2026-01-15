@@ -171,7 +171,7 @@ class InputHandler:
         # Play/pause keys
         elif code in (ecodes.KEY_KP0, ecodes.KEY_P, ecodes.KEY_PLAYPAUSE,
                       ecodes.KEY_PLAYCD, ecodes.KEY_PAUSECD):
-            action = 'play_pause'
+            action = 'play_pause_long' if is_long else 'play_pause'
 
         # Next track keys
         elif code in (ecodes.KEY_KP6, ecodes.KEY_RIGHT, ecodes.KEY_NEXTSONG):

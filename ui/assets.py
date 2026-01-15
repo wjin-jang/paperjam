@@ -36,6 +36,15 @@ class AssetManager:
         draw.line((0, height - 1, width - 1, 0), fill=0)
         return img
 
+    def _create_clear_icon(self, width: int = 12, height: int = 12) -> Image.Image:
+        """Create a clear/trash icon."""
+        img = Image.new('1', (width, height), 1) # White background
+        draw = ImageDraw.Draw(img)
+        # Draw X
+        draw.line((2, 2, width - 3, height - 3), fill=0, width=2)
+        draw.line((2, height - 3, width - 3, 2), fill=0, width=2)
+        return img
+
     def _load_icon(self, name: str, filename: str) -> Image.Image:
         """
         Load a single icon with error handling.
@@ -69,6 +78,9 @@ class AssetManager:
 
         for name, filename in icon_files.items():
             self._icons[name] = self._load_icon(name, filename)
+
+        # Manually create clear icon
+        self._icons['clear'] = self._create_clear_icon()
 
     def get_icon(self, name: str) -> Image.Image:
         """

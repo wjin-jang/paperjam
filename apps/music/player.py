@@ -31,7 +31,7 @@ class MusicPlayerApp:
         # Initialize components
         self.state = PlayerState(items=[], fav_albums=self.lib.fav_albums, fav_artists=self.lib.fav_artists)
         self.playlist = PlaylistManager()
-        self.context_menu = ContextMenuHandler(self.lib)
+        self.context_menu = ContextMenuHandler(self.lib, self.playlist)
         self.browse = BrowseHandler(self.lib)
 
         # Navigation state
@@ -87,6 +87,7 @@ class MusicPlayerApp:
             'back': self.nav_back,
             'back_long': self.nav_home,
             'play_pause': self.toggle_play,
+            'play_pause_long': self.show_queue_view,
             'next': self.next_track,
             'prev': self.prev_track
         }
@@ -100,6 +101,16 @@ class MusicPlayerApp:
         """Long press back - return to home menu."""
         self._wake_from_screensaver()
         self.running = False
+
+    def show_queue_view(self):
+        """Show the current play queue."""
+        if self._wake_from_screensaver():
+            return
+        
+        self.history.append((self.mode, self.current_path, self.state.selection_index))
+        self.mode = 'QUEUE_VIEW'
+        self.state.selection_index = 0
+        self.refresh_list()
 
     def _wake_from_screensaver(self):
         """Wake from screensaver if active. Returns True if was active."""
@@ -250,23 +261,59 @@ class MusicPlayerApp:
                 self.state.controls_index = min(3, self.state.controls_index + 1)
                 return
 
+        # Check Manual Queue first
+        if self.playlist.manual_queue:
+            path = self.playlist.manual_queue.popleft()
+            if from_user:
+                self.state.set_status_message("NEXT")
+            
+            # Load track directly
+            self.state.playing_path = path
+            self.audio.play(path)
+            self.state.is_playing = True
+            
+            covers = get_cover(Path(path))
+            self.state.playing_cover_s = covers[0]
+            self.state.playing_cover_l = covers[1]
+            
+            if self.state.screensaver_image:
+                self.state.screensaver_image = self.state.playing_cover_l or self.state.playing_cover_s
+            
+            self.lib.add_recent(Path(path))
+            return
+
         if not self.playlist.has_queue:
+            return
+
+        # Handle Loop One (Auto-advance only)
+        if not from_user and self.state.loop_mode == 2:
+            real_idx = self.playlist.queue[self.playlist.queue_idx]
+            self._load_track(real_idx, play=True)
             return
 
         # Check if we're about to wrap around to the beginning
         next_idx = (self.playlist.queue_idx + 1) % len(self.playlist.queue)
         at_end = next_idx == 0 and not from_user
 
-        # If endless playback is enabled and we've reached the end, play a random album
-        if at_end and self._settings and self._settings.get('endless_playback', False):
-            self._play_random_album()
-            return
+        if at_end:
+            # Endless playback check
+            if self._settings and self._settings.get('endless_playback', False):
+                self._play_random_album()
+                return
+            
+            # Loop Off check - Stop playback and reset to start
+            if self.state.loop_mode == 0:
+                self.playlist.queue_idx = 0
+                real_idx = self.playlist.queue[0]
+                self._load_track(real_idx, play=False)
+                self.state.set_status_message("IDLE")
+                return
 
         self.playlist.queue_idx = next_idx
         real_idx = self.playlist.queue[self.playlist.queue_idx]
         if from_user:
             self.state.set_status_message("NEXT")
-        self._load_track(real_idx)
+        self._load_track(real_idx, play=True)
 
     def prev_track(self):
         if not self.state.screensaver_image:
@@ -287,12 +334,17 @@ class MusicPlayerApp:
         self.state.set_status_message("PREVIOUS")
         self._load_track(real_idx)
 
-    def _load_track(self, real_idx):
-        """Load and play a track by its index in the playlist source."""
+    def _load_track(self, real_idx, play=True):
+        """Load a track by its index. If play is True, start playback."""
         path = self.playlist.playlist_source[real_idx]
         self.state.playing_path = path
-        self.audio.play(path)
-        self.state.is_playing = True
+        
+        if play:
+            self.audio.play(path)
+            self.state.is_playing = True
+        else:
+            self.audio.stop()
+            self.state.is_playing = False
 
         covers = get_cover(Path(path))
         self.state.playing_cover_s = covers[0]
@@ -301,7 +353,8 @@ class MusicPlayerApp:
         if self.state.screensaver_image:
             self.state.screensaver_image = self.state.playing_cover_l or self.state.playing_cover_s
 
-        self.lib.add_recent(Path(path))
+        if play:
+            self.lib.add_recent(Path(path))
 
     def update(self):
         """Update loop - check for track end, screensaver, etc."""
@@ -421,6 +474,49 @@ class MusicPlayerApp:
             self.state.items = items
             self.state.scrollable_items = items
             self.state.browsing_cover_s = cover
+
+        elif self.mode == 'QUEUE_VIEW':
+            # Manual Queue
+            manual_items = []
+            if self.playlist.manual_queue:
+                manual_items.append({'name': 'MANUAL QUEUE', 'type': 'heading'})
+                for p in self.playlist.manual_queue:
+                    p = Path(p)
+                    manual_items.append({
+                        'name': p.stem, 'type': 'file', 'path': p, 'icon': 'Q'
+                    })
+
+            # Auto Queue
+            auto_items = []
+            if self.playlist.has_queue:
+                auto_items.append({'name': 'AUTO QUEUE', 'type': 'heading'})
+                # Show next 20 items from auto queue
+                start_idx = (self.playlist.queue_idx + 1) % len(self.playlist.queue)
+                count = 0
+                idx = start_idx
+                while count < 20:
+                    real_idx = self.playlist.queue[idx]
+                    path_str = self.playlist.playlist_source[real_idx]
+                    p = Path(path_str)
+                    auto_items.append({
+                        'name': p.stem, 'type': 'file', 'path': p, 'icon': str(count + 1)
+                    })
+                    
+                    idx = (idx + 1) % len(self.playlist.queue)
+                    if idx == start_idx: break
+                    count += 1
+            
+            if not manual_items and not auto_items:
+                self.state.items = [{'name': '(Queue Empty)', 'type': 'info'}]
+                self.state.scrollable_items = self.state.items
+            else:
+                self.state.items = manual_items + auto_items
+                # Add controls bar
+                self.state.items.append({'type': 'controls'})
+                self.state.scrollable_items = self.state.items
+            
+            self.state.album = "QUEUE"
+            self.state.browsing_cover_s = self.state.playing_cover_s
 
         self.state.total_items = len(self.state.items)
 
@@ -552,7 +648,10 @@ class MusicPlayerApp:
             loop_messages = ["LOOP OFF", "LOOP ALL", "LOOP ONE"]
             self.state.set_status_message(loop_messages[self.state.loop_mode])
         elif idx == 3:
-            if self.mode == 'ARTIST_VIEW':
+            if self.mode == 'QUEUE_VIEW':
+                self.playlist.clear_manual_queue()
+                self.refresh_list()
+            elif self.mode == 'ARTIST_VIEW':
                 self.lib.toggle_fav_artist(self.state.album)
             else:
                 self.lib.toggle_fav_album(self.state.album)
