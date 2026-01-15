@@ -23,7 +23,8 @@ class MusicViewRenderer(RenderBase):
         """
         self.draw.rectangle(
             (cfg.PANEL_X, y_pos, cfg.PANEL_X + w, y_pos + cfg.ROW_HEIGHT),
-            fill=cfg.WHITE
+            fill=cfg.WHITE,
+            outline=cfg.BLACK
         )
         btn_w = w // 4
         icon_keys = ['back', 'shuffle', 'loop', 'fav']
@@ -59,6 +60,11 @@ class MusicViewRenderer(RenderBase):
             icon = UI_ICONS[key]
             if icon_inverted:
                 icon = ImageOps.invert(icon.convert('L')).convert('1')
+
+            self.draw.rectangle(
+                (bx, y_pos, bx + btn_w, y_pos + cfg.ROW_HEIGHT),
+                fill=cfgBLACK if icon_inverted else cfg.WHITE  
+            )
 
             ix = bx + (btn_w - icon.width) // 2
             iy = y_pos + (12 - icon.height) // 2
