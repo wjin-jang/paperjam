@@ -406,7 +406,7 @@ class MusicPlayerApp:
                 self.state.selection_index = i
                 break
 
-    def refresh_list(self):
+    def refresh_list(self, reset_selection=True):
         """Refresh the current list based on mode."""
         self.running = True
         self.state.is_scanning = self.lib.is_scanning
@@ -510,9 +510,15 @@ class MusicPlayerApp:
             self.state.browsing_cover_s = cover
 
         self.state.total_items = len(self.state.items)
-        # Only reset selection if not just refreshing the same view content (simple heuristic or always reset on mode change)
-        # The prompt implies "When entering a menu", which corresponds to this full refresh.
-        self._set_initial_selection()
+        
+        if reset_selection:
+            self._set_initial_selection()
+        else:
+            # Clamp selection to bounds if list shrank
+            if self.state.items:
+                self.state.selection_index = max(0, min(self.state.selection_index, self.state.total_items - 1))
+            else:
+                self.state.selection_index = 0
 
     def _load_tracks(self, tracks):
         """Convert track list to state items with controls bar."""
@@ -641,7 +647,7 @@ class MusicPlayerApp:
                 self.state.set_status_message("SHUFFLE OFF")
             
             if self.mode == 'QUEUE_VIEW':
-                self.refresh_list()
+                self.refresh_list(reset_selection=False)
 
         elif idx == 2:
             self.state.loop_mode = (self.state.loop_mode + 1) % 3
@@ -650,12 +656,12 @@ class MusicPlayerApp:
             self.state.set_status_message(loop_messages[self.state.loop_mode])
             
             if self.mode == 'QUEUE_VIEW':
-                self.refresh_list()
+                self.refresh_list(reset_selection=False)
 
         elif idx == 3:
             if self.mode == 'QUEUE_VIEW':
                 self.playlist.clear_manual_queue()
-                self.refresh_list()
+                self.refresh_list(reset_selection=False)
             elif self.mode == 'ARTIST_VIEW':
                 self.lib.toggle_fav_artist(self.state.album)
             else:

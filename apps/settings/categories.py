@@ -532,7 +532,8 @@ class SystemCategory(SettingsCategory):
         cpu_mode = "Powersave" if cpu_gov == "powersave" else "Normal"
         disk = self._get_disk_usage()
         return [
-            f"Disk: {disk}, Version: {cfg.VERSION}",
+            f"Disk: {disk}",
+            f"Ver: {cfg.VERSION} ({cfg.VERSION_DATE})",
             f"CPU Mode: {cpu_mode}",
             f"Long Press: {long_press}s",
             "Restart System",
@@ -540,7 +541,7 @@ class SystemCategory(SettingsCategory):
         ]
 
     def get_info_indices(self) -> List[int]:
-        return [0]  # Disk/Version line is info-only
+        return [0, 1]  # Disk and Version lines are info-only
 
     def handle_action(self, item_index: int) -> Optional[str]:
         item_text = self.items[item_index]
