@@ -63,7 +63,7 @@ class MusicViewRenderer(RenderBase):
 
             self.draw.rectangle(
                 (bx, y_pos, bx + btn_w, y_pos + cfg.ROW_HEIGHT),
-                fill=cfgBLACK if icon_inverted else cfg.WHITE  
+                fill=cfg.BLACK if icon_inverted else cfg.WHITE  
             )
 
             ix = bx + (btn_w - icon.width) // 2
