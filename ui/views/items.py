@@ -79,9 +79,9 @@ class Item(ABC):
 
         text_layer = Image.new('1', (w + 1, h + 1), bg)
         text_draw = ImageDraw.Draw(text_layer)
-        text_draw.rectangle((0, 0, w, h), outline=cfg.BLACK)
+        text_draw.rectangle((-1, -1, w, h), outline=cfg.BLACK)
 
-        padding_x, padding_y = 5, 3
+        padding_x, padding_y = 4, 2
         if center:
             bbox = text_draw.textbbox((0, 0), text, font=font)
             text_w = bbox[2] - bbox[0]
@@ -315,13 +315,13 @@ class HeadingItem(Item):
         text = sanitize_text(self.text).upper()
 
         # Always black background
-        draw.rectangle((x, y, x + w, y + h - 1), fill=cfg.BLACK)
+        draw.rectangle((x, y, x + w, y + h), fill=cfg.BLACK)
         self._draw_text_box(draw, canvas, text, x, y, w, h,
                            invert=True, font=cfg.FONT_MAIN)
 
         # Add white outline when selected
         if selected:
-            draw.rectangle((x + 1, y + 1, x + w - 1, y + h - 1), outline=cfg.WHITE)
+            draw.rectangle((x, y, x + w - 1, y + h - 1), outline=cfg.WHITE)
 
 
 class InfoItem(Item):
