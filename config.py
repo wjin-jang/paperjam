@@ -2,10 +2,6 @@ import os
 from pathlib import Path
 from PIL import ImageFont
 
-# --- Version ---
-VERSION = "1.0"
-VERSION_DATE = "2026-01-15"
-
 # --- Display ---
 SCREEN_WIDTH = 250
 SCREEN_HEIGHT = 122

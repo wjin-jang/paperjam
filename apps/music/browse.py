@@ -359,6 +359,11 @@ class BrowseHandler:
                 })
                 
                 idx = (idx + 1) % len(playlist.queue)
+                
+                # Stop at end of playlist if Loop is Off
+                if idx == 0 and playlist.loop_mode == 0:
+                    break
+                
                 if idx == start_idx: break
                 count += 1
         

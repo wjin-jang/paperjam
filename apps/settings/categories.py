@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional, Callable
 
 import config as cfg
+import version
 from core.settings_manager import format_duration
 
 
@@ -533,7 +534,7 @@ class SystemCategory(SettingsCategory):
         disk = self._get_disk_usage()
         return [
             f"Disk: {disk}",
-            f"Ver: {cfg.VERSION} ({cfg.VERSION_DATE})",
+            f"Ver: {version.VERSION} ({version.VERSION_DATE})",
             f"CPU Mode: {cpu_mode}",
             f"Long Press: {long_press}s",
             "Restart System",

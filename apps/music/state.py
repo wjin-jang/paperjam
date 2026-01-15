@@ -64,14 +64,15 @@ class PlayerState:
         self.context_target_item = None
         self.context_layer = 0
 
-    def reset_browsing_state(self):
+    def reset_browsing_state(self, reset_controls=True):
         """Reset browsing-related state."""
         self.items = []
         self.pinned_items = []
         self.scrollable_items = []
         self.artist = ""
         self.year = ""
-        self.controls_index = 0
+        if reset_controls:
+            self.controls_index = 0
         self.browsing_cover_s = None
 
     def set_status_message(self, message: str, duration: float = 1.5):

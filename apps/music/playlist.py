@@ -98,11 +98,12 @@ class PlaylistManager:
         next_idx = (self.queue_idx + 1) % len(self.queue)
         at_end = next_idx == 0
         
-        if at_end and auto_advance:
-            if self.loop_mode == 0: # Loop Off
-                self.queue_idx = 0 # Reset to start
-                return None
-            # Loop All (1) -> Wrap to start (next_idx is 0)
+        # Stop at end if Loop Off (Manual or Auto)
+        if at_end and self.loop_mode == 0:
+            self.queue_idx = 0 # Reset or stay? Reset is fine.
+            return None
+            
+        # Loop All (1) or One (2) -> Wrap to start (next_idx is 0)
             
         self.queue_idx = next_idx
         return self.get_current_path()

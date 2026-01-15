@@ -411,7 +411,7 @@ class MusicPlayerApp:
         self.running = True
         self.state.is_scanning = self.lib.is_scanning
         self.state.browse_mode = self.mode
-        self.state.reset_browsing_state()
+        self.state.reset_browsing_state(reset_controls=reset_selection)
 
         if self.mode == 'ROOT':
             self.state.album, self.state.items = self.browse.get_root_menu()
