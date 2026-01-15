@@ -63,7 +63,8 @@ class MusicViewRenderer(RenderBase):
 
             self.draw.rectangle(
                 (bx + 1, y_pos + 1, bx + btn_w, y_pos + cfg.ROW_HEIGHT),
-                fill=cfg.BLACK if icon_inverted else cfg.WHITE  
+                fill=cfg.BLACK if icon_inverted else cfg.WHITE,
+                outline=cfg.BLACK
             )
 
             ix = bx + (btn_w - icon.width) // 2
@@ -78,12 +79,6 @@ class MusicViewRenderer(RenderBase):
                 self.draw.rectangle(
                     (bx + 2, y_pos + 2, bx + btn_w - 1, y_pos + cfg.ROW_HEIGHT - 1),
                     outline=cfg.WHITE
-                )
-            # Draw separator between buttons (except last)
-            if b_i < 3:
-                self.draw.line(
-                    (bx + btn_w, y_pos + 2, bx + btn_w, y_pos + cfg.ROW_HEIGHT - 2),
-                    fill=cfg.BLACK
                 )
 
     def _render_info_columns(self, item, x, y, w, h):
