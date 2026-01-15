@@ -77,6 +77,9 @@ class MainApp:
         # First Run
         if self.music_app.lib.is_first_run():
             self._run_first_startup()
+        else:
+            # Check for auto-update on startup (only if not first run)
+            self._check_auto_update()
 
     def _run_first_startup(self):
         """Handle first run using WelcomeApp."""
@@ -116,6 +119,35 @@ class MainApp:
         self._display(frame, full_refresh=True)
         time.sleep(2)
         self.sys.shutdown()
+
+    def _check_auto_update(self):
+        """Check for updates on startup if auto-update is enabled."""
+        if not self.settings_app.settings.get('auto_update', False):
+            return
+
+        logger.info("Auto-update enabled, checking for updates...")
+
+        # Show checking status
+        frame = self.renderer.render_menu("AUTO-UPDATE", ["Checking..."], -1, 0)
+        self._display(frame, full_refresh=True)
+
+        # Check for updates
+        has_updates, msg = self.sys.check_for_updates()
+
+        if has_updates:
+            logger.info("Updates available, installing...")
+            frame = self.renderer.render_menu("AUTO-UPDATE", ["Installing..."], -1, 0)
+            self._display(frame, full_refresh=True)
+
+            success, result_msg = self.sys.perform_update()
+            if not success:
+                logger.error(f"Auto-update failed: {result_msg}")
+                frame = self.renderer.render_menu("AUTO-UPDATE", [f"Failed: {result_msg[:18]}"], -1, 0)
+                self._display(frame, full_refresh=True)
+                time.sleep(2)
+            # If successful, perform_update will restart the app
+        else:
+            logger.info(f"Auto-update check: {msg}")
 
     def run(self):
         logger.info("Entering main loop")

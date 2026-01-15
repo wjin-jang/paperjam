@@ -131,10 +131,21 @@ class SystemManager:
             Tuple of (success: bool, message: str)
         """
         try:
+            repo_path = Path(__file__).parent.parent
+
+            # Stash any local changes to avoid merge conflicts
+            subprocess.run(
+                ["git", "stash"],
+                cwd=repo_path,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=10
+            )
+
             # Git pull
             result = subprocess.run(
                 ["git", "pull", "origin", "main"],
-                cwd=Path(__file__).parent.parent,
+                cwd=repo_path,
                 capture_output=True,
                 text=True,
                 timeout=60
