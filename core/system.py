@@ -4,13 +4,16 @@ import subprocess
 from pathlib import Path
 import config as cfg
 from core.battery import get_battery_monitor
+from core.logger import setup_logger
+
+logger = setup_logger()
 
 try:
     from waveshare_epd import epd2in13_V4
     HAS_EPAPER = True
 except ImportError:
     HAS_EPAPER = False
-    print("WARNING: E-Paper drivers not found. Running in headless/text mode.")
+    logger.warning("E-Paper drivers not found - running in headless mode")
 
 class SystemManager:
     """
@@ -34,9 +37,10 @@ class SystemManager:
                 epd = epd2in13_V4.EPD()
                 epd.init()
                 epd.Clear(0xFF)
+                logger.info("E-Paper display initialized")
                 return epd
             except Exception as e:
-                print(f"EPD Init Error: {e}")
+                logger.error(f"E-Paper display init failed: {e}")
         return None
 
     def get_display(self):
@@ -52,7 +56,7 @@ class SystemManager:
         pct = self.battery.percentage
         
         if 0 <= pct <= self._low_battery_threshold and not self.battery.charging:
-            print(f"LOW BATTERY ({pct}%) - Initiating safe shutdown...")
+            logger.warning(f"Low battery ({pct}%) - initiating safe shutdown")
             if self.on_shutdown_request:
                 self.on_shutdown_request(reason="LOW BATTERY")
             else:
@@ -81,14 +85,24 @@ class SystemManager:
                 pass
 
     def shutdown(self):
-        print("System shutting down...")
+        logger.info("System shutting down")
         self.sleep_display()
-        subprocess.run(["sudo", "shutdown", "now"])
+        try:
+            subprocess.run(["/usr/bin/sudo", "/usr/sbin/shutdown", "now"], timeout=10)
+        except subprocess.TimeoutExpired:
+            logger.error("Shutdown command timed out")
+        except (subprocess.SubprocessError, OSError) as e:
+            logger.error(f"Shutdown failed: {e}")
 
     def reboot(self):
-        print("System rebooting...")
+        logger.info("System rebooting")
         self.sleep_display()
-        subprocess.run(["sudo", "reboot"])
+        try:
+            subprocess.run(["/usr/bin/sudo", "/usr/sbin/reboot"], timeout=10)
+        except subprocess.TimeoutExpired:
+            logger.error("Reboot command timed out")
+        except (subprocess.SubprocessError, OSError) as e:
+            logger.error(f"Reboot failed: {e}")
 
     def check_for_updates(self):
         """Check if updates are available from git.
@@ -159,19 +173,22 @@ class SystemManager:
                 return True, "Already up to date"
 
             # Restart the application
-            print("Update successful, restarting...")
+            logger.info("Update successful, restarting")
             self.sleep_display()
 
             # Use systemctl to restart the service if running as service
             # Otherwise just reboot
             try:
                 subprocess.run(
-                    ["systemctl", "--user", "restart", "paperjam"],
+                    ["/usr/bin/systemctl", "--user", "restart", "paperjam"],
                     timeout=5
                 )
             except (subprocess.SubprocessError, OSError):
                 # If service restart fails, do a full reboot
-                subprocess.run(["sudo", "reboot"])
+                try:
+                    subprocess.run(["/usr/bin/sudo", "/usr/sbin/reboot"], timeout=10)
+                except (subprocess.SubprocessError, OSError) as e:
+                    logger.error(f"Reboot after update failed: {e}")
 
             return True, "Updated, restarting..."
 

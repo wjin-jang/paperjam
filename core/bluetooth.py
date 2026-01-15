@@ -2,8 +2,11 @@ import subprocess
 import time
 import threading
 import re
-import signal
-import os
+import shlex
+from core.logger import setup_logger
+
+logger = setup_logger()
+
 
 class BluetoothManager:
     def __init__(self):
@@ -208,15 +211,20 @@ class BluetoothManager:
         t.start()
 
     def _connect_worker(self, mac, callback):
+        # Sanitize MAC for logging (already validated format)
+        safe_mac = shlex.quote(mac)
+        logger.info(f"Bluetooth connecting to {safe_mac}")
+
         # 1. Pre-check: If already connected, don't even start bluetoothctl
         if self.is_connected(mac):
+            logger.info(f"Bluetooth device {safe_mac} already connected")
             callback(True, "ALREADY CONNECTED")
             return
 
         proc = subprocess.Popen(
-            ['bluetoothctl'], 
-            stdin=subprocess.PIPE, 
-            stdout=subprocess.PIPE, 
+            ['bluetoothctl'],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
             encoding='utf-8',
             bufsize=1
         )
@@ -237,52 +245,65 @@ class BluetoothManager:
         success = False
         msg = "FAILED"
         start_time = time.time()
-        
-        while time.time() - start_time < 25: 
+        retry_count = 0
+        max_retries = 3
+
+        while time.time() - start_time < 25:
             line = proc.stdout.readline()
-            if not line: break
+            if not line:
+                break
             clean_line = self._clean_ansi(line).strip()
-            
-            # Debug log (Optional, comment out to reduce noise)
-            # if clean_line: print(f"[BT LOG]: {clean_line}")
 
             if "yes/no" in clean_line.lower() or "confirm" in clean_line.lower():
                 send("yes")
-            
+
             # --- SUCCESS CASES ---
             if "Connection successful" in clean_line:
                 success = True
                 msg = "CONNECTED"
+                logger.info(f"Bluetooth connected to {safe_mac}")
                 break
-            
+
             # --- FAILURE / BUSY CASES ---
-            # KEY FIX: If busy, check if we are actually connected
             if "br-connection-busy" in clean_line or "Device is already connected" in clean_line:
                 time.sleep(1)
                 if self.is_connected(mac):
                     success = True
                     msg = "CONNECTED"
                     break
-                else:
-                    # Actually busy with something else? Wait before retry
+                elif retry_count < max_retries:
+                    retry_count += 1
+                    logger.debug(f"Bluetooth busy, retry {retry_count}/{max_retries}")
                     time.sleep(2)
                     send(f'connect {mac}')
+                else:
+                    logger.warning(f"Bluetooth connection busy after {max_retries} retries")
+                    break
 
             if "Failed to connect" in clean_line and "busy" not in clean_line:
-                # Genuine failure, wait and retry
-                time.sleep(2)
-                send(f'connect {mac}')
+                if retry_count < max_retries:
+                    retry_count += 1
+                    logger.debug(f"Bluetooth connect failed, retry {retry_count}/{max_retries}")
+                    time.sleep(2)
+                    send(f'connect {mac}')
+                else:
+                    logger.warning(f"Bluetooth connection failed after {max_retries} retries")
+                    break
 
         try:
             proc.terminate()
             proc.wait(timeout=2)
         except (OSError, subprocess.TimeoutExpired):
             pass
-        
+
         # Final safety check
         if not success and self.is_connected(mac):
             success = True
             msg = "CONNECTED"
+            logger.info(f"Bluetooth connected to {safe_mac} (verified)")
+
+        if not success:
+            logger.warning(f"Bluetooth connection to {safe_mac} failed: {msg}")
 
         callback(success, msg)
 

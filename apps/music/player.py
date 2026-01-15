@@ -7,7 +7,7 @@ from pathlib import Path
 from PIL import Image
 
 from core.library import LibraryManager
-from core.metadata import get_cover
+from ui.image_utils import get_cover
 from core.track_info import extract_track_info
 from core.navigation import nav_skip_info_up, nav_skip_info_down, find_next_heading
 from ui.renderer import UIRenderer
@@ -34,6 +34,9 @@ class MusicPlayerApp:
         self.playlist = PlaylistManager()
         self.context_menu = ContextMenuHandler(self.lib, self.playlist)
         self.browse = BrowseHandler(self.lib)
+
+        # Clear browse cache when library scan completes
+        self.lib.set_on_scan_complete(self.browse.clear_cache)
 
         # Navigation state
         self.history = []
@@ -343,36 +346,7 @@ class MusicPlayerApp:
     def _load_track(self, real_idx, play=True):
         """Load a track by its index. If play is True, start playback."""
         path = self.playlist.playlist_source[real_idx]
-        self.state.playing_path = path
-        
-        # Update playing metadata
-        try:
-            info = extract_track_info(Path(path))
-            self.state.playing_artist = info.artist
-            self.state.playing_album = info.album
-        except (OSError, ValueError, AttributeError):
-            self.state.playing_artist = None
-            self.state.playing_album = None
-
-        if play:
-            self.audio.play(path)
-            self.state.is_playing = True
-        else:
-            self.audio.stop()
-            self.state.is_playing = False
-
-        covers = get_cover(Path(path))
-        self.state.playing_cover_s = covers[0]
-        self.state.playing_cover_l = covers[1]
-
-        if self.state.screensaver_image:
-            self.state.screensaver_image = self.state.playing_cover_l or self.state.playing_cover_s
-
-        if play:
-            self.lib.add_recent(Path(path))
-
-        if self.mode == 'QUEUE_VIEW':
-            self.refresh_list()
+        self._play_media(path, play=play)
 
     def update(self):
         """Update loop - check for track end, screensaver, etc."""

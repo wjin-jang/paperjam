@@ -3,6 +3,10 @@ import evdev
 import select
 from evdev import ecodes
 import config as cfg
+from core.logger import setup_logger
+
+logger = setup_logger()
+
 
 class InputHandler:
     def __init__(self, callbacks=None):
@@ -21,14 +25,14 @@ class InputHandler:
 
     def _find_devices(self):
         """Find all usable input devices (keyboard, remote, media controllers)."""
-        print("Scanning for input devices...")
+        logger.info("Scanning for input devices...")
         self.devices = []
 
         try:
             paths = evdev.list_devices()
             all_devices = [evdev.InputDevice(path) for path in paths]
         except Exception as e:
-            print(f"Scan Error: {e}")
+            logger.error(f"Input device scan error: {e}")
             return
 
         # Sort to prioritize keyboards/remotes
@@ -61,11 +65,11 @@ class InputHandler:
             ])
 
             if has_media_keys or has_nav_keys:
-                print(f"Input: Found {dev.name} ({dev.path})")
+                logger.info(f"Input device found: {dev.name} ({dev.path})")
                 self.devices.append(dev)
 
         if not self.devices:
-            print("WARNING: No valid input devices found!")
+            logger.warning("No valid input devices found")
 
     def check_inputs(self):
         if not self.devices:
@@ -89,11 +93,15 @@ class InputHandler:
                         if event.code == ecodes.KEY_ESC and event.value == 1:
                             return False
             except OSError:
-                print(f"Device disconnected: {dev.name}")
+                logger.warning(f"Input device disconnected: {dev.name}")
                 disconnected.append(dev)
 
-        # Remove disconnected devices
+        # Remove disconnected devices and close file descriptors
         for dev in disconnected:
+            try:
+                dev.close()
+            except (OSError, IOError):
+                pass
             self.devices.remove(dev)
 
         return True

@@ -7,7 +7,7 @@ from collections import deque
 from pathlib import Path
 from typing import List, Optional, Callable
 
-from core.metadata import get_cover
+from ui.image_utils import get_cover
 
 
 class PlaylistManager:

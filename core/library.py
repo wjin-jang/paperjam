@@ -5,8 +5,11 @@ import os
 from pathlib import Path
 from dataclasses import dataclass
 import config as cfg
-from core.metadata import get_cover
+from ui.image_utils import get_cover
 from core.track_info import extract_track_info
+from core.logger import setup_logger
+
+logger = setup_logger()
 
 @dataclass
 class TrackItem:
@@ -31,6 +34,7 @@ class LibraryManager:
         self._lock = threading.Lock()
         self._scan_lock = threading.Lock()  # Separate lock for scan progress
         self._all_tracks_cache = None
+        self._on_scan_complete = None  # Callback for scan completion
 
         # Scan progress tracking (protected by _scan_lock)
         self._scan_current_file = ""
@@ -49,14 +53,31 @@ class LibraryManager:
         """Check if this is the first run (no cache file exists)."""
         return not cfg.CACHE_FILE.exists()
 
+    def set_on_scan_complete(self, callback):
+        """Set callback to be called when library scan completes."""
+        self._on_scan_complete = callback
+
     def load_cache(self):
         if cfg.CACHE_FILE.exists():
             try:
                 with open(cfg.CACHE_FILE, 'r') as f:
                     data = json.load(f)
-                    self._deserialize_library(data)
-            except (json.JSONDecodeError, OSError) as e:
-                print(f"Cache load error: {e}")
+
+                # Validate cache structure
+                if not isinstance(data, dict):
+                    raise ValueError("Cache must be a dict")
+                if 'artists' in data and not isinstance(data['artists'], dict):
+                    raise ValueError("artists must be a dict")
+                if 'albums' in data and not isinstance(data['albums'], dict):
+                    raise ValueError("albums must be a dict")
+
+                self._deserialize_library(data)
+                logger.info(f"Library cache loaded: {len(self.artists)} artists, {len(self.albums)} albums")
+            except (json.JSONDecodeError, OSError, ValueError) as e:
+                logger.error(f"Cache load error: {e}")
+                # Reset to empty on corrupted cache
+                self.artists = {}
+                self.albums = {}
         # Don't auto-scan here - let main.py handle welcome screen
 
     @property
@@ -139,7 +160,7 @@ class LibraryManager:
                         self._scan_album_count = len(temp_albums)
                         self._scan_artist_count = len(temp_artists)
                 except Exception as e:
-                    print(f"Scan error processing {p}: {e}")
+                    logger.warning(f"Scan error processing {p}: {e}")
                     continue
 
         with self._lock:
@@ -152,11 +173,19 @@ class LibraryManager:
             self._scan_current_file = ""
         self.is_scanning = False
 
+        # Notify listeners that scan completed
+        if self._on_scan_complete:
+            try:
+                self._on_scan_complete()
+            except Exception as e:
+                logger.error(f"Scan complete callback error: {e}")
+
     def _save_cache(self):
         try:
             with open(cfg.CACHE_FILE, 'w') as f:
                 json.dump({'artists': self.artists, 'albums': self.albums}, f)
-        except Exception as e: print(f"Cache Save Error: {e}")
+        except Exception as e:
+            logger.error(f"Cache save error: {e}")
 
     def _deserialize_library(self, data):
         self.artists = data.get('artists', {})
@@ -177,21 +206,24 @@ class LibraryManager:
 
     def delete_playlist(self, path):
         try:
-            if path.exists(): os.remove(path)
+            if path.exists():
+                os.remove(path)
         except OSError as e:
-            print(f"Error deleting playlist {path}: {e}")
+            logger.error(f"Error deleting playlist {path}: {e}")
 
     def add_to_playlist(self, playlist_path, track_path):
         try:
             content = []
             if playlist_path.exists():
-                with open(playlist_path, 'r') as f: content = json.load(f)
+                with open(playlist_path, 'r') as f:
+                    content = json.load(f)
             str_path = str(track_path)
             if str_path not in content:
                 content.append(str_path)
-                with open(playlist_path, 'w') as f: json.dump(content, f)
+                with open(playlist_path, 'w') as f:
+                    json.dump(content, f)
         except (OSError, json.JSONDecodeError) as e:
-            print(f"Error updating playlist {playlist_path}: {e}")
+            logger.error(f"Error updating playlist {playlist_path}: {e}")
 
     def get_playlist_tracks(self, playlist_path):
         tracks = []
@@ -209,7 +241,7 @@ class LibraryManager:
                                 'duration': track.duration
                             })
             except (OSError, json.JSONDecodeError) as e:
-                print(f"Error reading playlist {playlist_path}: {e}")
+                logger.error(f"Error reading playlist {playlist_path}: {e}")
         return tracks
 
     def get_artist_tracks(self, artist):
@@ -281,13 +313,16 @@ class LibraryManager:
                 self.recents = []
 
     def add_recent(self, path):
-        if path in self.recents: self.recents.remove(path)
+        if path in self.recents:
+            self.recents.remove(path)
         self.recents.insert(0, path)
-        if len(self.recents) > cfg.RECENTS_LIMIT: self.recents.pop()
+        if len(self.recents) > cfg.RECENTS_LIMIT:
+            self.recents.pop()
         try:
-            with open(cfg.RECENTS_FILE, 'w') as f: json.dump([str(p) for p in self.recents], f)
+            with open(cfg.RECENTS_FILE, 'w') as f:
+                json.dump([str(p) for p in self.recents], f)
         except OSError as e:
-            print(f"Error saving recents: {e}")
+            logger.error(f"Error saving recents: {e}")
 
     def load_favs(self):
         if cfg.FAVS_FILE.exists():
@@ -303,7 +338,7 @@ class LibraryManager:
                         self.fav_albums = set(d.get('albums', []))
                         self.fav_artists = set(d.get('artists', []))
             except (OSError, json.JSONDecodeError) as e:
-                print(f"Error loading favorites: {e}")
+                logger.error(f"Error loading favorites: {e}")
 
     def toggle_fav_track(self, path_str):
         if path_str in self.fav_tracks: self.fav_tracks.remove(path_str)

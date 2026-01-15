@@ -112,6 +112,4 @@ def format_duration(seconds: int) -> str:
         return f"{hours}:{minutes:02d}:{secs:02d}"
     return f"{minutes}:{secs:02d}"
 
-# get_cover moved to ui.image_utils to fix circular dependency
-# Re-export for backward compatibility
-from ui.image_utils import get_cover
+# get_cover is in ui.image_utils - import directly from there

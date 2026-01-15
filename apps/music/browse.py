@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 import config as cfg
-from core.metadata import get_cover, format_duration
+from core.metadata import format_duration
+from ui.image_utils import get_cover
 from core.track_info import extract_track_info
 from core.library import LibraryManager
 
@@ -273,9 +274,19 @@ class BrowseHandler:
             dirs = []
             files = []
 
+            music_root = cfg.MUSIC_PATH.resolve()
             for p in all_items:
                 if p.name.startswith('.'):
                     continue
+
+                # Security: resolve symlinks and verify path is within music directory
+                try:
+                    resolved = p.resolve()
+                    if not resolved.is_relative_to(music_root):
+                        continue  # Skip paths outside music directory
+                except (ValueError, OSError):
+                    continue
+
                 if p.is_dir():
                     dirs.append({
                         'name': p.name, 'type': 'dir', 'mode': 'FILES',

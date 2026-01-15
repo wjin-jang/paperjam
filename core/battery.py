@@ -3,6 +3,9 @@ Battery monitoring for SugarPi 3 (IP5312 chip).
 """
 import threading
 import time
+from core.logger import setup_logger
+
+logger = setup_logger()
 
 # I2C address for IP5312 (SugarPi 3)
 I2C_ADDR = 0x57
@@ -24,9 +27,12 @@ class BatteryMonitor:
         try:
             import smbus2
             self._bus = smbus2.SMBus(1)
+            logger.info("Battery monitor I2C initialized")
         except ImportError:
+            logger.warning("smbus2 not available - battery monitoring disabled")
             self._bus = None
-        except Exception:
+        except Exception as e:
+            logger.error(f"Battery I2C init failed: {e}")
             self._bus = None
 
     def _read_battery(self):
@@ -46,8 +52,13 @@ class BatteryMonitor:
                 status = self._bus.read_byte_data(I2C_ADDR, 0x02)
                 charging = bool(status & 0x80)
 
+                self._consecutive_failures = 0
                 return pct, charging
-            except Exception:
+            except Exception as e:
+                self._consecutive_failures = getattr(self, '_consecutive_failures', 0) + 1
+                # Only log occasionally to avoid spam
+                if self._consecutive_failures == 1 or self._consecutive_failures % 10 == 0:
+                    logger.warning(f"Battery I2C read failed ({self._consecutive_failures}x): {e}")
                 return -1, False
 
     def start(self):
