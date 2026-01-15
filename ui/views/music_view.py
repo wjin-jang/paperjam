@@ -5,6 +5,7 @@ import math
 from PIL import ImageOps
 import config as cfg
 from ui.views.common import RenderBase
+from ui.views.items import ItemRenderer
 from ui.graphics import create_dithered_strip, UI_ICONS
 from core.metadata import sanitize_text
 
@@ -28,7 +29,7 @@ class MusicViewRenderer(RenderBase):
         )
         btn_w = w // 4
         icon_keys = ['back', 'shuffle', 'loop', 'fav']
-        
+
         # Swap fav for clear in queue view
         if state.browse_mode == 'QUEUE_VIEW':
             icon_keys = ['back', 'shuffle', 'loop', 'clear']
@@ -86,76 +87,6 @@ class MusicViewRenderer(RenderBase):
                     outline=cfg.WHITE
                 )
 
-    def _render_info_line(self, columns, x, y, w, h):
-        """Render a single line of an info item with columns.
-
-        Args:
-            columns: List of column strings, or a single string
-            x, y, w, h: Position and dimensions
-        """
-        if isinstance(columns, str):
-            # Single string - render as plain text
-            self.draw_text_box(sanitize_text(columns), x, y, w, h)
-            return
-
-        if not columns:
-            return
-
-        if len(columns) == 1:
-            # Single column - render as plain text
-            self.draw_text_box(sanitize_text(str(columns[0])), x, y, w, h)
-            return
-
-        # Calculate width needed for each right column (all except first)
-        right_widths = []
-        for col_text in columns[1:]:
-            text = sanitize_text(str(col_text))
-            # ~6px per char + padding, minimum 20px
-            col_w = max(20, len(text) * 6 + 8)
-            right_widths.append(col_w)
-
-        # First column gets remaining space
-        total_right = sum(right_widths)
-        left_w = w - total_right
-
-        # Render first column (left-aligned)
-        self.draw_text_box(sanitize_text(str(columns[0])), x, y, left_w, h)
-
-        # Render right columns
-        col_x = x + left_w
-        for i, col_text in enumerate(columns[1:]):
-            col_w = right_widths[i]
-            self.draw_text_box(sanitize_text(str(col_text)), col_x, y, col_w, h, center=True)
-            col_x += col_w
-
-    def _render_info_columns(self, item, x, y, w, h):
-        """Render an info item with multiple columns and optional multi-line support.
-
-        Supports:
-        - 'columns': List of strings for a single-line multi-column layout
-        - 'lines': List of lines, where each line is either a string or list of columns
-        - 'name': Fallback single text if neither columns nor lines provided
-        """
-        lines = item.get('lines', [])
-
-        if lines:
-            # Multi-line info item
-            line_height = h  # Each line gets one row height
-            for i, line in enumerate(lines):
-                line_y = y + (i * line_height)
-                self._render_info_line(line, x, line_y, w, line_height)
-            return
-
-        columns = item.get('columns', [])
-        if columns:
-            # Single-line multi-column layout (backwards compatible)
-            self._render_info_line(columns, x, y, w, h)
-            return
-
-        # Single text info item
-        name_str = sanitize_text(item.get('name', ''))
-        self.draw_text_box(name_str, x, y, w, h)
-
     def _get_item_row_count(self, item):
         """Get the number of rows an item should span.
 
@@ -191,76 +122,25 @@ class MusicViewRenderer(RenderBase):
         )
 
     def _render_item(self, item, x, y, w, h, is_selected, display_idx, state):
-        """Helper to render a single list item."""
+        """Helper to render a single list item using unified ItemRenderer."""
         itype = item.get('type')
 
-        # Controls bar
+        # Controls bar - handled specially
         if itype == 'controls':
             self.render_controls(y, w + 8, state, is_selected)
             return
 
-        # Info items (may span multiple rows)
-        if itype == 'info':
-            row_count = self._get_item_row_count(item)
-            item_height = h * row_count
-            self._render_info_columns(item, x, y, w + 8, item_height)
-            return
+        # Create ItemRenderer for direct canvas rendering
+        item_renderer = ItemRenderer(self.draw, self.canvas, content_offset_y=0)
 
-        # Heading items
-        if itype == 'heading':
-            name_str = sanitize_text(item.get('name', '')).upper()
-            self.draw.rectangle((x, y, x + w + 8, y + h - 1), fill=cfg.BLACK)
-            self.draw_text_box(name_str, x, y, w + 8, h, invert=True, font=cfg.FONT_MAIN)
-            if is_selected:
-                self.draw.rectangle((x + 1, y + 1, x + w + 7, y + h - 1), outline=cfg.WHITE)
-            return
+        # Build context for ItemRenderer
+        context = {
+            'state': state,
+            'display_idx': display_idx
+        }
 
-        # Regular items with icons
-        icons = cfg.MENU_ICONS
-        current_status_icon = icons.get('playing', 'Ⓟ') if state.is_playing else icons.get('paused', 'Ⓢ')
-        is_active_item = False
-        
-        if itype == 'file':
-            if state.playing_path and str(item.get('path')) == str(state.playing_path):
-                is_active_item = True
-        elif itype == 'album':
-            if state.playing_album and item.get('name') == state.playing_album:
-                is_active_item = True
-        elif itype == 'artist':
-            if state.playing_artist and item.get('name') == state.playing_artist:
-                is_active_item = True
-
-        if is_active_item:
-            icon_str = current_status_icon
-        elif itype == 'file':
-            if 'icon' in item and item['icon'] == 'P':
-                # Stale 'P' icon from previous state (list wasn't refreshed)
-                # Revert to track number or index
-                track_num = item.get('track', 0)
-                icon_val = track_num if track_num else display_idx
-                icon_str = f"{icon_val}." if icon_val else ""
-            elif 'icon' in item and item['icon'] not in ('S', ''):
-                icon_str = item['icon']
-                if not icon_str.endswith('.'): icon_str += "."
-            else:
-                track_num = item.get('track', 0)
-                icon_val = track_num if track_num else display_idx
-                icon_str = f"{icon_val}." if icon_val else ""
-        else:
-            if 'icon' in item:
-                icon_str = item['icon']
-            elif itype == 'dir': icon_str = icons.get('dir', 'Ⓕ')
-            elif itype == 'artist': icon_str = icons.get('artist', 'Ⓐ')
-            elif itype == 'album': icon_str = icons.get('album', 'Ⓑ')
-            elif itype == 'recent': icon_str = icons.get('recent', 'Ⓡ')
-            elif itype == 'playlist':
-                icon_str = icons.get('playlist', 'Ⓛ')
-                if "Fav" in item.get('name', ""): icon_str = icons.get('fav', 'Ⓗ')
-            else: icon_str = item.get('icon', '★')
-
-        self.draw_text_box(icon_str, x, y, 12, h, invert=is_selected, center=True)
-        name_str = sanitize_text(item.get('title', item.get('name', '')))
-        self.draw_text_box(name_str, x + 12, y, w - 4, h, invert=is_selected)
+        # Render using unified ItemRenderer
+        item_renderer.render_item(item, x, y, w + 8, h, is_selected, context)
 
     def render(self, state, view_items):
         """Render the full music view."""

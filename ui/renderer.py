@@ -1,11 +1,13 @@
 """
 Main UI renderer - orchestrates view components.
 """
+from typing import Optional, Dict, Callable
 from PIL import Image
 
 from ui.views.music_view import MusicViewRenderer
 from ui.views.menu_view import MenuViewRenderer
 from ui.views.screensaver_view import ScreensaverRenderer
+from ui.views.popup import PopupManager
 from ui.overlays import OverlayRenderer
 
 
@@ -22,6 +24,7 @@ class UIRenderer:
         self._menu_view = MenuViewRenderer()
         self._screensaver_view = ScreensaverRenderer()
         self.overlays = OverlayRenderer()
+        self.popups = PopupManager()
 
     def render_volume(self, title, volume_level) -> Image.Image:
         """Render volume control view."""
@@ -50,3 +53,30 @@ class UIRenderer:
     def render_context_menu(self, state) -> Image.Image:
         """Render context menu overlay."""
         return self._music_view.render_context_menu(state)
+
+    def render_with_popups(self, frame: Image.Image) -> Image.Image:
+        """Apply popup overlays to a rendered frame.
+
+        Args:
+            frame: Base frame to render popups onto
+
+        Returns:
+            Frame with popups rendered
+        """
+        return self.popups.render(frame)
+
+    def get_popup_callbacks(self) -> Optional[Dict[str, Callable]]:
+        """Get callbacks if a popup is active.
+
+        Returns:
+            Callback dict for active popup, or None
+        """
+        return self.popups.get_callbacks()
+
+    def has_active_popup(self) -> bool:
+        """Check if there's an active popup.
+
+        Returns:
+            True if popup is active
+        """
+        return self.popups.has_active_popup()

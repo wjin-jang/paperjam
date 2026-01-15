@@ -4,6 +4,7 @@ Menu view rendering for settings and navigation menus.
 import math
 import config as cfg
 from ui.views.common import RenderBase, Panel
+from ui.views.items import ItemRenderer
 from ui.graphics import create_dithered_strip
 
 
@@ -19,6 +20,41 @@ class MenuViewRenderer(RenderBase):
     def _get_total_rows(self, items) -> int:
         """Get total row count including multi-line items."""
         return sum(self._get_item_row_count(item) for item in items)
+
+    def _to_unified_item(self, item, is_info: bool) -> dict:
+        """Convert menu item to unified format for ItemRenderer.
+
+        Args:
+            item: Menu item (string or dict)
+            is_info: Whether this item is in info_indices
+
+        Returns:
+            Unified item dict
+        """
+        # Already a dict with type
+        if isinstance(item, dict) and 'type' in item:
+            return item
+
+        # String item
+        if isinstance(item, str):
+            # Info item with colon notation -> convert to columns
+            if is_info and ':' in item:
+                parts = item.split(':', 1)
+                label = parts[0].strip()
+                right_text = parts[1].strip() if len(parts) > 1 else ''
+                if ',' in right_text:
+                    right_cols = [c.strip() for c in right_text.split(',')]
+                else:
+                    right_cols = [right_text] if right_text else []
+                return {'type': 'info', 'columns': [label] + right_cols}
+            # Regular text or info without columns
+            return {'type': 'info' if is_info else 'text', 'name': item}
+
+        # Dict without type -> treat as text
+        if isinstance(item, dict):
+            return {'type': 'info' if is_info else 'text', 'name': item.get('name', str(item))}
+
+        return {'type': 'text', 'name': str(item)}
 
     def render_menu(self, title, items, sel_idx, scroll_idx, info_indices=None):
         """Render a menu with title and items.
@@ -48,6 +84,9 @@ class MenuViewRenderer(RenderBase):
         needs_scrollbar = total_rows * cfg.ROW_HEIGHT > avail_list_h
         item_draw_w = box_w
 
+        # Create item renderer for this panel
+        item_renderer = ItemRenderer(panel.draw, panel.canvas, content_offset_y=panel.content_y)
+
         # Render items to panel (y positions are relative to panel content area)
         current_row = 0
         for abs_idx, item_obj in enumerate(items):
@@ -58,51 +97,16 @@ class MenuViewRenderer(RenderBase):
             y_pos = y_offset * cfg.ROW_HEIGHT
 
             is_selected = (sel_idx == abs_idx)
+            is_info = abs_idx in info_indices
 
-            # Handle multi-line info items
-            if isinstance(item_obj, dict) and item_obj.get('type') == 'info' and item_obj.get('lines'):
-                for line_idx, line in enumerate(item_obj['lines']):
-                    line_y = y_pos + (line_idx * cfg.ROW_HEIGHT)
-                    panel.draw_text_box(line, 0, line_y, item_draw_w, cfg.ROW_HEIGHT, invert=False, center=False)
-            else:
-                # Single line item
-                text = item_obj if isinstance(item_obj, str) else item_obj.get('name', str(item_obj))
+            # Convert to unified format
+            unified_item = self._to_unified_item(item_obj, is_info)
 
-                # Info items: render as columns if contains ":"
-                if abs_idx in info_indices and ':' in text:
-                    # Split on first colon, then further split right side on commas for multiple columns
-                    parts = text.split(':', 1)
-                    label = parts[0].strip()
-                    right_text = parts[1].strip() if len(parts) > 1 else ''
-                    right_cols = [c.strip() for c in right_text.split(',')] if ',' in right_text else [right_text]
-
-                    # Calculate widths for right columns
-                    right_widths = []
-                    for col in right_cols:
-                        col_w = max(20, len(col) * 6 + 8)
-                        right_widths.append(col_w)
-
-                    total_right = sum(right_widths)
-                    label_w = max(20, item_draw_w - total_right)
-
-                    # If columns don't fit, scale them down proportionally
-                    if total_right + label_w > item_draw_w:
-                        scale = (item_draw_w - 20) / total_right if total_right > 0 else 1
-                        right_widths = [max(10, int(w * scale)) for w in right_widths]
-                        total_right = sum(right_widths)
-                        label_w = max(20, item_draw_w - total_right)
-
-                    # Render label (left column)
-                    panel.draw_text_box(label, 0, y_pos, label_w, cfg.ROW_HEIGHT, invert=False, center=False)
-
-                    # Render right columns
-                    col_x = label_w
-                    for j, col in enumerate(right_cols):
-                        col_w = right_widths[j]
-                        panel.draw_text_box(col, col_x, y_pos, col_w, cfg.ROW_HEIGHT, invert=False, center=True)
-                        col_x += col_w
-                else:
-                    panel.draw_text_box(text, 0, y_pos, item_draw_w, cfg.ROW_HEIGHT, invert=is_selected, center=False)
+            # Render using ItemRenderer
+            item_renderer.render_item(
+                unified_item, 0, y_pos, item_draw_w, cfg.ROW_HEIGHT,
+                is_selected=is_selected
+            )
 
             current_row += row_count
 

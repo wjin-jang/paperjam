@@ -49,10 +49,8 @@ class MainApp:
         self.confirm_target = None
         self.confirm_idx = 0
         
-        # Display/Overlay State
+        # Display State
         self.first_render = True
-        self.volume_display_time = 0
-        self.volume_display_duration = 1.5
 
         # Setup Global Callbacks
         self.sys.on_shutdown_request = self._handle_shutdown_request
@@ -153,17 +151,28 @@ class MainApp:
         logger.info("Entering main loop")
         try:
             while True:
+                # Check for popup input routing first
+                popup_callbacks = self.renderer.get_popup_callbacks()
+                if popup_callbacks:
+                    # Merge volume callbacks with popup callbacks
+                    popup_callbacks['vol_up'] = self._vol_up
+                    popup_callbacks['vol_down'] = self._vol_down
+                    self.inputs.set_callbacks(popup_callbacks)
+                elif self.current_app:
+                    self.inputs.set_callbacks(self.current_app.get_callbacks())
+                elif self.view == 'CONFIRM':
+                    self.inputs.set_callbacks(self._get_confirm_callbacks())
+                else:
+                    self.inputs.set_callbacks(self._get_home_callbacks())
+
                 if not self.inputs.check_inputs():
                     break
-                
+
                 self.sys.check_battery()
-                
+
                 frame = None
                 force_full = False
-                
-                # Check Overlays
-                show_volume = time.time() - self.volume_display_time < self.volume_display_duration
-                
+
                 # Update Running App
                 if self.current_app:
                     is_running = False
@@ -180,24 +189,18 @@ class MainApp:
                     if not is_running:
                         self.close_app()
                     else:
-                        # Render App or Overlay
-                        if show_volume and self.current_app != self.settings_app:
-                            vol = self.settings_app.categories['AUDIO'].volume_level
-                            frame = self.renderer.render_volume("VOLUME", vol)
-                        else:
-                            frame = self.current_app.get_frame()
+                        frame = self.current_app.get_frame()
                 else:
                     # Home Menu Logic
-                    if show_volume:
-                        vol = self.settings_app.categories['AUDIO'].volume_level
-                        frame = self.renderer.render_volume("VOLUME", vol)
-                    elif self.view == 'HOME':
+                    if self.view == 'HOME':
                         items = [n for _, n in self.registry.get_app_names()] + ["Reboot", "Shut Down"]
                         frame = self.renderer.render_menu("HOME MENU", items, self.menu_idx, 0)
                     elif self.view == 'CONFIRM':
                         frame = self._render_confirm()
 
                 if frame:
+                    # Render popups on top of frame
+                    frame = self.renderer.render_with_popups(frame)
                     self._display(frame, force_full)
 
                 # Background updates
@@ -237,11 +240,25 @@ class MainApp:
 
     def _vol_up(self):
         self.settings_app.categories['AUDIO'].set_volume(5)
-        self.volume_display_time = time.time()
+        vol = self.settings_app.categories['AUDIO'].volume_level
+        self._show_volume_popup(vol)
 
     def _vol_down(self):
         self.settings_app.categories['AUDIO'].set_volume(-5)
-        self.volume_display_time = time.time()
+        vol = self.settings_app.categories['AUDIO'].volume_level
+        self._show_volume_popup(vol)
+
+    def _show_volume_popup(self, level):
+        """Show or update volume popup."""
+        # Check if there's already a volume popup
+        popup = self.renderer.popups.peek()
+        if popup and hasattr(popup, 'state') and popup.state and popup.state.extra.get('is_volume'):
+            # Update existing popup
+            popup.update(extra={'level': level, 'title': 'VOLUME', 'is_volume': True})
+        else:
+            # Create new volume popup
+            popup = self.renderer.popups.show_volume("VOLUME", level)
+            popup.state.extra['is_volume'] = True
 
     # --- Home Menu Interaction ---
     def _get_home_callbacks(self):
