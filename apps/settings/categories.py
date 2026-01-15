@@ -501,6 +501,7 @@ class SystemCategory(SettingsCategory):
         super().__init__("SYSTEM", settings_manager)
         self._screen_clear_callback = None
         self._update_callback = None
+        self._reset_callback = None
         self._update_status = ""
 
     def set_screen_clear_callback(self, callback):
@@ -510,6 +511,10 @@ class SystemCategory(SettingsCategory):
     def set_update_callback(self, callback):
         """Set callback for performing updates."""
         self._update_callback = callback
+
+    def set_reset_callback(self, callback):
+        """Set callback for reset data action."""
+        self._reset_callback = callback
 
     def _get_disk_usage(self) -> str:
         try:
@@ -569,6 +574,7 @@ class SystemCategory(SettingsCategory):
             f"Auto-Update: {auto_update_str}",
             "Check for Updates",
             "Restart System",
+            "Reset Data & Reboot",
             "Clear Screen + Shut Down"
         ]
 
@@ -588,11 +594,14 @@ class SystemCategory(SettingsCategory):
         elif "Check for Updates" in item_text:
             if self._update_callback:
                 self._update_callback()
-        elif "Restart" in item_text:
+        elif "Restart System" in item_text:
             subprocess.run(["sudo", "reboot"], timeout=5)
         elif "Long Press" in item_text:
             new_val = self.settings.cycle('long_press_duration')
             self.items[item_index] = f"Long Press: {new_val}s"
+        elif "Reset Data" in item_text:
+            if self._reset_callback:
+                self._reset_callback()
         elif "Clear Screen" in item_text:
             if self._screen_clear_callback:
                 self._screen_clear_callback()

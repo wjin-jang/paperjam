@@ -60,7 +60,7 @@ echo "[2/9] Enabling I2C and SPI..."
 
 # Enable I2C
 if ! grep -q "^dtparam=i2c_arm=on" "$BOOT_CONFIG" 2>/dev/null; then
-    sudo bash -c "echo 'dtparam=i2c_arm=on' >> $BOOT_CONFIG"
+    echo 'dtparam=i2c_arm=on' | sudo tee -a "$BOOT_CONFIG" > /dev/null
     echo "  I2C enabled"
 else
     echo "  I2C already enabled"
@@ -68,7 +68,7 @@ fi
 
 # Enable SPI
 if ! grep -q "^dtparam=spi=on" "$BOOT_CONFIG" 2>/dev/null; then
-    sudo bash -c "echo 'dtparam=spi=on' >> $BOOT_CONFIG"
+    echo 'dtparam=spi=on' | sudo tee -a "$BOOT_CONFIG" > /dev/null
     echo "  SPI enabled"
 else
     echo "  SPI already enabled"

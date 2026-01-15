@@ -60,6 +60,14 @@ class SettingsApp:
         self.prev_view = ""
         self.popup_start = 0
 
+    def on_enter(self):
+        """Called when app is launched - reset running state."""
+        self.running = True
+        self.view = 'MAIN'
+        self.idx = 0
+        self.submenu_idx = 0
+        self.current_category = None
+
     def _init_categories(self):
         """Initialize settings categories."""
         self.categories: Dict[str, object] = {
