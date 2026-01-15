@@ -274,7 +274,7 @@ class MusicViewRenderer:
             message: Loading message to display
         """
         w = 100
-        h = cfg.ROW_HEIGHT + 8
+        h = cfg.ROW_HEIGHT
 
         x = (cfg.SCREEN_WIDTH - w) // 2
         y = (cfg.SCREEN_HEIGHT - h) // 2
