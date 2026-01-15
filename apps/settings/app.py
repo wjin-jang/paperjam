@@ -93,6 +93,40 @@ class SettingsApp:
                 self.current_submenu = category.items
         return self.running
 
+    def _get_info_indices(self) -> list:
+        """Get info indices for current category."""
+        cat_handler = self.categories.get(self.current_category)
+        if cat_handler:
+            return cat_handler.get_info_indices()
+        return []
+
+    def _nav_submenu(self, direction: int):
+        """Navigate submenu, skipping info-only items."""
+        info_indices = self._get_info_indices()
+        total = len(self.current_submenu)
+        if total == 0:
+            return
+
+        # Check if all items are info-only
+        selectable = [i for i in range(total) if i not in info_indices]
+        if not selectable:
+            self.submenu_idx = -1  # No selection possible
+            return
+
+        # Handle case where we start with no selection
+        if self.submenu_idx < 0:
+            self.submenu_idx = selectable[0] if direction > 0 else selectable[-1]
+            return
+
+        # Find next valid index
+        for _ in range(total):
+            if direction > 0:
+                self.submenu_idx = (self.submenu_idx + 1) % total
+            else:
+                self.submenu_idx = (self.submenu_idx - 1) % total
+            if self.submenu_idx not in info_indices:
+                return
+
     # --- Navigation ---
     def nav_up(self):
         if self.view == 'VOLUME':
@@ -101,7 +135,7 @@ class SettingsApp:
         if self.view == 'MAIN':
             self.idx = nav_index_up(self.idx, len(self.main_menu))
         elif self.view == 'SUBMENU':
-            self.submenu_idx = nav_index_up(self.submenu_idx, len(self.current_submenu))
+            self._nav_submenu(-1)
         elif self.view in ['BT_SAVED', 'BT_SCAN']:
             limit = len(self.bt_devices) + (1 if self.view == 'BT_SAVED' else 0)
             if limit > 0:
@@ -122,7 +156,7 @@ class SettingsApp:
         if self.view == 'MAIN':
             self.idx = nav_index_down(self.idx, len(self.main_menu))
         elif self.view == 'SUBMENU':
-            self.submenu_idx = nav_index_down(self.submenu_idx, len(self.current_submenu))
+            self._nav_submenu(1)
         elif self.view in ['BT_SAVED', 'BT_SCAN']:
             limit = len(self.bt_devices) + (1 if self.view == 'BT_SAVED' else 0)
             if limit > 0:
@@ -209,16 +243,24 @@ class SettingsApp:
     def _enter_category(self, category: str):
         """Enter a settings category."""
         self.current_category = category.upper()
-        self.submenu_idx = 0
+        self.submenu_idx = -1  # -1 means no selection
 
         cat_handler = self.categories.get(self.current_category)
         if cat_handler:
             cat_handler.refresh()
             self.current_submenu = cat_handler.items
+            # Find first non-info item
+            info_indices = cat_handler.get_info_indices()
+            for i in range(len(self.current_submenu)):
+                if i not in info_indices:
+                    self.submenu_idx = i
+                    break
             self.view = 'SUBMENU'
 
     def _handle_submenu_action(self):
         """Handle action in current submenu."""
+        if self.submenu_idx < 0:
+            return  # No selectable item
         cat_handler = self.categories.get(self.current_category)
         if not cat_handler:
             return

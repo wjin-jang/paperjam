@@ -32,6 +32,10 @@ class SettingsCategory(ABC):
         """
         pass
 
+    def get_info_indices(self) -> List[int]:
+        """Return indices of info-only items that should not be selectable."""
+        return []
+
     def refresh(self):
         """Refresh the menu items."""
         self.items = self.build_menu()
@@ -223,6 +227,9 @@ class LibraryCategory(SettingsCategory):
             f"Albums: {len(self.lib.albums)}",
             f"Artists: {len(self.lib.artists)}"
         ]
+
+    def get_info_indices(self) -> List[int]:
+        return [2, 3, 4]  # Tracks, Albums, Artists are info-only
 
     def handle_action(self, item_index: int) -> Optional[str]:
         item_text = self.items[item_index]
@@ -441,6 +448,9 @@ class NetworkCategory(SettingsCategory):
             f"  {self._get_bt_status()}"
         ]
 
+    def get_info_indices(self) -> List[int]:
+        return [1, 4]  # WiFi info and BT status are info-only
+
     def handle_action(self, item_index: int) -> Optional[str]:
         if item_index == 0:
             self._toggle_wifi()
@@ -515,6 +525,9 @@ class SystemCategory(SettingsCategory):
             "Restart System",
             "Clear Screen + Shut Down"
         ]
+
+    def get_info_indices(self) -> List[int]:
+        return [1, 3]  # Disk usage and Version are info-only
 
     def handle_action(self, item_index: int) -> Optional[str]:
         item_text = self.items[item_index]
