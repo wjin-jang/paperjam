@@ -89,3 +89,82 @@ class SystemManager:
         print("System rebooting...")
         self.sleep_display()
         subprocess.run(["sudo", "reboot"])
+
+    def check_for_updates(self):
+        """Check if updates are available from git.
+
+        Returns:
+            Tuple of (has_updates: bool, message: str)
+        """
+        try:
+            # Fetch from remote
+            subprocess.run(
+                ["git", "fetch"],
+                cwd=Path(__file__).parent.parent,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=30
+            )
+
+            # Check if we're behind origin/main
+            result = subprocess.run(
+                ["git", "status", "-uno"],
+                cwd=Path(__file__).parent.parent,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if "Your branch is behind" in result.stdout:
+                return True, "Updates available"
+            elif "Your branch is up to date" in result.stdout:
+                return False, "Up to date"
+            else:
+                return False, "Unknown status"
+        except (subprocess.SubprocessError, OSError) as e:
+            return False, f"Error: {str(e)[:20]}"
+
+    def perform_update(self):
+        """Pull updates from git and restart the application.
+
+        Returns:
+            Tuple of (success: bool, message: str)
+        """
+        try:
+            # Git pull
+            result = subprocess.run(
+                ["git", "pull", "origin", "main"],
+                cwd=Path(__file__).parent.parent,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+
+            if result.returncode != 0:
+                return False, f"Git error: {result.stderr[:30]}"
+
+            # Check if update was successful
+            if "Already up to date" in result.stdout:
+                return True, "Already up to date"
+
+            # Restart the application
+            print("Update successful, restarting...")
+            self.sleep_display()
+
+            # Use systemctl to restart the service if running as service
+            # Otherwise just reboot
+            try:
+                subprocess.run(
+                    ["systemctl", "--user", "restart", "paperjam"],
+                    timeout=5
+                )
+            except (subprocess.SubprocessError, OSError):
+                # If service restart fails, do a full reboot
+                subprocess.run(["sudo", "reboot"])
+
+            return True, "Updated, restarting..."
+
+        except subprocess.TimeoutExpired:
+            return False, "Update timed out"
+        except (subprocess.SubprocessError, OSError) as e:
+            return False, f"Error: {str(e)[:20]}"

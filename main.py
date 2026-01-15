@@ -71,25 +71,138 @@ class MainApp:
             self._run_first_startup()
 
     def _run_first_startup(self):
+        """Handle first run - show welcome screen with options."""
         logger.info("First run detected")
+
+        # Show initial choice screen
+        choice = self._show_startup_choice()
+
+        if choice == 'shutdown':
+            logger.info("User chose to shutdown for library setup")
+            frame = self.renderer.render_menu("SETUP", [
+                "Shutting down...",
+                "",
+                "Add music to:",
+                f"{cfg.MUSIC_PATH}"
+            ], -1, 0)
+            self._display(frame, full_refresh=True)
+            time.sleep(2)
+            self.sys.shutdown()
+            return
+
+        # User chose to scan
+        self._run_library_scan()
+
+    def _show_startup_choice(self):
+        """Show startup choice screen - scan now or shutdown to add music.
+
+        Returns:
+            'scan' or 'shutdown'
+        """
+        choice_idx = 0
+        choice_made = False
+        result = 'scan'
+
+        def on_up():
+            nonlocal choice_idx
+            choice_idx = (choice_idx - 1) % 2
+
+        def on_down():
+            nonlocal choice_idx
+            choice_idx = (choice_idx + 1) % 2
+
+        def on_enter():
+            nonlocal choice_made, result
+            result = 'scan' if choice_idx == 0 else 'shutdown'
+            choice_made = True
+
+        # Set temporary callbacks for this screen
+        self.inputs.set_callbacks({
+            'up': on_up,
+            'down': on_down,
+            'enter': on_enter
+        })
+
+        while not choice_made:
+            if not self.inputs.check_inputs():
+                break
+
+            items = [
+                "Welcome to PaperJam!",
+                "",
+                "Music path:",
+                f"{str(cfg.MUSIC_PATH)[:22]}",
+                "",
+                "Scan Library Now",
+                "Shutdown (Add Music)"
+            ]
+            # Selection is on items 5 or 6 (0-indexed)
+            sel_idx = 5 + choice_idx
+
+            frame = self.renderer.render_menu("FIRST RUN", items, sel_idx, 0)
+            self._display(frame, full_refresh=self.first_render)
+            self.first_render = False
+            time.sleep(0.05)
+
+        self.first_render = True
+        return result
+
+    def _run_library_scan(self):
+        """Run library scan with progress display."""
+        logger.info("Starting library scan")
         self.music_app.lib.scan_async(force=True)
-        
+
         while self.music_app.lib.is_scanning:
             lib = self.music_app.lib
             items = [
-                "Please wait whilst we",
-                "read your library.",
+                "Scanning library...",
                 "",
                 f"Tracks: {lib.scan_track_count}",
-                f"Albums: {lib.scan_album_count}"
+                f"Albums: {lib.scan_album_count}",
+                f"Artists: {lib.scan_artist_count}"
             ]
             if lib.scan_current_file:
-                items.append(f"{lib.scan_current_file[:24]}")
-            
-            frame = self.renderer.render_menu("WELCOME", items, -1, 0)
+                items.append("")
+                items.append(f"{lib.scan_current_file[:22]}")
+
+            frame = self.renderer.render_menu("SCANNING", items, -1, 0)
             self._display(frame, full_refresh=self.first_render)
+            self.first_render = False
             time.sleep(0.1)
-        
+
+        self.first_render = True
+        logger.info(f"Scan complete: {self.music_app.lib.scan_track_count} tracks")
+
+        # Show welcome screen with tiled album art
+        self._show_welcome_screen()
+
+    def _show_welcome_screen(self):
+        """Show welcome screen with tiled album covers and continue button."""
+        # Get random covers for tiling
+        covers = self.music_app.lib.get_random_covers(count=15, small=True)
+
+        # Wait for user to press enter
+        continue_pressed = False
+
+        def on_enter():
+            nonlocal continue_pressed
+            continue_pressed = True
+
+        self.inputs.set_callbacks({
+            'enter': on_enter,
+            'up': lambda: None,
+            'down': lambda: None
+        })
+
+        while not continue_pressed:
+            if not self.inputs.check_inputs():
+                break
+
+            frame = self.renderer.render_welcome_tiled(covers)
+            self._display(frame, full_refresh=self.first_render, skip_battery=True, skip_status=True)
+            self.first_render = False
+            time.sleep(0.05)
+
         self.first_render = True
 
     def run(self):
@@ -235,9 +348,18 @@ class MainApp:
             if self.confirm_target == "REBOOT":
                 self._perform_system_action("REBOOTING...", self.sys.reboot)
             elif self.confirm_target == "SHUTDOWN":
-                self.sys.shutdown()
+                self._perform_shutdown()
         else:
             self._cancel_confirm()
+
+    def _perform_shutdown(self):
+        """Perform shutdown with random cover art display."""
+        # Get random cover art from library
+        cover = self.music_app.lib.get_random_cover()
+        frame = self.renderer.render_shutdown(cover)
+        self._display(frame, full_refresh=True, skip_battery=True, skip_status=True)
+        time.sleep(1)
+        self.sys.shutdown()
 
     def _cancel_confirm(self):
         self.view = 'HOME'
@@ -252,11 +374,10 @@ class MainApp:
     def _handle_shutdown_request(self, reason="User Request"):
         logger.info(f"Shutdown requested: {reason}")
         if reason == "LOW BATTERY":
-             frame = self.renderer.render_menu("LOW BATTERY", ["Shutting down..."], 0, 0)
-             # Manually force draw battery empty
-             self._display(frame, full_refresh=True, skip_battery=False) 
-             time.sleep(2)
-        self.sys.shutdown()
+            frame = self.renderer.render_menu("LOW BATTERY", ["Shutting down..."], 0, 0)
+            self._display(frame, full_refresh=True, skip_battery=False)
+            time.sleep(2)
+        self._perform_shutdown()
 
     def _perform_screen_clear_shutdown(self):
         logger.info("Clearing screen for shutdown")

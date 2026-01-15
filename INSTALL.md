@@ -54,13 +54,13 @@ Run `sudo raspi-config` and enable under **Interface Options**:
 
 Or add directly to config:
 ```bash
-# Determine config location (Bookworm vs Trixie)
-CONFIG_FILE="/boot/firmware/config.txt"
-[ ! -f "$CONFIG_FILE" ] && CONFIG_FILE="/boot/config.txt"
+# Determine config location (Bookworm uses /boot/firmware/, older uses /boot/)
+BOOT_CONFIG="/boot/firmware/config.txt"
+[ ! -f "$BOOT_CONFIG" ] && BOOT_CONFIG="/boot/config.txt"
 
 # Enable I2C and SPI
-sudo bash -c "grep -q '^dtparam=i2c_arm=on' $CONFIG_FILE || echo 'dtparam=i2c_arm=on' >> $CONFIG_FILE"
-sudo bash -c "grep -q '^dtparam=spi=on' $CONFIG_FILE || echo 'dtparam=spi=on' >> $CONFIG_FILE"
+sudo bash -c "grep -q '^dtparam=i2c_arm=on' $BOOT_CONFIG || echo 'dtparam=i2c_arm=on' >> $BOOT_CONFIG"
+sudo bash -c "grep -q '^dtparam=spi=on' $BOOT_CONFIG || echo 'dtparam=spi=on' >> $BOOT_CONFIG"
 ```
 
 ### 3. Enable Bluetooth
@@ -109,8 +109,11 @@ pip install --upgrade pip
 pip install pillow mutagen python-vlc smbus2 evdev numpy spidev RPi.GPIO gpiozero pykakasi korean_romanizer
 
 # Symlink system lgpio into venv (can't be pip installed)
-ln -s /usr/lib/python3/dist-packages/lgpio.py ~/paperjam/venv/lib/python3.*/site-packages/
-ln -s /usr/lib/python3/dist-packages/_lgpio*.so ~/paperjam/venv/lib/python3.*/site-packages/
+# Get the exact Python version for the correct site-packages path
+PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+VENV_SITE="$HOME/paperjam/venv/lib/python$PYTHON_VERSION/site-packages"
+ln -sf /usr/lib/python3/dist-packages/lgpio.py "$VENV_SITE/"
+ln -sf /usr/lib/python3/dist-packages/_lgpio*.so "$VENV_SITE/" 2>/dev/null || true
 ```
 
 Dependencies:
@@ -124,6 +127,8 @@ Dependencies:
 - **RPi.GPIO** - GPIO access for Raspberry Pi
 - **gpiozero** - GPIO interface (required by Waveshare driver)
 - **lgpio** - GPIO backend for gpiozero (system package, symlinked)
+- **pykakasi** - Japanese text romanization (optional, for Japanese metadata)
+- **korean_romanizer** - Korean text romanization (optional, for Korean metadata)
 
 ### 8. Waveshare e-Paper Driver
 
@@ -134,29 +139,29 @@ git clone https://github.com/waveshare/e-Paper.git lib/waveshare
 pip install lib/waveshare/RaspberryPi_JetsonNano/python/
 ```
 
-Or via pip:
-```bash
-pip install waveshare-epd
-```
+**Note:** Installing from source is recommended as it ensures compatibility with your specific display model.
 
 ### 9. Configure PaperJam
 
-Run the installation script to interactively configure the music path.
+Create the config directory and configuration file:
+
+```bash
+mkdir -p ~/.config/paperjam
+```
 
 For manual configuration, create `~/.config/paperjam/config.json`:
 
 ```json
 {
-    "music_path": "/home/pi/Music",
+    "music_path": "/home/YOUR_USERNAME/Music",
     "screensaver_timeout": 60,
     "long_press_duration": 0.5,
     "recents_limit": 50,
-    "invert_colors": false,
-    "font_main": "BMmini.ttf",
-    "font_header": "Nintendo-DS-BIOS.ttf",
-    "font_icons": "Icons.ttf"
+    "invert_colors": false
 }
 ```
+
+Replace `YOUR_USERNAME` with your actual username (run `whoami` to check). The font settings are optional and use built-in defaults.
 
 ### 10. Run Manually
 

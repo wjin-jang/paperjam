@@ -29,13 +29,13 @@ echo
 
 # Determine config.txt location (Bookworm uses /boot/firmware/, older uses /boot/)
 if [ -f /boot/firmware/config.txt ]; then
-    CONFIG_FILE="/boot/firmware/config.txt"
+    BOOT_CONFIG="/boot/firmware/config.txt"
 else
-    CONFIG_FILE="/boot/config.txt"
+    BOOT_CONFIG="/boot/config.txt"
 fi
 
 # --- System Packages ---
-echo "[1/8] Installing system packages..."
+echo "[1/9] Installing system packages..."
 sudo apt update
 sudo apt install -y \
     python3-pip \
@@ -56,19 +56,19 @@ sudo apt install -y \
 
 # --- Enable Interfaces ---
 echo
-echo "[2/8] Enabling I2C and SPI..."
+echo "[2/9] Enabling I2C and SPI..."
 
 # Enable I2C
-if ! grep -q "^dtparam=i2c_arm=on" "$CONFIG_FILE" 2>/dev/null; then
-    sudo bash -c "echo 'dtparam=i2c_arm=on' >> $CONFIG_FILE"
+if ! grep -q "^dtparam=i2c_arm=on" "$BOOT_CONFIG" 2>/dev/null; then
+    sudo bash -c "echo 'dtparam=i2c_arm=on' >> $BOOT_CONFIG"
     echo "  I2C enabled"
 else
     echo "  I2C already enabled"
 fi
 
 # Enable SPI
-if ! grep -q "^dtparam=spi=on" "$CONFIG_FILE" 2>/dev/null; then
-    sudo bash -c "echo 'dtparam=spi=on' >> $CONFIG_FILE"
+if ! grep -q "^dtparam=spi=on" "$BOOT_CONFIG" 2>/dev/null; then
+    sudo bash -c "echo 'dtparam=spi=on' >> $BOOT_CONFIG"
     echo "  SPI enabled"
 else
     echo "  SPI already enabled"
@@ -76,13 +76,13 @@ fi
 
 # --- User Permissions ---
 echo
-echo "[3/8] Setting up user permissions..."
+echo "[3/9] Setting up user permissions..."
 sudo usermod -aG i2c,gpio,spi,bluetooth,audio $USER_NAME 2>/dev/null || true
 echo "  Added $USER_NAME to hardware groups"
 
 # --- Bluetooth ---
 echo
-echo "[4/8] Configuring Bluetooth..."
+echo "[4/9] Configuring Bluetooth..."
 sudo systemctl enable bluetooth 2>/dev/null || true
 sudo systemctl start bluetooth 2>/dev/null || true
 sudo rfkill unblock bluetooth 2>/dev/null || true
@@ -90,7 +90,7 @@ echo "  Bluetooth enabled"
 
 # --- Clone Repository ---
 echo
-echo "[5/8] Cloning PaperJam repository..."
+echo "[5/9] Cloning PaperJam repository..."
 if [ -d "$INSTALL_DIR" ]; then
     echo "  Directory exists, pulling latest..."
     cd "$INSTALL_DIR"
@@ -102,7 +102,7 @@ fi
 
 # --- Python Virtual Environment ---
 echo
-echo "[6/8] Setting up Python environment..."
+echo "[6/9] Setting up Python environment..."
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
@@ -117,7 +117,7 @@ echo "  Python dependencies installed"
 
 # --- Configuration ---
 echo
-echo "[7/8] Configuring PaperJam..."
+echo "[7/9] Configuring PaperJam..."
 CONFIG_DIR="$HOME_DIR/.config/paperjam"
 mkdir -p "$CONFIG_DIR"
 CONFIG_FILE="$CONFIG_DIR/config.json"
@@ -207,7 +207,7 @@ echo
 echo "A reboot is required for I2C/SPI changes to take effect."
 echo
 echo "After reboot:"
-echo "  - Edit music path: nano $INSTALL_DIR/config.py"
+echo "  - Edit config:     nano $HOME_DIR/.config/paperjam/config.json"
 echo "  - Start service:   systemctl --user start paperjam"
 echo "  - View logs:       journalctl --user -u paperjam -f"
 echo "  - Run manually:    cd $INSTALL_DIR && source venv/bin/activate && python main.py"

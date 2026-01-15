@@ -238,9 +238,39 @@ class LibraryManager:
                 covers = get_cover(Path(tracks[0]['path']))
                 if with_album:
                     return covers[1], alb
-                return covers[1] # Return Large
+                return covers[1]  # Return Large
         except (OSError, KeyError, IndexError):
             return (None, None) if with_album else None
+
+    def get_random_covers(self, count=10, small=True):
+        """Get multiple random album covers for tiled displays.
+
+        Args:
+            count: Number of covers to retrieve
+            small: If True, return small covers; if False, return large covers
+
+        Returns:
+            List of cover images (may contain None entries)
+        """
+        covers = []
+        if not self.albums:
+            return covers
+
+        album_keys = list(self.albums.keys())
+        random.shuffle(album_keys)
+
+        for alb in album_keys[:count]:
+            try:
+                tracks = self.albums[alb]
+                if tracks:
+                    cover_pair = get_cover(Path(tracks[0]['path']))
+                    cover = cover_pair[0] if small else cover_pair[1]
+                    if cover:
+                        covers.append(cover)
+            except (OSError, KeyError, IndexError):
+                continue
+
+        return covers
 
     def load_recents(self):
         if cfg.RECENTS_FILE.exists():

@@ -40,8 +40,12 @@ class UIRenderer:
         return self._menu_view.render_menu(title, items, sel_idx, scroll_idx, info_indices=info_indices)
 
     def render_shutdown(self, image=None) -> Image.Image:
-        """Render shutdown screen."""
+        """Render shutdown screen with cover art and POWER OFF text."""
         return self._screensaver_view.render_shutdown(image)
+
+    def render_welcome_tiled(self, covers, dialog_text="WELCOME TO PAPERJAM", button_text="Continue...") -> Image.Image:
+        """Render welcome screen with tiled album art and dialog box."""
+        return self._screensaver_view.render_welcome_tiled(covers, dialog_text, button_text)
 
     def render_context_menu(self, state) -> Image.Image:
         """Render context menu overlay."""

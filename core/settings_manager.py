@@ -71,6 +71,10 @@ class SettingsManager:
         'endless_playback': SettingDefinition(
             key='endless_playback',
             default=False
+        ),
+        'auto_update': SettingDefinition(
+            key='auto_update',
+            default=False
         )
     }
 

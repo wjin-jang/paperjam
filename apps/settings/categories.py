@@ -500,10 +500,16 @@ class SystemCategory(SettingsCategory):
     def __init__(self, settings_manager):
         super().__init__("SYSTEM", settings_manager)
         self._screen_clear_callback = None
+        self._update_callback = None
+        self._update_status = ""
 
     def set_screen_clear_callback(self, callback):
         """Set callback for screen clear shutdown."""
         self._screen_clear_callback = callback
+
+    def set_update_callback(self, callback):
+        """Set callback for performing updates."""
+        self._update_callback = callback
 
     def _get_disk_usage(self) -> str:
         try:
@@ -550,6 +556,8 @@ class SystemCategory(SettingsCategory):
 
     def build_menu(self) -> List[str]:
         long_press = self.settings.get('long_press_duration', 0.5)
+        auto_update = self.settings.get('auto_update', False)
+        auto_update_str = "ON" if auto_update else "OFF"
         cpu_gov = self._get_cpu_governor()
         cpu_mode = "Powersave" if cpu_gov == "powersave" else "Normal"
         disk = self._get_disk_usage()
@@ -558,6 +566,8 @@ class SystemCategory(SettingsCategory):
             f"Ver: {version.VERSION} ({version.VERSION_DATE})",
             f"CPU Mode: {cpu_mode}",
             f"Long Press: {long_press}s",
+            f"Auto-Update: {auto_update_str}",
+            "Check for Updates",
             "Restart System",
             "Clear Screen + Shut Down"
         ]
@@ -571,8 +581,15 @@ class SystemCategory(SettingsCategory):
         if "CPU Mode" in item_text:
             self._toggle_cpu_powersave()
             self.refresh()
+        elif "Auto-Update" in item_text:
+            new_val = self.settings.toggle('auto_update')
+            state = "ON" if new_val else "OFF"
+            self.items[item_index] = f"Auto-Update: {state}"
+        elif "Check for Updates" in item_text:
+            if self._update_callback:
+                self._update_callback()
         elif "Restart" in item_text:
-            subprocess.run(["sudo", "reboot"])
+            subprocess.run(["sudo", "reboot"], timeout=5)
         elif "Long Press" in item_text:
             new_val = self.settings.cycle('long_press_duration')
             self.items[item_index] = f"Long Press: {new_val}s"

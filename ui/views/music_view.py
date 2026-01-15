@@ -86,17 +86,24 @@ class MusicViewRenderer(RenderBase):
                     outline=cfg.WHITE
                 )
 
-    def _render_info_columns(self, item, x, y, w, h):
-        """Render an info item with multiple columns.
+    def _render_info_line(self, columns, x, y, w, h):
+        """Render a single line of an info item with columns.
 
-        Columns are sized to fit their content, with the first column
-        taking remaining space. Right columns are right-aligned.
+        Args:
+            columns: List of column strings, or a single string
+            x, y, w, h: Position and dimensions
         """
-        columns = item.get('columns', [])
+        if isinstance(columns, str):
+            # Single string - render as plain text
+            self.draw_text_box(sanitize_text(columns), x, y, w, h)
+            return
+
         if not columns:
-            # Single text info item
-            name_str = sanitize_text(item.get('name', ''))
-            self.draw_text_box(name_str, x, y, w, h)
+            return
+
+        if len(columns) == 1:
+            # Single column - render as plain text
+            self.draw_text_box(sanitize_text(str(columns[0])), x, y, w, h)
             return
 
         # Calculate width needed for each right column (all except first)
@@ -120,6 +127,44 @@ class MusicViewRenderer(RenderBase):
             col_w = right_widths[i]
             self.draw_text_box(sanitize_text(str(col_text)), col_x, y, col_w, h, center=True)
             col_x += col_w
+
+    def _render_info_columns(self, item, x, y, w, h):
+        """Render an info item with multiple columns and optional multi-line support.
+
+        Supports:
+        - 'columns': List of strings for a single-line multi-column layout
+        - 'lines': List of lines, where each line is either a string or list of columns
+        - 'name': Fallback single text if neither columns nor lines provided
+        """
+        lines = item.get('lines', [])
+
+        if lines:
+            # Multi-line info item
+            line_height = h  # Each line gets one row height
+            for i, line in enumerate(lines):
+                line_y = y + (i * line_height)
+                self._render_info_line(line, x, line_y, w, line_height)
+            return
+
+        columns = item.get('columns', [])
+        if columns:
+            # Single-line multi-column layout (backwards compatible)
+            self._render_info_line(columns, x, y, w, h)
+            return
+
+        # Single text info item
+        name_str = sanitize_text(item.get('name', ''))
+        self.draw_text_box(name_str, x, y, w, h)
+
+    def _get_item_row_count(self, item):
+        """Get the number of rows an item should span.
+
+        Multi-line info items span multiple rows based on their 'lines' field.
+        All other items span 1 row.
+        """
+        if item.get('type') == 'info' and item.get('lines'):
+            return len(item['lines'])
+        return 1
 
     def render_scrollbar(self, total, current, page_size, x, y, h):
         """Render scrollbar."""
@@ -154,9 +199,11 @@ class MusicViewRenderer(RenderBase):
             self.render_controls(y, w + 8, state, is_selected)
             return
 
-        # Info items
+        # Info items (may span multiple rows)
         if itype == 'info':
-            self._render_info_columns(item, x, y, w + 8, h)
+            row_count = self._get_item_row_count(item)
+            item_height = h * row_count
+            self._render_info_columns(item, x, y, w + 8, item_height)
             return
 
         # Heading items
@@ -254,8 +301,9 @@ class MusicViewRenderer(RenderBase):
         # Render pinned items (always visible at top)
         for i, item in enumerate(pinned_items):
             is_selected = (i == state.selection_index)
+            row_count = self._get_item_row_count(item)
             self._render_item(item, cfg.PANEL_X, list_start_y, cfg.PANEL_W - 8, cfg.ROW_HEIGHT, is_selected, None, state)
-            list_start_y += cfg.ROW_HEIGHT
+            list_start_y += cfg.ROW_HEIGHT * row_count
 
         avail_h = (cfg.PANEL_Y + cfg.PANEL_H) - list_start_y
         # Scrollbar based on scrollable items only
@@ -270,12 +318,16 @@ class MusicViewRenderer(RenderBase):
             if itype not in ('heading', 'info', 'controls'):
                 track_offset += 1
 
+        # Render scrollable items with multi-line support
+        current_y = list_start_y
         for i, item in enumerate(scrollable_items):
-            y_pos = list_start_y + (i * cfg.ROW_HEIGHT)
-            remaining_h = (cfg.PANEL_Y + cfg.PANEL_H) - y_pos
+            row_count = self._get_item_row_count(item)
+            item_height = cfg.ROW_HEIGHT * row_count
+
+            remaining_h = (cfg.PANEL_Y + cfg.PANEL_H) - current_y
             if remaining_h <= 0:
                 break
-            draw_h = min(cfg.ROW_HEIGHT, remaining_h)
+            draw_h = min(item_height, remaining_h)
 
             abs_idx = state.view_start_index + i + pinned_count
             is_selected = (abs_idx == state.selection_index)
@@ -287,24 +339,8 @@ class MusicViewRenderer(RenderBase):
                 track_offset += 1
                 display_idx = track_offset
 
-            self._render_item(item, cfg.PANEL_X, y_pos, item_w, draw_h, is_selected, display_idx, state)
-
-        if has_scrollbar:
-            # Adjust scrollbar for pinned items
-            adjusted_selection = max(0, state.selection_index - pinned_count)
-            self.render_scrollbar(
-                scrollable_total, adjusted_selection, state.page_size,
-                cfg.PANEL_X + cfg.PANEL_W - 8, list_start_y, avail_h + 1
-            )
-
-        # Loading overlay
-        if state.loading_message:
-            self.render_loading(state.loading_message)
-        # Context menu overlay
-        elif state.context_menu_active:
-            self.render_context_menu(state)
-
-        return self.canvas
+            self._render_item(item, cfg.PANEL_X, current_y, item_w, cfg.ROW_HEIGHT, is_selected, display_idx, state)
+            current_y += item_height
 
         if has_scrollbar:
             # Adjust scrollbar for pinned items
