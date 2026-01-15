@@ -81,7 +81,7 @@ class Item(ABC):
         text_draw = ImageDraw.Draw(text_layer)
         text_draw.rectangle((0, 0, w, h), outline=cfg.BLACK)
 
-        padding_x, padding_y = 4, 2
+        padding_x, padding_y = 5, 3
         if center:
             bbox = text_draw.textbbox((0, 0), text, font=font)
             text_w = bbox[2] - bbox[0]

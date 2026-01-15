@@ -179,7 +179,7 @@ class MusicViewRenderer:
         # Get appropriate cover art
         art = state.playing_cover_s if state.playing_path else state.browsing_cover_s
         art_item = ImageItem(image=art, placeholder="NO IMAGE")
-        art_item.set_height(art_size - 2)  # Account for border
+        art_item.set_height(art_size + 1)  # Account for border
         art_menu.items = [art_item]
 
         art_panel.render(self.canvas)

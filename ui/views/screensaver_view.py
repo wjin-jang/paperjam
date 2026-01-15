@@ -42,7 +42,7 @@ class ScreensaverRenderer:
             art_panel = Panel(x, y, img.width, img.height)
             art_menu = art_panel.create_menu()
             art_item = ImageItem(image=img)
-            art_item.set_height(img.height)
+            art_item.set_height(img.height + 1)
             art_menu.items = [art_item]
             art_panel.render(self.canvas)
 

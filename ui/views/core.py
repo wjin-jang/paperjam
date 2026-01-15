@@ -331,7 +331,7 @@ class Panel:
 
         # Draw shadow (offset by 1 pixel)
         draw.rectangle(
-            (self.x, self.y,
+            (self.x + 1, self.y + 1,
              self.x + self.width + 1, self.y + self.height + 1),
             outline=cfg.BLACK
         )
