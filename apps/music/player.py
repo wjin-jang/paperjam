@@ -397,6 +397,15 @@ class MusicPlayerApp:
 
         return self.running
 
+    def _set_initial_selection(self):
+        """Set selection to the first selectable item (skipping headers/controls)."""
+        self.state.selection_index = 0
+        for i, item in enumerate(self.state.items):
+            itype = item.get('type')
+            if itype not in ('heading', 'info', 'controls'):
+                self.state.selection_index = i
+                break
+
     def refresh_list(self):
         """Refresh the current list based on mode."""
         self.running = True
@@ -501,6 +510,9 @@ class MusicPlayerApp:
             self.state.browsing_cover_s = cover
 
         self.state.total_items = len(self.state.items)
+        # Only reset selection if not just refreshing the same view content (simple heuristic or always reset on mode change)
+        # The prompt implies "When entering a menu", which corresponds to this full refresh.
+        self._set_initial_selection()
 
     def _load_tracks(self, tracks):
         """Convert track list to state items with controls bar."""
@@ -627,11 +639,19 @@ class MusicPlayerApp:
                         self._play_from_list(target['path'])
             else:
                 self.state.set_status_message("SHUFFLE OFF")
+            
+            if self.mode == 'QUEUE_VIEW':
+                self.refresh_list()
+
         elif idx == 2:
             self.state.loop_mode = (self.state.loop_mode + 1) % 3
             self.playlist.loop_mode = self.state.loop_mode # Sync with playlist manager
             loop_messages = ["LOOP OFF", "LOOP ALL", "LOOP ONE"]
             self.state.set_status_message(loop_messages[self.state.loop_mode])
+            
+            if self.mode == 'QUEUE_VIEW':
+                self.refresh_list()
+
         elif idx == 3:
             if self.mode == 'QUEUE_VIEW':
                 self.playlist.clear_manual_queue()
