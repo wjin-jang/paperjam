@@ -90,33 +90,30 @@ class AudioCategory(SettingsCategory):
         """Get list of available PulseAudio sinks (audio output devices)."""
         self._audio_sinks = []
         try:
+            # Get full sink info including descriptions
             result = subprocess.check_output(
-                ["pactl", "list", "short", "sinks"],
+                ["pactl", "list", "sinks"],
                 text=True, stderr=subprocess.DEVNULL, timeout=2
             )
-            for line in result.strip().split('\n'):
-                if line:
-                    parts = line.split('\t')
-                    if len(parts) >= 2:
-                        sink_id = parts[0]
-                        sink_name = parts[1]
-                        # Create a friendly display name
-                        if 'bluez' in sink_name.lower():
-                            display = 'Bluetooth'
-                        elif 'hdmi' in sink_name.lower():
-                            display = 'HDMI'
-                        elif 'usb' in sink_name.lower():
-                            display = 'USB'
-                        elif 'headphone' in sink_name.lower():
-                            display = 'Headphones'
-                        else:
-                            # Use last part of name for display
-                            display = sink_name.split('.')[-1][:12]
-                        self._audio_sinks.append({
-                            'id': sink_id,
-                            'name': sink_name,
-                            'display': display
-                        })
+
+            current_sink = {}
+            for line in result.split('\n'):
+                line = line.strip()
+                if line.startswith('Sink #'):
+                    if current_sink.get('name'):
+                        self._audio_sinks.append(current_sink)
+                    current_sink = {'id': line.split('#')[1]}
+                elif line.startswith('Name:'):
+                    current_sink['name'] = line.split(':', 1)[1].strip()
+                elif line.startswith('Description:'):
+                    desc = line.split(':', 1)[1].strip()
+                    # Truncate long descriptions
+                    current_sink['display'] = desc[:20] if len(desc) > 20 else desc
+
+            # Don't forget the last sink
+            if current_sink.get('name'):
+                self._audio_sinks.append(current_sink)
+
             # Find current default sink
             default = subprocess.check_output(
                 ["pactl", "get-default-sink"],
