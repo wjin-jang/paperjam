@@ -246,7 +246,7 @@ class ColumnItem(Item):
 
             ix = x + (w - icon.width) // 2
             iy = y + (h - icon.height) // 2
-            canvas.paste(icon, (ix, iy), mask=icon if not invert else None)
+            canvas.paste(icon, (ix, iy + 1), mask=icon if not invert else None)
 
         # Add inner border for active+selected
         if add_inner_border:

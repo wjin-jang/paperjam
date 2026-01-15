@@ -129,12 +129,12 @@ class MusicViewRenderer:
         # Use explicit icon if provided
         if 'icon' in item:
             icon = item['icon']
-            if itype == 'file' and icon == 'P':
+            if itype == 'file' and icon == 'Ⓟ':
                 # Stale playing icon
                 track_num = item.get('track', 0)
                 val = track_num if track_num else display_idx
                 return f"{val}." if val else ""
-            if itype == 'file' and icon not in ('S', ''):
+            if itype == 'file' and icon not in ('Ⓢ', ''):
                 return icon if icon.endswith('.') else f"{icon}."
             return icon
 

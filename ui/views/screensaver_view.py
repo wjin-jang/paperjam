@@ -62,7 +62,7 @@ class ScreensaverRenderer:
             bbox = self.draw.textbbox((0, 0), icon, font=cfg.FONT_HEADER)
             text_w = bbox[2] - bbox[0]
             text_x = px + (pw - text_w) // 2
-            self.draw.text((text_x + 1, py + 1), icon, font=cfg.FONT_HEADER, fill=cfg.BLACK)
+            self.draw.text((text_x + 1, py), icon, font=cfg.FONT_HEADER, fill=cfg.BLACK)
 
         return self.canvas
 
