@@ -66,15 +66,22 @@ class MenuViewRenderer(RenderBase):
                     right_widths.append(col_w)
 
                 total_right = sum(right_widths)
-                label_w = item_draw_w - total_right
+                label_w = max(20, item_draw_w - total_right)
+
+                # If columns don't fit, scale them down proportionally
+                if total_right + label_w > item_draw_w:
+                    scale = (item_draw_w - 20) / total_right if total_right > 0 else 1
+                    right_widths = [max(10, int(w * scale)) for w in right_widths]
+                    total_right = sum(right_widths)
+                    label_w = max(20, item_draw_w - total_right)
 
                 # Render label (left column)
                 self.draw_text_box(label, box_x, y_pos, label_w, draw_h, invert=False, center=False)
 
                 # Render right columns
                 col_x = box_x + label_w
-                for i, col in enumerate(right_cols):
-                    col_w = right_widths[i]
+                for j, col in enumerate(right_cols):
+                    col_w = right_widths[j]
                     self.draw_text_box(col, col_x, y_pos, col_w, draw_h, invert=False, center=True)
                     col_x += col_w
             else:
