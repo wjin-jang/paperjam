@@ -41,7 +41,9 @@ sudo apt install -y \
     pulseaudio \
     pulseaudio-module-bluetooth \
     alsa-utils \
-    wireless-tools
+    wireless-tools \
+    swig \
+    python3-lgpio
 ```
 
 ### 2. Enable Interfaces
@@ -104,7 +106,11 @@ cd paperjam
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
-pip install pillow mutagen python-vlc smbus2 evdev numpy
+pip install pillow mutagen python-vlc smbus2 evdev numpy spidev RPi.GPIO gpiozero
+
+# Symlink system lgpio into venv (can't be pip installed)
+ln -s /usr/lib/python3/dist-packages/lgpio.py ~/paperjam/venv/lib/python3.*/site-packages/
+ln -s /usr/lib/python3/dist-packages/_lgpio*.so ~/paperjam/venv/lib/python3.*/site-packages/
 ```
 
 Dependencies:
@@ -114,6 +120,10 @@ Dependencies:
 - **smbus2** - I2C for battery monitoring
 - **evdev** - Input device handling
 - **numpy** - Image dithering
+- **spidev** - SPI communication for e-paper display
+- **RPi.GPIO** - GPIO access for Raspberry Pi
+- **gpiozero** - GPIO interface (required by Waveshare driver)
+- **lgpio** - GPIO backend for gpiozero (system package, symlinked)
 
 ### 8. Waveshare e-Paper Driver
 

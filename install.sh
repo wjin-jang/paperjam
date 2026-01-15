@@ -50,7 +50,9 @@ sudo apt install -y \
     pulseaudio \
     pulseaudio-module-bluetooth \
     alsa-utils \
-    wireless-tools
+    wireless-tools \
+    swig \
+    python3-lgpio
 
 # --- Enable Interfaces ---
 echo
@@ -104,7 +106,13 @@ echo "[6/8] Setting up Python environment..."
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
-pip install pillow mutagen python-vlc smbus2 evdev numpy
+pip install pillow mutagen python-vlc smbus2 evdev numpy spidev RPi.GPIO gpiozero
+
+# Symlink system lgpio into venv (can't be pip installed)
+PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+VENV_SITE="$INSTALL_DIR/venv/lib/python$PYTHON_VERSION/site-packages"
+ln -sf /usr/lib/python3/dist-packages/lgpio.py "$VENV_SITE/"
+ln -sf /usr/lib/python3/dist-packages/_lgpio*.so "$VENV_SITE/" 2>/dev/null || true
 echo "  Python dependencies installed"
 
 # --- Waveshare EPD Library ---
@@ -166,7 +174,7 @@ echo "  - Start service:   systemctl --user start paperjam"
 echo "  - View logs:       journalctl --user -u paperjam -f"
 echo "  - Run manually:    cd $INSTALL_DIR && source venv/bin/activate && python main.py"
 echo
-read -p "Reboot now? (y/n) " -n 1 -r
+read -p "Reboot now? (y/n) " -n 1 -r REPLY </dev/tty
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     sudo reboot
