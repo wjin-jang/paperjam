@@ -236,6 +236,39 @@ class MusicPlayerApp:
             self.context_menu.open(item)
             self._sync_context_state()
 
+    def _play_media(self, path, play=True):
+        """Play a media file and update state."""
+        self.state.playing_path = str(path)
+        
+        # Update playing metadata
+        try:
+            info = extract_track_info(Path(path))
+            self.state.playing_artist = info.artist
+            self.state.playing_album = info.album
+        except:
+            self.state.playing_artist = None
+            self.state.playing_album = None
+
+        if play:
+            self.audio.play(path)
+            self.state.is_playing = True
+        else:
+            self.audio.stop()
+            self.state.is_playing = False
+
+        covers = get_cover(Path(path))
+        self.state.playing_cover_s = covers[0]
+        self.state.playing_cover_l = covers[1]
+
+        if self.state.screensaver_image:
+            self.state.screensaver_image = self.state.playing_cover_l or self.state.playing_cover_s
+
+        if play:
+            self.lib.add_recent(Path(path))
+
+        if self.mode == 'QUEUE_VIEW':
+            self.refresh_list()
+
     def toggle_play(self):
         if not self.state.screensaver_image:
             self.last_input_time = time.time()
@@ -262,34 +295,20 @@ class MusicPlayerApp:
                 self.state.controls_index = min(3, self.state.controls_index + 1)
                 return
 
+        # Handle Loop One (Auto-advance only)
+        if not from_user and self.state.loop_mode == 2 and self.state.playing_path:
+            self._play_media(self.state.playing_path)
+            return
+
         # Check Manual Queue first
         if self.playlist.manual_queue:
             path = self.playlist.manual_queue.popleft()
             if from_user:
                 self.state.set_status_message("NEXT")
-            
-            # Load track directly
-            self.state.playing_path = path
-            self.audio.play(path)
-            self.state.is_playing = True
-            
-            covers = get_cover(Path(path))
-            self.state.playing_cover_s = covers[0]
-            self.state.playing_cover_l = covers[1]
-            
-            if self.state.screensaver_image:
-                self.state.screensaver_image = self.state.playing_cover_l or self.state.playing_cover_s
-            
-            self.lib.add_recent(Path(path))
+            self._play_media(path)
             return
 
         if not self.playlist.has_queue:
-            return
-
-        # Handle Loop One (Auto-advance only)
-        if not from_user and self.state.loop_mode == 2:
-            real_idx = self.playlist.queue[self.playlist.queue_idx]
-            self._load_track(real_idx, play=True)
             return
 
         # Check if we're about to wrap around to the beginning
@@ -612,6 +631,8 @@ class MusicPlayerApp:
             self.nav_back()
         elif idx == 1:
             self.state.shuffle_active = not self.state.shuffle_active
+            self.playlist.toggle_shuffle() # Sync with playlist manager
+            
             if self.state.shuffle_active:
                 self.state.set_status_message("SHUFFLE ON")
                 if not self.state.playing_path:
@@ -623,6 +644,7 @@ class MusicPlayerApp:
                 self.state.set_status_message("SHUFFLE OFF")
         elif idx == 2:
             self.state.loop_mode = (self.state.loop_mode + 1) % 3
+            self.playlist.loop_mode = self.state.loop_mode # Sync with playlist manager
             loop_messages = ["LOOP OFF", "LOOP ALL", "LOOP ONE"]
             self.state.set_status_message(loop_messages[self.state.loop_mode])
         elif idx == 3:
