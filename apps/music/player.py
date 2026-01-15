@@ -340,6 +340,15 @@ class MusicPlayerApp:
         path = self.playlist.playlist_source[real_idx]
         self.state.playing_path = path
         
+        # Update playing metadata
+        try:
+            info = extract_track_info(Path(path))
+            self.state.playing_artist = info.artist
+            self.state.playing_album = info.album
+        except:
+            self.state.playing_artist = None
+            self.state.playing_album = None
+
         if play:
             self.audio.play(path)
             self.state.is_playing = True

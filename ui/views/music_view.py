@@ -250,9 +250,27 @@ class MusicViewRenderer(RenderBase):
 
             # Determine icon for other item types
             icons = cfg.MENU_ICONS
+            
+            # Check if this item is currently playing/paused
+            current_status_icon = icons.get('playing', 'Ⓟ') if state.is_playing else icons.get('paused', 'Ⓢ')
+            is_active_item = False
+            
             if itype == 'file':
+                if state.playing_path and str(item.get('path')) == str(state.playing_path):
+                    is_active_item = True
+            elif itype == 'album':
+                if state.playing_album and item.get('name') == state.playing_album:
+                    is_active_item = True
+            elif itype == 'artist':
+                if state.playing_artist and item.get('name') == state.playing_artist:
+                    is_active_item = True
+
+            if is_active_item:
+                icon_str = current_status_icon
+            elif itype == 'file':
                 if 'icon' in item and item['icon'] == 'P':
-                    icon_str = icons.get('playing', 'Ⓟ')
+                    # Fallback for old logic if needed, though active_item should catch it
+                    icon_str = current_status_icon
                 elif 'icon' in item and item['icon'] not in ('S', ''):
                     # Use provided icon if it's not the default 'S'
                     icon_str = item['icon']
