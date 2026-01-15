@@ -8,7 +8,8 @@
       "Bash(python -c:*)",
       "WebSearch",
       "WebFetch(domain:github.com)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(grep:*)"
     ]
   }
 }

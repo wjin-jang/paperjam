@@ -1,43 +1,40 @@
 """
-Menu view rendering for settings and navigation menus.
+Menu view rendering using Panel → Menu → Item hierarchy.
 """
-import math
+from PIL import Image, ImageDraw
 import config as cfg
-from ui.views.common import RenderBase, Panel
-from ui.views.items import ItemRenderer
-from ui.graphics import create_dithered_strip
+from ui.views.core import Panel
+from ui.views.items import TextItem, InfoItem, ColumnItem, Column
 
 
-class MenuViewRenderer(RenderBase):
-    """Renderer for menu views."""
+class MenuViewRenderer:
+    """Renderer for menu views using the new Panel/Menu system."""
 
-    def _get_item_row_count(self, item) -> int:
-        """Get the number of rows an item should span."""
-        if isinstance(item, dict) and item.get('type') == 'info' and item.get('lines'):
-            return len(item['lines'])
-        return 1
+    def __init__(self):
+        self.canvas = Image.new('1', (cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), cfg.WHITE)
+        self.draw = ImageDraw.Draw(self.canvas)
 
-    def _get_total_rows(self, items) -> int:
-        """Get total row count including multi-line items."""
-        return sum(self._get_item_row_count(item) for item in items)
+    def clear(self):
+        """Clear the canvas."""
+        self.draw.rectangle((0, 0, cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), fill=cfg.WHITE)
 
-    def _to_unified_item(self, item, is_info: bool) -> dict:
-        """Convert menu item to unified format for ItemRenderer.
+    def _convert_legacy_item(self, item, is_info: bool):
+        """Convert legacy item format to new Item classes.
 
         Args:
-            item: Menu item (string or dict)
-            is_info: Whether this item is in info_indices
+            item: String or dict in legacy format
+            is_info: Whether item should be non-selectable info
 
         Returns:
-            Unified item dict
+            Item instance
         """
-        # Already a dict with type
-        if isinstance(item, dict) and 'type' in item:
-            return item
+        # Already has 'type' field with 'info' and 'lines'
+        if isinstance(item, dict) and item.get('type') == 'info' and item.get('lines'):
+            return InfoItem(lines=item['lines'])
 
         # String item
         if isinstance(item, str):
-            # Info item with colon notation -> convert to columns
+            # Info item with colon notation -> columns
             if is_info and ':' in item:
                 parts = item.split(':', 1)
                 label = parts[0].strip()
@@ -46,30 +43,49 @@ class MenuViewRenderer(RenderBase):
                     right_cols = [c.strip() for c in right_text.split(',')]
                 else:
                     right_cols = [right_text] if right_text else []
-                return {'type': 'info', 'columns': [label] + right_cols}
-            # Regular text or info without columns
-            return {'type': 'info' if is_info else 'text', 'name': item}
+                return InfoItem(columns=[label] + right_cols)
+            # Regular text
+            if is_info:
+                return InfoItem(text=item)
+            return TextItem(item)
 
-        # Dict without type -> treat as text
+        # Dict with 'name' field
         if isinstance(item, dict):
-            return {'type': 'info' if is_info else 'text', 'name': item.get('name', str(item))}
+            name = item.get('name', str(item))
+            if is_info:
+                return InfoItem(text=name)
+            return TextItem(name)
 
-        return {'type': 'text', 'name': str(item)}
+        return TextItem(str(item))
+
+    def _get_item_row_count(self, item) -> int:
+        """Get the number of rows an item should span (legacy support)."""
+        if isinstance(item, dict) and item.get('type') == 'info' and item.get('lines'):
+            return len(item['lines'])
+        return 1
+
+    def _get_total_rows(self, items) -> int:
+        """Get total row count including multi-line items."""
+        return sum(self._get_item_row_count(item) for item in items)
 
     def render_menu(self, title, items, sel_idx, scroll_idx, info_indices=None):
         """Render a menu with title and items.
 
         Args:
             title: Menu title
-            items: List of menu items (strings or dicts with 'lines' for multi-line)
+            items: List of menu items (legacy format)
             sel_idx: Selected index (-1 for no selection)
-            scroll_idx: Scroll offset
-            info_indices: List of indices that are info-only (non-selectable, rendered as columns)
+            scroll_idx: Scroll offset (legacy, converted internally)
+            info_indices: List of indices that are info-only
+
+        Returns:
+            Rendered canvas image
         """
         self.clear()
         if info_indices is None:
             info_indices = []
 
+        # Calculate panel dimensions
         box_w = 160
         total_rows = self._get_total_rows(items)
         full_content_h = (total_rows * cfg.ROW_HEIGHT) + cfg.ROW_HEIGHT
@@ -77,60 +93,43 @@ class MenuViewRenderer(RenderBase):
         box_x = (cfg.SCREEN_WIDTH - box_w) // 2
         box_y = (cfg.SCREEN_HEIGHT - box_h) // 2
 
-        # Create panel for clipped rendering
-        panel = self.create_panel(box_x, box_y, box_w, box_h, header=title)
+        # Create panel and menu
+        panel = Panel(box_x, box_y, box_w, box_h, header=title)
+        menu = panel.create_menu()
 
-        avail_list_h = box_h - cfg.ROW_HEIGHT
-        needs_scrollbar = total_rows * cfg.ROW_HEIGHT > avail_list_h
-        item_draw_w = box_w
+        # Convert legacy items to new Item objects
+        new_items = []
+        for i, item in enumerate(items):
+            is_info = i in info_indices
+            new_items.append(self._convert_legacy_item(item, is_info))
 
-        # Create item renderer for this panel
-        item_renderer = ItemRenderer(panel.draw, panel.canvas, content_offset_y=panel.content_y)
+        menu.items = new_items
 
-        # Render items to panel (y positions are relative to panel content area)
-        current_row = 0
-        for abs_idx, item_obj in enumerate(items):
-            row_count = self._get_item_row_count(item_obj)
+        # Set cursor position based on sel_idx
+        if sel_idx >= 0 and sel_idx < len(new_items):
+            menu.cursor.row = sel_idx
+            menu.cursor.col = 0
+        else:
+            menu.cursor.row = -1  # No selection
 
-            # Calculate y position relative to panel content area
-            y_offset = current_row - scroll_idx
-            y_pos = y_offset * cfg.ROW_HEIGHT
+        # Set scroll offset
+        menu.scroll_offset = scroll_idx
 
-            is_selected = (sel_idx == abs_idx)
-            is_info = abs_idx in info_indices
-
-            # Convert to unified format
-            unified_item = self._to_unified_item(item_obj, is_info)
-
-            # Render using ItemRenderer
-            item_renderer.render_item(
-                unified_item, 0, y_pos, item_draw_w, cfg.ROW_HEIGHT,
-                is_selected=is_selected
-            )
-
-            current_row += row_count
-
-        # Composite panel onto canvas
-        panel.composite(self.canvas)
-
-        # Draw scrollbar on top if needed
-        if needs_scrollbar:
-            list_y = box_y + cfg.ROW_HEIGHT
-            visible_rows = math.ceil(avail_list_h / cfg.ROW_HEIGHT)
-            sb_h = avail_list_h
-            self.canvas.paste(create_dithered_strip(8, sb_h), (box_x + box_w - 8, list_y))
-            if total_rows > 0:
-                handle_h = max(4, int(sb_h * (visible_rows / total_rows)))
-                handle_y = list_y + int((sb_h - handle_h) * (scroll_idx / total_rows))
-                self.draw.rectangle(
-                    (box_x + box_w - 8, handle_y, box_x + box_w, handle_y + handle_h),
-                    fill=cfg.WHITE, outline=cfg.BLACK
-                )
+        # Render panel to canvas
+        panel.render(self.canvas)
 
         return self.canvas
 
     def render_volume(self, title, volume_level):
-        """Render volume control view."""
+        """Render volume control view.
+
+        Args:
+            title: Title text (e.g., "VOLUME")
+            volume_level: Volume level 0-100
+
+        Returns:
+            Rendered canvas image
+        """
         self.clear()
 
         panel_w = 160
@@ -138,20 +137,31 @@ class MenuViewRenderer(RenderBase):
         x = (cfg.SCREEN_WIDTH - panel_w) // 2
         y = (cfg.SCREEN_HEIGHT - panel_h) // 2
 
-        self.draw_panel(x, y, panel_w, panel_h, header=f"{title} {int(volume_level)}%")
-        self.draw_text_box('-', x, y + cfg.ROW_HEIGHT, cfg.ROW_HEIGHT, cfg.ROW_HEIGHT,
-                          padding=(4, 0), font=cfg.FONT_HEADER)
-        self.draw_text_box('+', x + panel_w - cfg.ROW_HEIGHT, y + cfg.ROW_HEIGHT,
-                          cfg.ROW_HEIGHT, cfg.ROW_HEIGHT, padding=(4, 0), font=cfg.FONT_HEADER)
+        # Create panel with header
+        panel = Panel(x, y, panel_w, panel_h, header=f"{title} {int(volume_level)}%")
+        menu = panel.create_menu()
 
-        # Draw volume bar fill
+        # Create volume bar as ColumnItem with 3 columns: [-] [bar] [+]
         bar_w = panel_w - (cfg.ROW_HEIGHT * 2)
-        fill_w = int(bar_w * (volume_level / 100.0))
-        bar_x = x + cfg.ROW_HEIGHT
-        bar_y = y + cfg.ROW_HEIGHT
-        bar_h = cfg.ROW_HEIGHT
+        menu.items = [
+            ColumnItem([
+                Column(content="-", width=cfg.ROW_HEIGHT, align='center'),
+                Column(content="", width=bar_w, align='left'),  # Bar placeholder
+                Column(content="+", width=cfg.ROW_HEIGHT, align='center'),
+            ], selectable=False)
+        ]
 
+        # Render panel
+        panel.render(self.canvas)
+
+        # Draw the volume bar fill on top (special case - progress bar)
+        content_y = y + cfg.ROW_HEIGHT
+        bar_x = x + cfg.ROW_HEIGHT
+        fill_w = int(bar_w * (volume_level / 100.0))
         if fill_w > 0:
-            self.draw.rectangle((bar_x, bar_y, bar_x + fill_w, bar_y + bar_h), fill=cfg.BLACK)
+            self.draw.rectangle(
+                (bar_x, content_y, bar_x + fill_w, content_y + cfg.ROW_HEIGHT),
+                fill=cfg.BLACK
+            )
 
         return self.canvas

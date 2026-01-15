@@ -1,149 +1,383 @@
 """
-Unified item rendering for all view types.
+Item classes for the Menu rendering system.
 
-This module consolidates item rendering logic from menu_view and music_view
-into a single, consistent system.
+All items share a common interface for rendering and navigation.
 """
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import List, Union, Optional
 from PIL import Image, ImageDraw, ImageOps
+from abc import ABC, abstractmethod
+
 import config as cfg
 from core.metadata import sanitize_text
 
 
-class ItemRenderer:
-    """Unified item rendering for panels.
+class Item(ABC):
+    """Base class for all menu items.
 
-    Handles all item types consistently:
-    - text: Simple text item
-    - info: Non-selectable info with columns/lines
-    - heading: Section heading (black background)
-    - controls: Controls bar with icon buttons
-    - file, album, artist, dir, playlist, recent: Icon + text items
+    Items are rendered within a Menu and support cursor selection.
     """
 
-    def __init__(self, draw: ImageDraw.Draw, canvas: Image.Image, content_offset_y: int = 0):
-        """Create an item renderer.
+    def __init__(self, selectable: bool = True, pinned: bool = False):
+        """Create an item.
 
         Args:
-            draw: ImageDraw instance for rendering
-            canvas: Canvas image to draw on
-            content_offset_y: Y offset for content area (e.g., header height)
+            selectable: Whether this item can be selected
+            pinned: Whether item stays at top (doesn't scroll)
         """
-        self.draw = draw
-        self.canvas = canvas
-        self.content_offset_y = content_offset_y
+        self.selectable = selectable
+        self.pinned = pinned
 
-    def render_item(self, item, x: int, y: int, w: int, h: int,
-                    is_selected: bool = False, context: dict = None) -> int:
-        """Render an item and return the height consumed.
-
-        Args:
-            item: Item dict with 'type' and type-specific fields, or string
-            x: X position
-            y: Y position
-            w: Width available
-            h: Row height
-            is_selected: Whether item is currently selected
-            context: Optional context dict with state info for music view items
-
-        Returns:
-            Height consumed by this item
-        """
-        if isinstance(item, str):
-            self._render_text(item, x, y, w, h, is_selected)
-            return h
-
-        item_type = item.get('type', 'text')
-
-        if item_type == 'text':
-            text = item.get('name', str(item))
-            self._render_text(text, x, y, w, h, is_selected)
-            return h
-
-        if item_type == 'info':
-            return self._render_info(item, x, y, w, h)
-
-        if item_type == 'heading':
-            self._render_heading(item, x, y, w, h, is_selected)
-            return h
-
-        if item_type == 'controls':
-            # Controls are rendered by specialized method in music view
-            # Return height but don't render (caller handles this)
-            return h
-
-        # Icon + text items (file, album, artist, dir, playlist, recent)
-        if item_type in ('file', 'album', 'artist', 'dir', 'playlist', 'recent'):
-            self._render_icon_text(item, x, y, w, h, is_selected, context)
-            return h
-
-        # Default: render as text
-        text = item.get('name', str(item))
-        self._render_text(text, x, y, w, h, is_selected)
-        return h
-
-    def get_item_height(self, item) -> int:
-        """Get the height an item will consume.
-
-        Args:
-            item: Item dict or string
-
-        Returns:
-            Height in pixels
-        """
-        if isinstance(item, str):
-            return cfg.ROW_HEIGHT
-
-        if item.get('type') == 'info' and item.get('lines'):
-            return len(item['lines']) * cfg.ROW_HEIGHT
-
+    def get_height(self) -> int:
+        """Get item height in pixels."""
         return cfg.ROW_HEIGHT
 
-    def _render_text(self, text: str, x: int, y: int, w: int, h: int,
-                     is_selected: bool, center: bool = False, font=None):
-        """Render a text item."""
-        self._draw_text_box(text, x, y, w, h, invert=is_selected,
-                           center=center, font=font)
+    def get_column_count(self) -> int:
+        """Get number of columns (for horizontal navigation)."""
+        return 1
 
-    def _render_info(self, item: dict, x: int, y: int, w: int, h: int) -> int:
-        """Render an info item with columns/lines support.
+    @abstractmethod
+    def render(self, draw: ImageDraw.Draw, canvas: Image.Image,
+               x: int, y: int, w: int, h: int,
+               selected: bool = False, selected_col: int = -1):
+        """Render the item.
 
-        Returns height consumed.
+        Args:
+            draw: ImageDraw instance
+            canvas: Target canvas for pasting images
+            x, y: Position to render at
+            w, h: Available dimensions
+            selected: Whether item is selected
+            selected_col: Selected column index (-1 if whole item selected)
         """
-        lines = item.get('lines', [])
+        pass
 
-        if lines:
-            for i, line in enumerate(lines):
+    def _draw_text_box(self, draw: ImageDraw.Draw, canvas: Image.Image,
+                       text: str, x: int, y: int, w: int, h: int,
+                       invert: bool = False, center: bool = False,
+                       font=None):
+        """Draw a text box with optional inversion.
+
+        Args:
+            draw: ImageDraw instance
+            canvas: Canvas for compositing
+            text: Text to draw
+            x, y, w, h: Box dimensions
+            invert: Whether to invert colors
+            center: Whether to center text
+            font: Optional font override
+        """
+        if h < 1 or w < 1:
+            return
+
+        if font is None:
+            font = cfg.FONT_MAIN
+
+        bg = cfg.BLACK if invert else cfg.WHITE
+        fg = cfg.WHITE if invert else cfg.BLACK
+
+        text_layer = Image.new('1', (w + 1, h + 1), bg)
+        text_draw = ImageDraw.Draw(text_layer)
+        text_draw.rectangle((0, 0, w, h), outline=cfg.BLACK)
+
+        padding_x, padding_y = 5, 3
+        if center:
+            bbox = text_draw.textbbox((0, 0), text, font=font)
+            text_w = bbox[2] - bbox[0]
+            draw_x = (w - text_w) // 2 + 1
+        else:
+            draw_x = padding_x
+
+        text_draw.text((draw_x, padding_y), text, font=font, fill=fg)
+        canvas.paste(text_layer, (x, y))
+
+
+class TextItem(Item):
+    """Simple text item with optional icon prefix."""
+
+    def __init__(self, text: str, icon: Union[str, Image.Image] = None,
+                 selectable: bool = True, pinned: bool = False):
+        """Create a text item.
+
+        Args:
+            text: Display text
+            icon: Optional icon (text string or PIL Image)
+            selectable: Whether item can be selected
+            pinned: Whether item stays at top
+        """
+        super().__init__(selectable, pinned)
+        self.text = text
+        self.icon = icon
+
+    def render(self, draw: ImageDraw.Draw, canvas: Image.Image,
+               x: int, y: int, w: int, h: int,
+               selected: bool = False, selected_col: int = -1):
+        """Render text item."""
+        invert = selected and self.selectable
+        text = sanitize_text(self.text)
+
+        if self.icon:
+            icon_w = 12
+            if isinstance(self.icon, str):
+                # Text icon
+                self._draw_text_box(draw, canvas, self.icon, x, y, icon_w, h,
+                                   invert=invert, center=True)
+            else:
+                # Image icon
+                icon = self.icon
+                if invert:
+                    icon = ImageOps.invert(icon.convert('L')).convert('1')
+                ix = x + (icon_w - icon.width) // 2
+                iy = y + (h - icon.height) // 2
+                if invert:
+                    draw.rectangle((x, y, x + icon_w, y + h), fill=cfg.BLACK)
+                canvas.paste(icon, (ix, iy))
+            self._draw_text_box(draw, canvas, text, x + icon_w, y, w - icon_w, h,
+                               invert=invert)
+        else:
+            self._draw_text_box(draw, canvas, text, x, y, w, h, invert=invert)
+
+
+@dataclass
+class Column:
+    """A single column within a ColumnItem."""
+    content: Union[str, Image.Image]  # Text string or PIL Image
+    width: Optional[int] = None  # None = auto-calculate
+    align: str = 'left'  # 'left', 'center', 'right'
+    active: bool = False  # For toggle states (e.g., shuffle on)
+
+
+class ColumnItem(Item):
+    """Item with multiple columns supporting horizontal navigation."""
+
+    def __init__(self, columns: List[Column],
+                 selectable: bool = True, pinned: bool = False):
+        """Create a column item.
+
+        Args:
+            columns: List of Column objects
+            selectable: Whether item can be selected
+            pinned: Whether item stays at top
+        """
+        super().__init__(selectable, pinned)
+        self.columns = columns
+
+    def get_column_count(self) -> int:
+        """Get number of columns."""
+        return len(self.columns)
+
+    def render(self, draw: ImageDraw.Draw, canvas: Image.Image,
+               x: int, y: int, w: int, h: int,
+               selected: bool = False, selected_col: int = -1):
+        """Render column item.
+
+        Selection logic:
+        - If column.active: always inverted
+        - If column is selected (selected_col == col_idx): inverted
+        - If column.active AND selected: add white inner border
+        """
+        # Calculate column widths
+        widths = self._calculate_widths(w)
+
+        col_x = x
+        for i, (col, col_w) in enumerate(zip(self.columns, widths)):
+            is_col_selected = selected and (selected_col == i)
+            invert = col.active or is_col_selected
+            add_inner_border = col.active and is_col_selected
+
+            self._render_column(draw, canvas, col, col_x, y, col_w, h,
+                               invert, add_inner_border)
+            col_x += col_w
+
+    def _calculate_widths(self, total_w: int) -> List[int]:
+        """Calculate column widths."""
+        widths = []
+        fixed_total = 0
+        auto_count = 0
+
+        for col in self.columns:
+            if col.width is not None:
+                widths.append(col.width)
+                fixed_total += col.width
+            else:
+                widths.append(None)
+                auto_count += 1
+
+        # Distribute remaining width to auto columns
+        if auto_count > 0:
+            remaining = total_w - fixed_total
+            auto_width = remaining // auto_count
+            widths = [w if w is not None else auto_width for w in widths]
+
+        return widths
+
+    def _render_column(self, draw: ImageDraw.Draw, canvas: Image.Image,
+                       col: Column, x: int, y: int, w: int, h: int,
+                       invert: bool, add_inner_border: bool):
+        """Render a single column."""
+        bg = cfg.BLACK if invert else cfg.WHITE
+        fg = cfg.WHITE if invert else cfg.BLACK
+
+        # Draw background
+        draw.rectangle((x, y, x + w, y + h), fill=bg, outline=cfg.BLACK)
+
+        if isinstance(col.content, str):
+            # Text content
+            text = sanitize_text(col.content)
+            font = cfg.FONT_MAIN
+
+            bbox = draw.textbbox((0, 0), text, font=font)
+            text_w = bbox[2] - bbox[0]
+
+            if col.align == 'center':
+                text_x = x + (w - text_w) // 2
+            elif col.align == 'right':
+                text_x = x + w - text_w - 5
+            else:
+                text_x = x + 5
+
+            draw.text((text_x, y + 3), text, font=font, fill=fg)
+        else:
+            # Image content
+            icon = col.content
+            if invert:
+                icon = ImageOps.invert(icon.convert('L')).convert('1')
+
+            ix = x + (w - icon.width) // 2
+            iy = y + (h - icon.height) // 2
+            canvas.paste(icon, (ix, iy), mask=icon if not invert else None)
+
+        # Add inner border for active+selected
+        if add_inner_border:
+            draw.rectangle((x + 1, y + 1, x + w - 1, y + h - 1), outline=fg)
+
+
+class ImageItem(Item):
+    """Item displaying an image (for album art)."""
+
+    def __init__(self, image: Image.Image = None, placeholder: str = "NO IMAGE",
+                 selectable: bool = False, pinned: bool = False):
+        """Create an image item.
+
+        Args:
+            image: PIL Image to display
+            placeholder: Text to show when no image
+            selectable: Whether item can be selected
+            pinned: Whether item stays at top
+        """
+        super().__init__(selectable, pinned)
+        self.image = image
+        self.placeholder = placeholder
+        self._height = None  # Set by parent
+
+    def set_height(self, h: int):
+        """Set item height (for album art sizing)."""
+        self._height = h
+
+    def get_height(self) -> int:
+        """Get item height."""
+        return self._height if self._height else cfg.ROW_HEIGHT
+
+    def render(self, draw: ImageDraw.Draw, canvas: Image.Image,
+               x: int, y: int, w: int, h: int,
+               selected: bool = False, selected_col: int = -1):
+        """Render image item."""
+        if self.image:
+            # Paste image (assumes it's already sized correctly)
+            canvas.paste(self.image, (x, y))
+        else:
+            # Show placeholder text
+            placeholder_y = y + (h // 2) - (cfg.ROW_HEIGHT // 2)
+            self._draw_text_box(draw, canvas, self.placeholder,
+                               x, placeholder_y, w, cfg.ROW_HEIGHT,
+                               invert=True, center=True)
+
+
+class HeadingItem(Item):
+    """Section heading (always inverted background)."""
+
+    def __init__(self, text: str, selectable: bool = True, pinned: bool = False):
+        """Create a heading item.
+
+        Args:
+            text: Heading text (will be uppercased)
+            selectable: Whether heading can be selected (for jumping)
+            pinned: Whether item stays at top
+        """
+        super().__init__(selectable, pinned)
+        self.text = text
+
+    def render(self, draw: ImageDraw.Draw, canvas: Image.Image,
+               x: int, y: int, w: int, h: int,
+               selected: bool = False, selected_col: int = -1):
+        """Render heading item."""
+        text = sanitize_text(self.text).upper()
+
+        # Always black background
+        draw.rectangle((x, y, x + w, y + h - 1), fill=cfg.BLACK)
+        self._draw_text_box(draw, canvas, text, x, y, w, h,
+                           invert=True, font=cfg.FONT_MAIN)
+
+        # Add white outline when selected
+        if selected:
+            draw.rectangle((x + 1, y + 1, x + w - 1, y + h - 1), outline=cfg.WHITE)
+
+
+class InfoItem(Item):
+    """Non-selectable info item with optional columns."""
+
+    def __init__(self, columns: List[str] = None, lines: List = None,
+                 text: str = None, pinned: bool = False):
+        """Create an info item.
+
+        Args:
+            columns: Single row of column strings
+            lines: Multiple rows, each a string or list of column strings
+            text: Simple text (if no columns/lines)
+            pinned: Whether item stays at top
+        """
+        super().__init__(selectable=False, pinned=pinned)
+        self.columns = columns
+        self.lines = lines
+        self.text = text
+
+    def get_height(self) -> int:
+        """Get item height based on line count."""
+        if self.lines:
+            return len(self.lines) * cfg.ROW_HEIGHT
+        return cfg.ROW_HEIGHT
+
+    def render(self, draw: ImageDraw.Draw, canvas: Image.Image,
+               x: int, y: int, w: int, h: int,
+               selected: bool = False, selected_col: int = -1):
+        """Render info item."""
+        if self.lines:
+            for i, line in enumerate(self.lines):
                 line_y = y + (i * cfg.ROW_HEIGHT)
                 if isinstance(line, list):
-                    self._render_columns(line, x, line_y, w, cfg.ROW_HEIGHT)
+                    self._render_columns(draw, canvas, line, x, line_y, w)
                 else:
-                    self._draw_text_box(sanitize_text(str(line)), x, line_y, w, cfg.ROW_HEIGHT)
-            return len(lines) * cfg.ROW_HEIGHT
+                    self._draw_text_box(draw, canvas, sanitize_text(str(line)),
+                                       x, line_y, w, cfg.ROW_HEIGHT)
+        elif self.columns:
+            self._render_columns(draw, canvas, self.columns, x, y, w)
+        elif self.text:
+            self._draw_text_box(draw, canvas, sanitize_text(self.text),
+                               x, y, w, cfg.ROW_HEIGHT)
 
-        columns = item.get('columns', [])
-        if columns:
-            self._render_columns(columns, x, y, w, h)
-            return h
-
-        # Single text info item
-        name = sanitize_text(item.get('name', ''))
-        self._draw_text_box(name, x, y, w, h)
-        return h
-
-    def _render_columns(self, columns: list, x: int, y: int, w: int, h: int):
-        """Render a row with multiple columns.
-
-        First column is left-aligned, remaining columns are right-aligned
-        with calculated widths.
-        """
+    def _render_columns(self, draw: ImageDraw.Draw, canvas: Image.Image,
+                        columns: List[str], x: int, y: int, w: int):
+        """Render a row of text columns."""
         if not columns:
             return
 
         if len(columns) == 1:
-            self._draw_text_box(sanitize_text(str(columns[0])), x, y, w, h)
+            self._draw_text_box(draw, canvas, sanitize_text(str(columns[0])),
+                               x, y, w, cfg.ROW_HEIGHT)
             return
 
-        # Calculate widths for right columns (~6px per char + padding)
+        # Calculate widths for right columns
         right_widths = []
         for col in columns[1:]:
             text = sanitize_text(str(col))
@@ -153,7 +387,7 @@ class ItemRenderer:
         total_right = sum(right_widths)
         left_w = w - total_right
 
-        # Scale down if columns don't fit
+        # Scale if needed
         if total_right + 20 > w:
             scale = (w - 20) / total_right if total_right > 0 else 1
             right_widths = [max(10, int(cw * scale)) for cw in right_widths]
@@ -161,124 +395,13 @@ class ItemRenderer:
             left_w = max(20, w - total_right)
 
         # Render left column
-        self._draw_text_box(sanitize_text(str(columns[0])), x, y, left_w, h)
+        self._draw_text_box(draw, canvas, sanitize_text(str(columns[0])),
+                           x, y, left_w, cfg.ROW_HEIGHT)
 
         # Render right columns (centered)
         col_x = x + left_w
         for i, col in enumerate(columns[1:]):
             col_w = right_widths[i]
-            self._draw_text_box(sanitize_text(str(col)), col_x, y, col_w, h, center=True)
+            self._draw_text_box(draw, canvas, sanitize_text(str(col)),
+                               col_x, y, col_w, cfg.ROW_HEIGHT, center=True)
             col_x += col_w
-
-    def _render_heading(self, item: dict, x: int, y: int, w: int, h: int, is_selected: bool):
-        """Render a section heading (black background, white text)."""
-        name = sanitize_text(item.get('name', '')).upper()
-        abs_y = y + self.content_offset_y
-
-        self.draw.rectangle((x, abs_y, x + w, abs_y + h - 1), fill=cfg.BLACK)
-        self._draw_text_box(name, x, y, w, h, invert=True, font=cfg.FONT_MAIN)
-
-        if is_selected:
-            self.draw.rectangle((x + 1, abs_y + 1, x + w - 1, abs_y + h - 1), outline=cfg.WHITE)
-
-    def _render_icon_text(self, item: dict, x: int, y: int, w: int, h: int,
-                          is_selected: bool, context: dict = None):
-        """Render an item with icon and text."""
-        icon_w = 12
-        icon_str = self._get_item_icon(item, context)
-
-        self._draw_text_box(icon_str, x, y, icon_w, h, invert=is_selected, center=True)
-
-        name = sanitize_text(item.get('title', item.get('name', '')))
-        self._draw_text_box(name, x + icon_w, y, w - icon_w, h, invert=is_selected)
-
-    def _get_item_icon(self, item: dict, context: dict = None) -> str:
-        """Get the appropriate icon for an item."""
-        itype = item.get('type')
-        icons = cfg.MENU_ICONS
-
-        # Check if this is the currently playing item
-        if context:
-            state = context.get('state')
-            if state:
-                is_playing = state.is_playing
-                current_status_icon = icons.get('playing', 'Ⓟ') if is_playing else icons.get('paused', 'Ⓢ')
-
-                is_active = False
-                if itype == 'file' and state.playing_path:
-                    if str(item.get('path')) == str(state.playing_path):
-                        is_active = True
-                elif itype == 'album' and state.playing_album:
-                    if item.get('name') == state.playing_album:
-                        is_active = True
-                elif itype == 'artist' and state.playing_artist:
-                    if item.get('name') == state.playing_artist:
-                        is_active = True
-
-                if is_active:
-                    return current_status_icon
-
-        # Item has explicit icon
-        if 'icon' in item:
-            icon = item['icon']
-            # Handle stale 'P' icon from previous state
-            if itype == 'file' and icon == 'P':
-                track_num = item.get('track', 0)
-                display_idx = context.get('display_idx') if context else None
-                icon_val = track_num if track_num else display_idx
-                return f"{icon_val}." if icon_val else ""
-            if itype == 'file' and icon not in ('S', ''):
-                return icon if icon.endswith('.') else f"{icon}."
-            return icon
-
-        # Default icons by type
-        if itype == 'file':
-            track_num = item.get('track', 0)
-            display_idx = context.get('display_idx') if context else None
-            icon_val = track_num if track_num else display_idx
-            return f"{icon_val}." if icon_val else ""
-        if itype == 'dir':
-            return icons.get('dir', 'Ⓕ')
-        if itype == 'artist':
-            return icons.get('artist', 'Ⓐ')
-        if itype == 'album':
-            return icons.get('album', 'Ⓑ')
-        if itype == 'recent':
-            return icons.get('recent', 'Ⓡ')
-        if itype == 'playlist':
-            if "Fav" in item.get('name', ''):
-                return icons.get('fav', 'Ⓗ')
-            return icons.get('playlist', 'Ⓛ')
-
-        return item.get('icon', '')
-
-    def _draw_text_box(self, text: str, x: int, y: int, w: int, h: int,
-                       invert: bool = False, padding: tuple = (5, 3),
-                       center: bool = False, font=None):
-        """Draw a text box with optional inversion."""
-        if h < 1 or w < 1:
-            return
-
-        if font is None:
-            font = cfg.FONT_MAIN
-
-        abs_y = y + self.content_offset_y
-
-        bg = cfg.BLACK if invert else cfg.WHITE
-        fg = cfg.WHITE if invert else cfg.BLACK
-
-        text_layer = Image.new('1', (w + 1, h + 1), bg)
-        text_draw = ImageDraw.Draw(text_layer)
-        text_draw.rectangle((0, 0, w, h), outline=cfg.BLACK)
-
-        if center:
-            bbox = text_draw.textbbox((0, 0), text, font=font)
-            text_w = bbox[2] - bbox[0]
-            draw_x = (w - text_w) // 2 + 1
-            draw_y = padding[1]
-        else:
-            draw_x = padding[0]
-            draw_y = padding[1]
-
-        text_draw.text((draw_x, draw_y), text, font=font, fill=fg)
-        self.canvas.paste(text_layer, (x, abs_y))

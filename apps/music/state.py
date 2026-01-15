@@ -5,6 +5,8 @@ import time
 from dataclasses import dataclass, field
 from typing import List, Optional, Set, Any
 
+from ui.views.core import Cursor
+
 
 @dataclass
 class PlayerState:
@@ -12,9 +14,8 @@ class PlayerState:
     items: List[dict] = field(default_factory=list)
     pinned_items: List[dict] = field(default_factory=list)
     scrollable_items: List[dict] = field(default_factory=list)
-    selection_index: int = 0
+    cursor: Cursor = field(default_factory=Cursor)
     view_start_index: int = 0
-    controls_index: int = 0  # Selected button in controls bar (0=back, 1=shuffle, 2=loop, 3=fav)
     album: str = "Library"
     artist: str = ""
     year: str = ""
@@ -72,8 +73,26 @@ class PlayerState:
         self.artist = ""
         self.year = ""
         if reset_controls:
-            self.controls_index = 0
+            self.cursor.col = 0
         self.browsing_cover_s = None
+
+    @property
+    def selection_index(self) -> int:
+        """Backward-compatible selection index (cursor row)."""
+        return self.cursor.row
+
+    @selection_index.setter
+    def selection_index(self, value: int):
+        self.cursor.row = value
+
+    @property
+    def controls_index(self) -> int:
+        """Backward-compatible controls index (cursor column)."""
+        return self.cursor.col
+
+    @controls_index.setter
+    def controls_index(self, value: int):
+        self.cursor.col = value
 
     def set_status_message(self, message: str, duration: float = 1.5):
         """Set a temporary status message."""

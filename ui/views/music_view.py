@@ -1,286 +1,288 @@
 """
-Music player view rendering.
+Music player view rendering using Panel → Menu → Item hierarchy.
 """
-import math
-from PIL import ImageOps
+from PIL import Image, ImageDraw
 import config as cfg
-from ui.views.common import RenderBase
-from ui.views.items import ItemRenderer
-from ui.graphics import create_dithered_strip, UI_ICONS
+from ui.views.core import Panel, Menu
+from ui.views.items import TextItem, ImageItem, HeadingItem, InfoItem, ColumnItem, Column
+from ui.graphics import UI_ICONS
 from core.metadata import sanitize_text
 
 
-class MusicViewRenderer(RenderBase):
-    """Renderer for music player view."""
+class MusicViewRenderer:
+    """Renderer for music player view using the new Panel/Menu system."""
 
-    def render_controls(self, y_pos, w, state, is_selected):
-        """Render the controls bar with icons.
+    def __init__(self):
+        self.canvas = Image.new('1', (cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), cfg.WHITE)
+        self.draw = ImageDraw.Draw(self.canvas)
+
+    def clear(self):
+        """Clear the canvas."""
+        self.draw.rectangle((0, 0, cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), fill=cfg.WHITE)
+
+    def _create_controls_item(self, state) -> ColumnItem:
+        """Create controls bar as a ColumnItem.
 
         Args:
-            y_pos: Y position to render at
-            w: Width of the controls bar
-            state: Player state
-            is_selected: Whether this item is currently selected
-        """
-        self.draw.rectangle(
-            (cfg.PANEL_X, y_pos, cfg.PANEL_X + w, y_pos + cfg.ROW_HEIGHT),
-            fill=cfg.WHITE,
-            outline=cfg.BLACK
-        )
-        btn_w = w // 4
-        icon_keys = ['back', 'shuffle', 'loop', 'fav']
+            state: Player state with shuffle_active, loop_mode, etc.
 
-        # Swap fav for clear in queue view
+        Returns:
+            ColumnItem with 4 icon columns
+        """
+        # Determine which icons to use
+        icon_keys = ['back', 'shuffle', 'loop', 'fav']
         if state.browse_mode == 'QUEUE_VIEW':
             icon_keys = ['back', 'shuffle', 'loop', 'clear']
 
-        for b_i, key in enumerate(icon_keys):
-            bx = cfg.PANEL_X + (b_i * btn_w)
-            is_active = False
+        columns = []
+        for i, key in enumerate(icon_keys):
+            icon = UI_ICONS.get(key, UI_ICONS.get('back'))
+            active = False
 
             if key == 'shuffle' and state.shuffle_active:
-                is_active = True
-            if key == 'loop' and state.loop_mode > 0:
-                is_active = True
-            if key == 'fav':
-                if state.browse_mode == 'ARTIST_VIEW' and state.fav_artists and state.album in state.fav_artists:
-                    is_active = True
+                active = True
+            elif key == 'loop' and state.loop_mode > 0:
+                active = True
+            elif key == 'fav':
+                if state.browse_mode == 'ARTIST_VIEW':
+                    if state.fav_artists and state.album in state.fav_artists:
+                        active = True
                 elif state.fav_albums and state.album in state.fav_albums:
-                    is_active = True
-            # clear button is never 'active' state, just a trigger
+                    active = True
 
-            # Button is focused when controls bar is selected AND this button is active
-            is_focused = is_selected and (state.controls_index == b_i)
+            columns.append(Column(
+                content=icon,
+                width=35,  # 140 / 4 = 35
+                align='center',
+                active=active
+            ))
 
-            draw_inner_box = False
-            icon_inverted = False
+        return ColumnItem(columns, selectable=True, pinned=True)
 
-            if is_active:
-                icon_inverted = True
-                if is_focused:
-                    draw_inner_box = True
-            else:
-                if is_focused:
-                    icon_inverted = True
+    def _convert_legacy_item(self, item: dict, state, display_idx: int = None):
+        """Convert legacy item format to new Item classes.
 
-            icon = UI_ICONS[key]
-            if icon_inverted:
-                icon = ImageOps.invert(icon.convert('L')).convert('1')
+        Args:
+            item: Dict with 'type', 'name', etc.
+            state: Player state for determining active items
+            display_idx: Display index for track numbering
 
-            self.draw.rectangle(
-                (bx, y_pos, bx + btn_w, y_pos + cfg.ROW_HEIGHT),
-                fill=cfg.BLACK if icon_inverted else cfg.WHITE,
-                outline=cfg.BLACK
-            )
-
-            ix = bx + (btn_w - icon.width) // 2
-            iy = y_pos + (cfg.ROW_HEIGHT - icon.height) // 2 + 1
-            self.canvas.paste(icon, (ix, iy), mask=icon if not icon_inverted else None)
-
-            if key == 'loop' and state.loop_mode == 2:
-                txt_col = cfg.BLACK if not icon_inverted else cfg.WHITE
-                self.draw.text((bx + 3, y_pos + 2), "1", font=cfg.FONT_MAIN, fill=txt_col)
-
-            if draw_inner_box:
-                self.draw.rectangle(
-                    (bx + 1, y_pos + 1, bx + btn_w - 1, y_pos + cfg.ROW_HEIGHT - 1),
-                    outline=cfg.WHITE
-                )
-
-    def _get_item_row_count(self, item):
-        """Get the number of rows an item should span.
-
-        Multi-line info items span multiple rows based on their 'lines' field.
-        All other items span 1 row.
+        Returns:
+            Item instance
         """
-        if item.get('type') == 'info' and item.get('lines'):
-            return len(item['lines'])
-        return 1
-
-    def render_scrollbar(self, total, current, page_size, x, y, h):
-        """Render scrollbar."""
-        if total <= page_size:
-            return
-
-        self.canvas.paste(create_dithered_strip(9, h), (x, y))
-
-        total_pages = math.ceil(total / page_size)
-        current_page = current // page_size
-
-        handle_h = max(6, int(h / total_pages))
-
-        if total_pages > 1:
-            pct = current_page / (total_pages - 1)
-        else:
-            pct = 0
-
-        handle_y = y + int((h - handle_h) * pct)
-
-        self.draw.rectangle(
-            (x, handle_y, x + 8, handle_y + handle_h - 1),
-            fill=cfg.WHITE, outline=cfg.BLACK
-        )
-
-    def _render_item(self, item, x, y, w, h, is_selected, display_idx, state):
-        """Helper to render a single list item using unified ItemRenderer."""
         itype = item.get('type')
 
-        # Controls bar - handled specially
         if itype == 'controls':
-            self.render_controls(y, w + 8, state, is_selected)
-            return
+            return self._create_controls_item(state)
 
-        # Create ItemRenderer for direct canvas rendering
-        item_renderer = ItemRenderer(self.draw, self.canvas, content_offset_y=0)
+        if itype == 'heading':
+            return HeadingItem(item.get('name', ''), selectable=True)
 
-        # Build context for ItemRenderer
-        context = {
-            'state': state,
-            'display_idx': display_idx
-        }
+        if itype == 'info':
+            lines = item.get('lines')
+            columns = item.get('columns')
+            if lines:
+                return InfoItem(lines=lines)
+            if columns:
+                return InfoItem(columns=columns)
+            return InfoItem(text=item.get('name', ''))
 
-        # Render using unified ItemRenderer
-        item_renderer.render_item(item, x, y, w + 8, h, is_selected, context)
+        # Icon+text items (file, album, artist, dir, playlist, recent)
+        icon_str = self._get_item_icon(item, state, display_idx)
+        name = sanitize_text(item.get('title', item.get('name', '')))
+
+        pinned = item.get('pinned', False)
+        return TextItem(name, icon=icon_str, selectable=True, pinned=pinned)
+
+    def _get_item_icon(self, item: dict, state, display_idx: int = None) -> str:
+        """Get icon string for an item.
+
+        Args:
+            item: Item dict
+            state: Player state
+            display_idx: Display index for track numbering
+
+        Returns:
+            Icon string
+        """
+        itype = item.get('type')
+        icons = cfg.MENU_ICONS
+
+        # Check if this is the currently playing item
+        is_playing = state.is_playing
+        current_icon = icons.get('playing', 'Ⓟ') if is_playing else icons.get('paused', 'Ⓢ')
+
+        is_active = False
+        if itype == 'file' and state.playing_path:
+            if str(item.get('path')) == str(state.playing_path):
+                is_active = True
+        elif itype == 'album' and state.playing_album:
+            if item.get('name') == state.playing_album:
+                is_active = True
+        elif itype == 'artist' and state.playing_artist:
+            if item.get('name') == state.playing_artist:
+                is_active = True
+
+        if is_active:
+            return current_icon
+
+        # Use explicit icon if provided
+        if 'icon' in item:
+            icon = item['icon']
+            if itype == 'file' and icon == 'P':
+                # Stale playing icon
+                track_num = item.get('track', 0)
+                val = track_num if track_num else display_idx
+                return f"{val}." if val else ""
+            if itype == 'file' and icon not in ('S', ''):
+                return icon if icon.endswith('.') else f"{icon}."
+            return icon
+
+        # Default icons by type
+        if itype == 'file':
+            track_num = item.get('track', 0)
+            val = track_num if track_num else display_idx
+            return f"{val}." if val else ""
+        if itype == 'dir':
+            return icons.get('dir', 'Ⓕ')
+        if itype == 'artist':
+            return icons.get('artist', 'Ⓐ')
+        if itype == 'album':
+            return icons.get('album', 'Ⓑ')
+        if itype == 'recent':
+            return icons.get('recent', 'Ⓡ')
+        if itype == 'playlist':
+            if "Fav" in item.get('name', ''):
+                return icons.get('fav', 'Ⓗ')
+            return icons.get('playlist', 'Ⓛ')
+
+        return item.get('icon', '')
 
     def render(self, state, view_items):
-        """Render the full music view."""
+        """Render the full music view.
+
+        Args:
+            state: PlayerState with all current state
+            view_items: List of items to display (legacy format)
+
+        Returns:
+            Rendered canvas image
+        """
         self.clear()
 
-        # Album art - show playing cover if track is loaded (playing or paused)
-        art = state.playing_cover_s if state.playing_path else state.browsing_cover_s
+        # === Album Art Panel ===
         art_size = 84
         art_x, art_y = 8, 8
-        self.draw_panel(art_x, art_y, art_size, art_size)
-        if art:
-            self.canvas.paste(art, (art_x + 1, art_y + 1))
-        else:
-            self.draw_text_box("NO IMAGE", art_x + 1, art_y + 35, 82, 12, invert=True, center=True)
+        art_panel = Panel(art_x, art_y, art_size, art_size)
+        art_menu = art_panel.create_menu()
 
-        # Status bar - use state's status text method for temporary messages
+        # Get appropriate cover art
+        art = state.playing_cover_s if state.playing_path else state.browsing_cover_s
+        art_item = ImageItem(image=art, placeholder="NO IMAGE")
+        art_item.set_height(art_size - 2)  # Account for border
+        art_menu.items = [art_item]
+
+        art_panel.render(self.canvas)
+
+        # === Status Bar Panel ===
+        status_panel = Panel(8, 100, art_size, cfg.ROW_HEIGHT)
+        status_menu = status_panel.create_menu()
+
         raw_status = state.get_status_text()
         icon = cfg.STATUS_ICONS.get(raw_status, 'Ⓘ')
         status_text = f"{icon} {raw_status}"
-        self.draw_panel(8, 100, art_size, cfg.ROW_HEIGHT)
-        self.draw_text_box(
-            status_text, 8, 100, art_size, cfg.ROW_HEIGHT,
-            invert=False, padding=(0, 0), center=True, font=cfg.FONT_HEADER
-        )
+        status_menu.items = [TextItem(status_text, selectable=False)]
 
-        # Main panel
+        status_panel.render(self.canvas)
+
+        # === Main Panel ===
         header_text = "Scanning..." if state.is_scanning else state.album
-        self.draw_panel(cfg.PANEL_X, cfg.PANEL_Y, cfg.PANEL_W, cfg.PANEL_H, header=header_text)
-
-        list_start_y = cfg.PANEL_Y + cfg.ROW_HEIGHT
+        main_panel = Panel(cfg.PANEL_X, cfg.PANEL_Y, cfg.PANEL_W, cfg.PANEL_H,
+                          header=header_text)
+        main_menu = main_panel.create_menu()
 
         # Separate pinned and scrollable items
-        pinned_items = [item for item in view_items if item.get('pinned')]
-        scrollable_items = [item for item in view_items if not item.get('pinned')]
+        pinned_legacy = [item for item in view_items if item.get('pinned')]
+        scrollable_legacy = [item for item in view_items if not item.get('pinned')]
 
-        pinned_count = len(pinned_items)
-
-        # Render pinned items (always visible at top)
-        for i, item in enumerate(pinned_items):
-            is_selected = (i == state.selection_index)
-            row_count = self._get_item_row_count(item)
-            self._render_item(item, cfg.PANEL_X, list_start_y, cfg.PANEL_W - 8, cfg.ROW_HEIGHT, is_selected, None, state)
-            list_start_y += cfg.ROW_HEIGHT * row_count
-
-        avail_h = (cfg.PANEL_Y + cfg.PANEL_H) - list_start_y
-        # Scrollbar based on scrollable items only
-        scrollable_total = state.total_items - pinned_count
-        has_scrollbar = scrollable_total * cfg.ROW_HEIGHT > avail_h
-        item_w = cfg.PANEL_W - 16 if has_scrollbar else cfg.PANEL_W - 8
-
-        # Calculate how many tracks are before the current view slice to keep index consistent
+        # Convert items
+        menu_items = []
         track_offset = 0
-        for j in range(state.view_start_index):
-            itype = state.items[j + pinned_count].get('type')
-            if itype not in ('heading', 'info', 'controls'):
-                track_offset += 1
 
-        # Render scrollable items with multi-line support
-        current_y = list_start_y
-        for i, item in enumerate(scrollable_items):
-            row_count = self._get_item_row_count(item)
-            item_height = cfg.ROW_HEIGHT * row_count
+        # Convert pinned items
+        for item in pinned_legacy:
+            menu_items.append(self._convert_legacy_item(item, state))
 
-            remaining_h = (cfg.PANEL_Y + cfg.PANEL_H) - current_y
-            if remaining_h <= 0:
-                break
-            draw_h = min(item_height, remaining_h)
-
-            abs_idx = state.view_start_index + i + pinned_count
-            is_selected = (abs_idx == state.selection_index)
-
-            # Track index for display (skipping headings/info)
+        # Convert scrollable items
+        for i, item in enumerate(scrollable_legacy):
             itype = item.get('type')
             display_idx = None
             if itype not in ('heading', 'info', 'controls'):
                 track_offset += 1
                 display_idx = track_offset
 
-            self._render_item(item, cfg.PANEL_X, current_y, item_w, cfg.ROW_HEIGHT, is_selected, display_idx, state)
-            current_y += item_height
+            menu_items.append(self._convert_legacy_item(item, state, display_idx))
 
-        if has_scrollbar:
-            # Adjust scrollbar for pinned items
-            adjusted_selection = max(0, state.selection_index - pinned_count)
-            self.render_scrollbar(
-                scrollable_total, adjusted_selection, state.page_size,
-                cfg.PANEL_X + cfg.PANEL_W - 8, list_start_y, avail_h + 1
-            )
+        main_menu.items = menu_items
 
-        # Loading overlay
+        # Set cursor from state
+        main_menu.cursor.row = state.cursor.row
+        main_menu.cursor.col = state.cursor.col
+
+        # Set scroll from state
+        main_menu.scroll_offset = state.view_start_index
+
+        main_panel.render(self.canvas)
+
+        # === Overlays ===
         if state.loading_message:
             self.render_loading(state.loading_message)
-        # Context menu overlay
         elif state.context_menu_active:
             self.render_context_menu(state)
 
         return self.canvas
 
     def render_context_menu(self, state):
-        """Render context menu overlay."""
+        """Render context menu overlay.
+
+        Args:
+            state: Player state with context_options and context_index
+        """
         w = 120
         max_h = 96
-        item_h = cfg.ROW_HEIGHT
         header_h = cfg.ROW_HEIGHT
-        padding = 4
 
         num_opts = len(state.context_options)
-        needed_h = header_h + (num_opts * item_h) + padding
+        needed_h = header_h + (num_opts * cfg.ROW_HEIGHT) + 4
         menu_h = min(needed_h, max_h)
 
         x = (cfg.SCREEN_WIDTH - w) // 2
         y = (cfg.SCREEN_HEIGHT - menu_h) // 2
 
-        self.draw_panel(x, y, w, menu_h, header="OPTIONS")
+        panel = Panel(x, y, w, menu_h, header="OPTIONS")
+        menu = panel.create_menu()
 
-        list_y = y + header_h
-        visible_count = (menu_h - header_h) // item_h
+        # Convert options to TextItems
+        menu.items = [TextItem(opt) for opt in state.context_options]
+        menu.cursor.row = state.context_index
+        menu.cursor.col = 0
 
-        start_idx = 0
-        if state.context_index >= visible_count:
-            start_idx = state.context_index - visible_count + 1
-
-        for i in range(visible_count):
-            idx = start_idx + i
-            if idx >= num_opts:
-                break
-
-            opt = state.context_options[idx]
-            opt_y = list_y + (i * item_h)
-            is_sel = (idx == state.context_index)
-
-            self.draw_text_box(opt, x, opt_y, w, item_h, invert=is_sel)
+        panel.render(self.canvas)
 
     def render_loading(self, message: str):
-        """Render loading overlay."""
+        """Render loading overlay.
+
+        Args:
+            message: Loading message to display
+        """
         w = 100
         h = cfg.ROW_HEIGHT + 8
 
         x = (cfg.SCREEN_WIDTH - w) // 2
         y = (cfg.SCREEN_HEIGHT - h) // 2
 
-        self.draw_panel(x, y, w, h)
-        self.draw_text_box(message, x, y, w, h, center=True, font=cfg.FONT_HEADER)
+        panel = Panel(x, y, w, h)
+        menu = panel.create_menu()
+        menu.items = [TextItem(message, selectable=False)]
+
+        panel.render(self.canvas)

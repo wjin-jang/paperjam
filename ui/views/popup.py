@@ -13,7 +13,8 @@ from typing import Optional, Callable, List, Dict, Any
 import time
 from PIL import Image, ImageDraw
 import config as cfg
-from ui.views.common import Panel
+from ui.views.core import Panel
+from ui.views.items import TextItem, ColumnItem, Column
 
 
 class PopupTermination(Enum):
@@ -241,40 +242,27 @@ class PopupPanel:
             x = (cfg.SCREEN_WIDTH - w) // 2
             y = cfg.SCREEN_HEIGHT - h - 8
 
-        # Create panel
+        # Create panel using core.Panel
         panel = Panel(x, y, w, h, header=self.config.header)
+        menu = panel.create_menu()
 
-        # Render content items
-        current_y = 0
-        visible_h = h - header_h
-        visible_count = visible_h // cfg.ROW_HEIGHT
-
-        # Calculate scroll offset for long lists
-        start_idx = 0
-        if self.state.selection_index >= visible_count:
-            start_idx = self.state.selection_index - visible_count + 1
-
-        for i in range(visible_count):
-            idx = start_idx + i
-            if idx >= len(self.state.content or []):
-                break
-
-            item = self.state.content[idx]
-            is_selected = (idx == self.state.selection_index)
-
-            # Get text from item
+        # Convert content to TextItems
+        items = []
+        for item in (self.state.content or []):
             if isinstance(item, str):
                 text = item
             elif isinstance(item, dict):
                 text = item.get('name', str(item))
             else:
                 text = str(item)
+            items.append(TextItem(text, selectable=True))
 
-            panel.draw_text_box(text, 0, current_y, w, cfg.ROW_HEIGHT, invert=is_selected)
-            current_y += cfg.ROW_HEIGHT
+        menu.items = items
+        menu.cursor.row = self.state.selection_index
+        menu.cursor.col = 0
 
-        # Composite onto base
-        panel.composite(base_canvas, shadow=self.config.shadow)
+        # Render panel to base canvas
+        panel.render(base_canvas)
 
         return base_canvas
 
@@ -384,7 +372,7 @@ class PopupManager:
             shadow=True
         )
         popup = PopupPanel(config)
-        popup.show([{'name': message}])
+        popup.show([message])
         return self.push(popup)
 
     def show_volume(self, title: str, level: int) -> PopupPanel:
@@ -406,47 +394,30 @@ class PopupManager:
             x = (cfg.SCREEN_WIDTH - panel_w) // 2
             y = (cfg.SCREEN_HEIGHT - panel_h) // 2
 
-            draw = ImageDraw.Draw(canvas)
+            # Create panel with header
+            panel = Panel(x, y, panel_w, panel_h, header=f"{title_text} {int(vol)}%")
+            menu = panel.create_menu()
 
-            # Draw shadow
-            draw.rectangle(
-                (x + 1, y + 1, x + panel_w + 1, y + panel_h + 1),
-                outline=cfg.BLACK
-            )
-            # Draw panel border
-            draw.rectangle(
-                (x, y, x + panel_w, y + panel_h),
-                fill=cfg.WHITE, outline=cfg.BLACK
-            )
-            # Draw header
-            draw.rectangle(
-                (x, y, x + panel_w, y + cfg.ROW_HEIGHT),
-                fill=cfg.BLACK
-            )
-            draw.text(
-                (x + 5, y),
-                f"{title_text} {int(vol)}%",
-                font=cfg.FONT_HEADER, fill=cfg.WHITE
-            )
-
-            # Draw +/- buttons
-            btn_y = y + cfg.ROW_HEIGHT
-            # Minus button
-            draw.rectangle((x, btn_y, x + cfg.ROW_HEIGHT, btn_y + cfg.ROW_HEIGHT), outline=cfg.BLACK)
-            draw.text((x + 4, btn_y), '-', font=cfg.FONT_HEADER, fill=cfg.BLACK)
-            # Plus button
-            plus_x = x + panel_w - cfg.ROW_HEIGHT
-            draw.rectangle((plus_x, btn_y, plus_x + cfg.ROW_HEIGHT, btn_y + cfg.ROW_HEIGHT), outline=cfg.BLACK)
-            draw.text((plus_x + 4, btn_y), '+', font=cfg.FONT_HEADER, fill=cfg.BLACK)
-
-            # Draw volume bar
-            bar_x = x + cfg.ROW_HEIGHT
+            # Create volume bar as ColumnItem
             bar_w = panel_w - (cfg.ROW_HEIGHT * 2)
-            fill_w = int(bar_w * (vol / 100.0))
+            menu.items = [
+                ColumnItem([
+                    Column(content="-", width=cfg.ROW_HEIGHT, align='center'),
+                    Column(content="", width=bar_w, align='left'),
+                    Column(content="+", width=cfg.ROW_HEIGHT, align='center'),
+                ], selectable=False)
+            ]
 
+            panel.render(canvas)
+
+            # Draw volume bar fill on top
+            draw = ImageDraw.Draw(canvas)
+            content_y = y + cfg.ROW_HEIGHT
+            bar_x = x + cfg.ROW_HEIGHT
+            fill_w = int(bar_w * (vol / 100.0))
             if fill_w > 0:
                 draw.rectangle(
-                    (bar_x, btn_y, bar_x + fill_w, btn_y + cfg.ROW_HEIGHT),
+                    (bar_x, content_y, bar_x + fill_w, content_y + cfg.ROW_HEIGHT),
                     fill=cfg.BLACK
                 )
 

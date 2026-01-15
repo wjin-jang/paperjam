@@ -9,7 +9,7 @@ from PIL import Image
 from core.library import LibraryManager
 from core.metadata import get_cover
 from core.track_info import extract_track_info
-from core.navigation import nav_index_up, nav_index_down, nav_skip_info_up, nav_skip_info_down, find_next_heading
+from core.navigation import nav_skip_info_up, nav_skip_info_down, find_next_heading
 from ui.renderer import UIRenderer
 import config as cfg
 

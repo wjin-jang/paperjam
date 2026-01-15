@@ -15,8 +15,8 @@ class UIRenderer:
     """
     Main UI renderer that delegates to specialized view renderers.
 
-    This class maintains backward compatibility while using modular
-    view components internally.
+    Uses the new Panel → Menu → Item hierarchy internally while
+    maintaining backward compatibility with existing API.
     """
 
     def __init__(self):

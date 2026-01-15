@@ -1,12 +1,22 @@
 """
-Screensaver and shutdown view rendering.
+Screensaver and shutdown view rendering using Panel → Menu → Item hierarchy.
 """
+from PIL import Image, ImageDraw
 import config as cfg
-from ui.views.common import RenderBase
+from ui.views.core import Panel
+from ui.views.items import TextItem, ImageItem
 
 
-class ScreensaverRenderer(RenderBase):
+class ScreensaverRenderer:
     """Renderer for screensaver and shutdown views."""
+
+    def __init__(self):
+        self.canvas = Image.new('1', (cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), cfg.WHITE)
+        self.draw = ImageDraw.Draw(self.canvas)
+
+    def clear(self):
+        """Clear the canvas."""
+        self.draw.rectangle((0, 0, cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), fill=cfg.WHITE)
 
     def render_screensaver(self, state):
         """Render screensaver with album art."""
@@ -14,25 +24,41 @@ class ScreensaverRenderer(RenderBase):
 
         img = state.screensaver_image
         if not img:
-            self.draw_text_box("IDLE", 0, 73, 104, 20, center=True, font=cfg.FONT_HEADER)
+            # No image - show IDLE text centered
+            panel_w = 104
+            panel_h = cfg.ROW_HEIGHT
+            x = (cfg.SCREEN_WIDTH - panel_w) // 2
+            y = (cfg.SCREEN_HEIGHT - panel_h) // 2
+
+            panel = Panel(x, y, panel_w, panel_h)
+            menu = panel.create_menu()
+            menu.items = [TextItem("IDLE", selectable=False)]
+            panel.render(self.canvas)
         else:
+            # Show album art in a panel
             x = (cfg.SCREEN_WIDTH - img.width + 1) // 2
             y = (cfg.SCREEN_HEIGHT - img.height + 1) // 2
-            self.draw_panel(x - 1, y - 1, img.width + 1, img.height + 1)
-            self.canvas.paste(img, (x, y))
 
-            # Draw status indicator with icon
+            art_panel = Panel(x - 1, y - 1, img.width + 2, img.height + 2)
+            art_menu = art_panel.create_menu()
+            art_item = ImageItem(image=img)
+            art_item.set_height(img.height)
+            art_menu.items = [art_item]
+            art_panel.render(self.canvas)
+
+            # Draw status indicator panel
             raw_status = state.get_status_text()
             icon = cfg.STATUS_ICONS.get(raw_status, 'Ⓘ')
-            status_text = f"{icon}"
 
             pw = cfg.ROW_HEIGHT
             ph = cfg.ROW_HEIGHT
             px = x + img.width + 8
             py = y + img.height - ph
 
-            self.draw_panel(px, py, pw, ph)
-            self.draw_text_box(status_text, px, py, pw, ph, invert=False, padding=(2, 0), font=cfg.FONT_HEADER)
+            status_panel = Panel(px, py, pw, ph)
+            status_menu = status_panel.create_menu()
+            status_menu.items = [TextItem(icon, selectable=False)]
+            status_panel.render(self.canvas)
 
         return self.canvas
 
@@ -40,14 +66,19 @@ class ScreensaverRenderer(RenderBase):
         """Render shutdown screen with cover art and POWER OFF text."""
         self.clear()
 
-        # Draw background cover art
+        # Draw background cover art in a panel
         if image:
             x = (cfg.SCREEN_WIDTH - image.width) // 2
             y = (cfg.SCREEN_HEIGHT - image.height) // 2
-            self.draw_panel(x - 1, y - 1, image.width + 1, image.height + 1)
-            self.canvas.paste(image, (x, y))
 
-        # Draw "POWER OFF" text in bottom right with 8px padding
+            art_panel = Panel(x - 1, y - 1, image.width + 2, image.height + 2)
+            art_menu = art_panel.create_menu()
+            art_item = ImageItem(image=image)
+            art_item.set_height(image.height)
+            art_menu.items = [art_item]
+            art_panel.render(self.canvas)
+
+        # Draw "POWER OFF" text in bottom right
         text = "POWER OFF"
         font = cfg.FONT_HEADER
 
@@ -77,12 +108,10 @@ class ScreensaverRenderer(RenderBase):
         # Tile covers with regular offset, starting outside top-right
         if covers:
             cover_size = covers[0].width if covers else 40
-            # Offset between rows - stagger by half width
             x_spacing = cover_size + 4
             y_spacing = cover_size + 4
             row_offset = cover_size // 2 + 2
 
-            # Start position - outside top-right corner
             start_x = cfg.SCREEN_WIDTH + 10
             start_y = -cover_size // 2
 
@@ -91,7 +120,6 @@ class ScreensaverRenderer(RenderBase):
             y = start_y
 
             while y < cfg.SCREEN_HEIGHT + cover_size:
-                # Offset every other row
                 x = start_x - (row * row_offset)
 
                 while x > -cover_size:
@@ -103,18 +131,16 @@ class ScreensaverRenderer(RenderBase):
                 row += 1
                 y += y_spacing
 
-        # Draw dialog box in center
+        # Draw dialog box as a Panel
         dialog_w = 140
-        dialog_h = 36
+        dialog_h = cfg.ROW_HEIGHT * 2 + 4
         dialog_x = (cfg.SCREEN_WIDTH - dialog_w) // 2
         dialog_y = (cfg.SCREEN_HEIGHT - dialog_h) // 2
 
-        self.draw_panel(dialog_x, dialog_y, dialog_w, dialog_h, header=dialog_text)
-
-        # Draw button text
-        self.draw_text_box(
-            button_text, dialog_x, dialog_y + cfg.ROW_HEIGHT,
-            dialog_w, cfg.ROW_HEIGHT * 2, center=True, invert=True
-        )
+        panel = Panel(dialog_x, dialog_y, dialog_w, dialog_h, header=dialog_text)
+        menu = panel.create_menu()
+        menu.items = [TextItem(button_text, selectable=True)]
+        menu.cursor.row = 0  # Select the button
+        panel.render(self.canvas)
 
         return self.canvas
