@@ -79,7 +79,7 @@ class Item(ABC):
 
         text_layer = Image.new('1', (w + 1, h + 1), bg)
         text_draw = ImageDraw.Draw(text_layer)
-        text_draw.rectangle((-1, -1, w, h), outline=cfg.BLACK)
+        text_draw.rectangle((0, 0, w, h), outline=cfg.BLACK)
 
         padding_x, padding_y = 4, 2
         if center:
@@ -321,7 +321,7 @@ class HeadingItem(Item):
 
         # Add white outline when selected
         if selected:
-            draw.rectangle((x, y, x + w - 1, y + h - 1), outline=cfg.WHITE)
+            draw.rectangle((x + 1, y + 1, x + w - 1, y + h - 1), outline=cfg.WHITE)
 
 
 class InfoItem(Item):

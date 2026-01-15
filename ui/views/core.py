@@ -338,7 +338,7 @@ class Panel:
 
         # Draw panel border and fill
         draw.rectangle(
-            (self.x - 1, self.y - 1, self.x + self.width, self.y + self.height),
+            (self.x, self.y, self.x + self.width, self.y + self.height),
             fill=cfg.WHITE, outline=cfg.BLACK
         )
 
@@ -349,7 +349,7 @@ class Panel:
                 fill=cfg.BLACK
             )
             draw.text(
-                (self.x + 5, self.y),
+                (self.x + 4, self.y),
                 self.header,
                 font=cfg.FONT_HEADER, fill=cfg.WHITE
             )
@@ -377,6 +377,7 @@ class Panel:
         sb_x = self.x + self.width - 8
         sb_y = self.y + self.content_y
         sb_h = self.content_height
+        sb_w = 8
 
         # Dithered background
         strip = create_dithered_strip(8, sb_h)
@@ -398,6 +399,6 @@ class Panel:
         handle_y = sb_y + int((sb_h - handle_h) * scroll_ratio)
 
         draw.rectangle(
-            (sb_x, handle_y, sb_x + 7, handle_y + handle_h - 1),
+            (sb_x, handle_y, sb_x + sb_w, handle_y + handle_h - 1),
             fill=cfg.WHITE, outline=cfg.BLACK
         )
