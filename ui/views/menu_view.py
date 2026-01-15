@@ -109,11 +109,10 @@ class MenuViewRenderer:
         if sel_idx >= 0 and sel_idx < len(new_items):
             menu.cursor.row = sel_idx
             menu.cursor.col = 0
+            # Auto-scroll to make selection visible
+            menu._ensure_visible()
         else:
             menu.cursor.row = -1  # No selection
-
-        # Set scroll offset (scroll_idx is a row index)
-        menu.set_scroll_to_row(scroll_idx)
 
         # Render panel to canvas
         panel.render(self.canvas)

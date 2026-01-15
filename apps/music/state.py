@@ -15,7 +15,6 @@ class PlayerState:
     pinned_items: List[dict] = field(default_factory=list)
     scrollable_items: List[dict] = field(default_factory=list)
     cursor: Cursor = field(default_factory=Cursor)
-    view_start_index: int = 0
     album: str = "Library"
     artist: str = ""
     year: str = ""
@@ -40,7 +39,6 @@ class PlayerState:
     browse_mode: str = 'ROOT'
     is_scanning: bool = False
     total_items: int = 0
-    page_size: int = 7
 
     # Temporary status message
     status_message: Optional[str] = None

@@ -225,12 +225,10 @@ class MusicViewRenderer:
 
         main_menu.items = menu_items
 
-        # Set cursor from state
+        # Set cursor from state and auto-scroll to make it visible
         main_menu.cursor.row = state.cursor.row
         main_menu.cursor.col = state.cursor.col
-
-        # Set scroll from state (view_start_index is a row index)
-        main_menu.set_scroll_to_row(state.view_start_index)
+        main_menu._ensure_visible()
 
         main_panel.render(self.canvas)
 

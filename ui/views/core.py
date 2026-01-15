@@ -86,7 +86,7 @@ class Menu:
         Args:
             row_idx: Row index to scroll to
         """
-        if row_idx <= 0:
+        if row_idx <= 0 or not self.items:
             self.scroll_offset = 0
             return
 
@@ -97,7 +97,9 @@ class Menu:
                 break
             y += item.get_height()
 
-        self.scroll_offset = y
+        # Clamp to max scrollable area
+        max_scroll = max(0, self.get_total_height() - self.height)
+        self.scroll_offset = min(y, max_scroll)
 
     # Navigation
 
@@ -223,6 +225,10 @@ class Menu:
         elif row_bottom > self.scroll_offset + self.height:
             # Scroll down - align item bottom with viewport bottom
             self.scroll_offset = row_bottom - self.height
+
+        # Clamp to valid range
+        max_scroll = max(0, self.get_total_height() - self.height)
+        self.scroll_offset = max(0, min(self.scroll_offset, max_scroll))
 
     def render(self) -> Image.Image:
         """Render menu items to a frame buffer.

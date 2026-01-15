@@ -673,24 +673,6 @@ class MusicPlayerApp:
         if self.state.screensaver_image:
             return self.renderer.render_screensaver(self.state)
 
-        # Use pre-calculated item lists
-        pinned_items = self.state.pinned_items
-        scrollable_items = self.state.scrollable_items
-
-        pinned_count = len(pinned_items)
-
-        # Calculate available height for scrollable content
-        current_list_y = cfg.PANEL_Y + cfg.ROW_HEIGHT + (pinned_count * cfg.ROW_HEIGHT)
-        avail_h = (cfg.PANEL_Y + cfg.PANEL_H) - current_list_y
-        self.state.page_size = max(1, avail_h // cfg.ROW_HEIGHT)
-
-        page = self.state.page_size
-        # Selection index relative to scrollable items (after pinned)
-        sel = max(0, self.state.selection_index - pinned_count)
-        start = (sel // page) * page
-        self.state.view_start_index = start
-
-        # Order: pinned items first, then slice of scrollable items
-        view_items = pinned_items + scrollable_items[start: start + page + 1]
-
+        # Pass all items - the Menu system handles scrolling based on cursor
+        view_items = self.state.pinned_items + self.state.scrollable_items
         return self.renderer.render_music_view(self.state, view_items)
