@@ -68,6 +68,9 @@ class ContextMenuHandler:
             return ["Add to Queue", "Favourite Artist", "Cancel"]
         elif item.get('type') == 'album':
             return ["Add to Queue", "Favourite Album", "Cancel"]
+        elif item.get('type') == 'heading':
+            # Headings are typically album names in artist view
+            return ["Go to Album", "Add to Queue", "Favourite Album", "Cancel"]
         elif item.get('type') == 'file':
             opts = ["Add to Queue", "Favourite Song", "Add to Playlist"]
             if item.get('artist'):
@@ -113,22 +116,28 @@ class ContextMenuHandler:
             elif opt == "Add to Queue":
                 if target['type'] == 'file':
                     self.playlist.add_to_manual_queue(str(target['path']))
-                
+
                 elif target['type'] == 'album':
                     tracks = self.lib.get_album_tracks(target['name'])
                     for t in tracks:
                         self.playlist.add_to_manual_queue(str(t['path']))
-                        
+
+                elif target['type'] == 'heading':
+                    # Headings represent albums in artist view
+                    tracks = self.lib.get_album_tracks(target['name'])
+                    for t in tracks:
+                        self.playlist.add_to_manual_queue(str(t['path']))
+
                 elif target['type'] == 'artist':
                     tracks = self.lib.get_artist_tracks(target['name'])
                     for t in tracks:
                         self.playlist.add_to_manual_queue(str(t['path']))
-                        
+
                 elif target['type'] == 'playlist':
                     tracks = self.lib.get_playlist_tracks(Path(target['path']))
                     for t in tracks:
                         self.playlist.add_to_manual_queue(str(t['path']))
-                        
+
                 self.close()
                 return None
 
@@ -147,6 +156,7 @@ class ContextMenuHandler:
                 return None
 
             elif opt == "Favourite Album":
+                # Works for both album and heading types
                 self.lib.toggle_fav_album(target['name'])
                 self.close()
                 if current_mode == 'FAV_ALBUMS':
@@ -175,9 +185,11 @@ class ContextMenuHandler:
 
             elif opt == "Go to Album":
                 self.close()
+                # For file items, album is in 'album' field; for headings, it's in 'name'
+                album_name = target.get('album') or target.get('name')
                 return {
                     'mode': 'ALBUM_VIEW',
-                    'path': target['album']
+                    'path': album_name
                 }
 
         elif self.layer == 1:

@@ -227,12 +227,18 @@ class PopupPanel:
         if self.config.custom_render:
             return self.config.custom_render(base_canvas, self.state)
 
-        # Calculate dimensions
+        # Calculate dimensions (always multiples of ROW_HEIGHT)
         header_h = cfg.ROW_HEIGHT if self.config.header else 0
         content_h = len(self.state.content) * cfg.ROW_HEIGHT if self.state.content else cfg.ROW_HEIGHT
         total_h = header_h + content_h
 
-        h = min(self.config.max_height, max(self.config.min_height, total_h))
+        # Round to nearest multiple of ROW_HEIGHT
+        def round_to_row(val):
+            return ((val + cfg.ROW_HEIGHT - 1) // cfg.ROW_HEIGHT) * cfg.ROW_HEIGHT
+
+        min_h = round_to_row(self.config.min_height)
+        max_h = round_to_row(self.config.max_height)
+        h = min(max_h, max(min_h, round_to_row(total_h)))
         w = self.config.width
 
         if self.config.centered:

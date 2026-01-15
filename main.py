@@ -51,6 +51,7 @@ class MainApp:
         
         # Display State
         self.first_render = True
+        self._last_frame_hash = None  # For change detection
 
         # Setup Global Callbacks
         self.sys.on_shutdown_request = self._handle_shutdown_request
@@ -381,10 +382,17 @@ class MainApp:
         # Delete data files
         try:
             import shutil
+            import json
             if cfg.DATA_DIR.exists():
                 shutil.rmtree(cfg.DATA_DIR)
             if cfg.CONFIG_FILE.exists():
                 cfg.CONFIG_FILE.unlink()
+
+            # Create default config file
+            cfg.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            with open(cfg.CONFIG_FILE, 'w') as f:
+                json.dump(cfg.DEFAULT_CONFIG, f, indent=4)
+            logger.info("Created default config file")
         except OSError as e:
             logger.error(f"Reset error: {e}")
 
@@ -397,17 +405,23 @@ class MainApp:
         # Apply Overlays
         if not skip_status:
             img = self.renderer.overlays.draw_status_icons(
-                img, 
-                self._check_audio_device(), 
-                self._check_wifi(), 
+                img,
+                self._check_audio_device(),
+                self._check_wifi(),
                 self._check_bluetooth()
             )
         if not skip_battery:
             img = self.renderer.overlays.draw_battery(img)
-            
+
         if self.settings_app.invert_colors:
             from PIL import ImageOps
             img = ImageOps.invert(img.convert('L')).convert('1')
+
+        # Check if frame changed (skip refresh if identical)
+        frame_hash = hash(img.tobytes())
+        if not full_refresh and not self.first_render and frame_hash == self._last_frame_hash:
+            return  # No change, skip display update
+        self._last_frame_hash = frame_hash
 
         epd = self.sys.get_display()
         if epd:

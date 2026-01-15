@@ -52,7 +52,7 @@ class MusicViewRenderer:
 
             columns.append(Column(
                 content=icon,
-                width=35,  # 140 / 4 = 35
+                width=None,  # Auto-calculate to fit available width
                 align='center',
                 active=active
             ))

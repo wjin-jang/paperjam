@@ -75,7 +75,7 @@ class ScreensaverRenderer:
             x = (cfg.SCREEN_WIDTH - image.width) // 2
             y = (cfg.SCREEN_HEIGHT - image.height) // 2
 
-            art_panel = Panel(x - 1, y - 1, image.width + 2, image.height + 2)
+            art_panel = Panel(x, y, image.width + 1, image.height + 1)
             art_menu = art_panel.create_menu()
             art_item = ImageItem(image=image)
             art_item.set_height(image.height)

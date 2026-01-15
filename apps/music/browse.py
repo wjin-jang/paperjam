@@ -296,9 +296,10 @@ class BrowseHandler:
                         disc = 0
                         track_num = 0
 
-                    icon = 'P' if playing_path == str(p) else 'S'
+                    # Don't set icon - let music_view._get_item_icon() handle it
+                    # based on playing state and track number
                     files.append({
-                        'name': title, 'type': 'file', 'path': p, 'icon': icon,
+                        'name': title, 'type': 'file', 'path': p,
                         'artist': artist, 'album': album,
                         'disc': disc, 'track': track_num
                     })

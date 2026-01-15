@@ -337,9 +337,16 @@ class LibraryManager:
                 tracks.append({
                     'path': p, 'album': track.album, 'artist': track.artist,
                     'title': track.title, 'year': track.year,
-                    'duration': track.duration
+                    'duration': track.duration,
+                    'disc': track.disc_num, 'track': track.track_num
                 })
-        tracks.sort(key=lambda x: (x['artist'].lower(), x['title'].lower()))
+        # Sort by artist > album > disc > track
+        tracks.sort(key=lambda x: (
+            x.get('artist', '').lower(),
+            x.get('album', '').lower(),
+            x.get('disc', 0),
+            x.get('track', 0)
+        ))
         return tracks
 
     def get_total_tracks(self):

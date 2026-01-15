@@ -76,7 +76,7 @@ class PlayerState:
 
     @property
     def selection_index(self) -> int:
-        """Backward-compatible selection index (cursor row)."""
+        """Current selection index (cursor row position)."""
         return self.cursor.row
 
     @selection_index.setter
@@ -85,7 +85,7 @@ class PlayerState:
 
     @property
     def controls_index(self) -> int:
-        """Backward-compatible controls index (cursor column)."""
+        """Current controls index (cursor column position)."""
         return self.cursor.col
 
     @controls_index.setter

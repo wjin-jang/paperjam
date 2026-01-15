@@ -353,18 +353,72 @@ class InfoItem(Item):
                selected: bool = False, selected_col: int = -1):
         """Render info item."""
         if self.lines:
+            # Draw one box spanning all lines (no internal borders)
+            total_h = len(self.lines) * cfg.ROW_HEIGHT
+            info_layer = Image.new('1', (w + 1, total_h + 1), cfg.WHITE)
+            info_draw = ImageDraw.Draw(info_layer)
+            # Outer border only
+            info_draw.rectangle((0, 0, w, total_h), outline=cfg.BLACK)
+
             for i, line in enumerate(self.lines):
-                line_y = y + (i * cfg.ROW_HEIGHT)
+                line_y = i * cfg.ROW_HEIGHT
                 if isinstance(line, list):
-                    self._render_columns(draw, canvas, line, x, line_y, w)
+                    self._render_line_columns(info_draw, line, 0, line_y, w)
                 else:
-                    self._draw_text_box(draw, canvas, sanitize_text(str(line)),
-                                       x, line_y, w, cfg.ROW_HEIGHT)
+                    # Draw text without box
+                    text = sanitize_text(str(line))
+                    info_draw.text((5, line_y + 3), text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+
+            canvas.paste(info_layer, (x, y))
         elif self.columns:
             self._render_columns(draw, canvas, self.columns, x, y, w)
         elif self.text:
             self._draw_text_box(draw, canvas, sanitize_text(self.text),
                                x, y, w, cfg.ROW_HEIGHT)
+
+    def _render_line_columns(self, draw: ImageDraw.Draw, columns: List[str],
+                             x: int, y: int, w: int):
+        """Render a row of text columns without drawing boxes."""
+        if not columns:
+            return
+
+        if len(columns) == 1:
+            text = sanitize_text(str(columns[0]))
+            draw.text((x + 5, y + 3), text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+            return
+
+        # Calculate widths for right columns
+        right_widths = []
+        for col in columns[1:]:
+            text = sanitize_text(str(col))
+            col_w = max(20, len(text) * 6 + 8)
+            right_widths.append(col_w)
+
+        total_right = sum(right_widths)
+        left_w = w - total_right
+
+        # Scale if needed
+        if total_right + 20 > w:
+            scale = (w - 20) / total_right if total_right > 0 else 1
+            right_widths = [max(10, int(cw * scale)) for cw in right_widths]
+            total_right = sum(right_widths)
+            left_w = max(20, w - total_right)
+
+        # Render left column
+        draw.text((x + 5, y + 3), sanitize_text(str(columns[0])),
+                  font=cfg.FONT_MAIN, fill=cfg.BLACK)
+
+        # Render right columns (centered)
+        col_x = x + left_w
+        for i, col in enumerate(columns[1:]):
+            col_w = right_widths[i]
+            text = sanitize_text(str(col))
+            # Center the text in column
+            bbox = draw.textbbox((0, 0), text, font=cfg.FONT_MAIN)
+            text_w = bbox[2] - bbox[0]
+            text_x = col_x + (col_w - text_w) // 2
+            draw.text((text_x, y + 3), text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+            col_x += col_w
 
     def _render_columns(self, draw: ImageDraw.Draw, canvas: Image.Image,
                         columns: List[str], x: int, y: int, w: int):

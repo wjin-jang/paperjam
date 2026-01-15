@@ -237,8 +237,8 @@ class MusicPlayerApp:
         if not self.state.items or not (0 <= self.state.selection_index < len(self.state.items)):
             return
         item = self.state.items[self.state.selection_index]
-        # Allow context menu for artists and albums too now
-        if item['type'] in ['file', 'playlist', 'artist', 'album']:
+        # Allow context menu for artists, albums, and headings (album headings in artist view)
+        if item['type'] in ['file', 'playlist', 'artist', 'album', 'heading']:
             self.context_menu.open(item)
             self._sync_context_state()
 
@@ -539,8 +539,6 @@ class MusicPlayerApp:
         self.state.selection_index = controls_idx
 
         # Optimized list construction
-        playing_path = self.state.playing_path
-        
         # Pre-process items that don't need conversion (heading, info)
         # and convert track items in one pass using list comprehension
         processed_items = [
@@ -548,7 +546,6 @@ class MusicPlayerApp:
                 'name': t.get('title', ''),
                 'type': 'file',
                 'path': t.get('path'),
-                'icon': 'P' if playing_path == str(t.get('path', '')) else 'S',
                 'artist': t.get('artist'),
                 'album': t.get('album'),
                 'track': t.get('track', 0)

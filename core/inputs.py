@@ -67,19 +67,6 @@ class InputHandler:
         if not self.devices:
             print("WARNING: No valid input devices found!")
 
-    @property
-    def device(self):
-        """Backward compatibility - return first device."""
-        return self.devices[0] if self.devices else None
-
-    @device.setter
-    def device(self, value):
-        """Backward compatibility - set single device."""
-        if value:
-            self.devices = [value]
-        else:
-            self.devices = []
-
     def check_inputs(self):
         if not self.devices:
             return True

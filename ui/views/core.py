@@ -202,7 +202,11 @@ class Menu:
         self.cursor.col = 0
 
     def _ensure_visible(self):
-        """Ensure cursor row is visible in the viewport."""
+        """Ensure cursor row is visible in the viewport using page-based scrolling.
+
+        When scrolling past the last fully visible item, load the next page.
+        When scrolling past the first visible item, load the previous page.
+        """
         if not self.items or self.cursor.row < 0:
             return
 
@@ -218,13 +222,14 @@ class Menu:
         else:
             return
 
-        # Adjust scroll to keep cursor visible (scroll_offset is in pixels)
+        # Page-based scrolling
         if row_top < self.scroll_offset:
-            # Scroll up - align item top with viewport top
-            self.scroll_offset = row_top
+            # Scrolling up - show previous page with cursor at bottom
+            # Calculate page offset that puts cursor item at bottom of viewport
+            self.scroll_offset = max(0, row_bottom - self.height)
         elif row_bottom > self.scroll_offset + self.height:
-            # Scroll down - align item bottom with viewport bottom
-            self.scroll_offset = row_bottom - self.height
+            # Scrolling down - show next page with cursor at top
+            self.scroll_offset = row_top
 
         # Clamp to valid range
         max_scroll = max(0, self.get_total_height() - self.height)
