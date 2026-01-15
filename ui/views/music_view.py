@@ -29,7 +29,7 @@ class MusicViewRenderer(RenderBase):
         icon_keys = ['back', 'shuffle', 'loop', 'fav']
 
         for b_i, key in enumerate(icon_keys):
-            bx = cfg.PANEL_X + (b_i * btn_w) + 1
+            bx = cfg.PANEL_X + (b_i * btn_w)
             is_active = False
 
             if key == 'shuffle' and state.shuffle_active:
