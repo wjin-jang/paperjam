@@ -173,7 +173,7 @@ class MusicViewRenderer:
         # === Album Art Panel ===
         art_size = 84
         art_x, art_y = 8, 8
-        art_panel = Panel(art_x, art_y, art_size + 1, art_size + 1)
+        art_panel = Panel(art_x, art_y, art_size, art_size)
         art_menu = art_panel.create_menu()
 
         # Get appropriate cover art

@@ -349,7 +349,7 @@ class Panel:
                 fill=cfg.BLACK
             )
             draw.text(
-                (self.x + 4, self.y),
+                (self.x + 5, self.y),
                 self.header,
                 font=cfg.FONT_HEADER, fill=cfg.WHITE
             )
@@ -375,7 +375,7 @@ class Panel:
             return
 
         sb_x = self.x + self.width - 8
-        sb_y = self.y + self.content_y
+        sb_y = self.y + self.content_y + 1
         sb_h = self.content_height
         sb_w = 8
 
