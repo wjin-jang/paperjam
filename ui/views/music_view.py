@@ -62,7 +62,7 @@ class MusicViewRenderer(RenderBase):
                 icon = ImageOps.invert(icon.convert('L')).convert('1')
 
             self.draw.rectangle(
-                (bx, y_pos, bx + btn_w, y_pos + cfg.ROW_HEIGHT),
+                (bx + 1, y_pos + 1, bx + btn_w, y_pos + cfg.ROW_HEIGHT),
                 fill=cfg.BLACK if icon_inverted else cfg.WHITE  
             )
 
