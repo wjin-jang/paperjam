@@ -8,6 +8,7 @@ from PIL import Image
 
 from core.library import LibraryManager
 from core.metadata import get_cover
+from core.track_info import extract_track_info
 from core.navigation import nav_index_up, nav_index_down, nav_skip_info_up, nav_skip_info_down, find_next_heading
 from ui.renderer import UIRenderer
 import config as cfg
@@ -356,6 +357,9 @@ class MusicPlayerApp:
         if play:
             self.lib.add_recent(Path(path))
 
+        if self.mode == 'QUEUE_VIEW':
+            self.refresh_list()
+
     def update(self):
         """Update loop - check for track end, screensaver, etc."""
         if self.state.is_playing and self.audio.has_ended():
@@ -480,10 +484,14 @@ class MusicPlayerApp:
             manual_items = []
             if self.playlist.manual_queue:
                 manual_items.append({'name': 'MANUAL QUEUE', 'type': 'heading'})
-                for p in self.playlist.manual_queue:
-                    p = Path(p)
+                for p_str in self.playlist.manual_queue:
+                    p = Path(p_str)
+                    try:
+                        name = extract_track_info(p).title
+                    except:
+                        name = p.stem
                     manual_items.append({
-                        'name': p.stem, 'type': 'file', 'path': p, 'icon': 'Q'
+                        'name': name, 'type': 'file', 'path': p, 'icon': 'Q'
                     })
 
             # Auto Queue
@@ -498,20 +506,25 @@ class MusicPlayerApp:
                     real_idx = self.playlist.queue[idx]
                     path_str = self.playlist.playlist_source[real_idx]
                     p = Path(path_str)
+                    try:
+                        name = extract_track_info(p).title
+                    except:
+                        name = p.stem
                     auto_items.append({
-                        'name': p.stem, 'type': 'file', 'path': p, 'icon': str(count + 1)
+                        'name': name, 'type': 'file', 'path': p, 'icon': str(count + 1)
                     })
                     
                     idx = (idx + 1) % len(self.playlist.queue)
                     if idx == start_idx: break
                     count += 1
             
+            controls_item = {'type': 'controls'}
             if not manual_items and not auto_items:
-                self.state.items = [{'type': 'controls'}, {'name': '(Queue Empty)', 'type': 'info'}]
+                self.state.items = [controls_item, {'name': '(Queue Empty)', 'type': 'info'}]
                 self.state.scrollable_items = self.state.items
             else:
                 # Add controls bar at the top
-                self.state.items = [{'type': 'controls'}] + manual_items + auto_items
+                self.state.items = [controls_item] + manual_items + auto_items
                 self.state.scrollable_items = self.state.items
             
             self.state.album = "QUEUE"

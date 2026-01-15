@@ -192,6 +192,13 @@ class MusicViewRenderer(RenderBase):
         has_scrollbar = scrollable_total * cfg.ROW_HEIGHT > avail_h
         item_w = cfg.PANEL_W - 16 if has_scrollbar else cfg.PANEL_W - 8
 
+        # Calculate how many headings/info items are before the current view slice to keep index consistent
+        track_offset = 0
+        for j in range(state.view_start_index):
+            itype = state.items[j + pinned_count].get('type')
+            if itype not in ('heading', 'info', 'controls'):
+                track_offset += 1
+
         for i, item in enumerate(scrollable_items):
             y_pos = list_start_y + (i * cfg.ROW_HEIGHT)
             remaining_h = (cfg.PANEL_Y + cfg.PANEL_H) - y_pos
@@ -199,11 +206,18 @@ class MusicViewRenderer(RenderBase):
                 break
             draw_h = min(cfg.ROW_HEIGHT, remaining_h)
 
-            # Index accounts for pinned + scroll position
+            # Index for selection
             abs_idx = state.view_start_index + i + pinned_count
             is_selected = (abs_idx == state.selection_index)
 
             itype = item.get('type')
+            
+            # Track index for display (skipping headings/info)
+            if itype not in ('heading', 'info', 'controls'):
+                track_offset += 1
+                display_idx = track_offset
+            else:
+                display_idx = None
 
             # Controls bar - scrollable row with icons
             if itype == 'controls':
@@ -236,10 +250,22 @@ class MusicViewRenderer(RenderBase):
 
             # Determine icon for other item types
             icons = cfg.MENU_ICONS
-            if 'icon' in item and itype != 'file':
-                icon_str = item['icon']
+            if itype == 'file':
+                if 'icon' in item and item['icon'] == 'P':
+                    icon_str = icons.get('playing', 'Ⓟ')
+                elif 'icon' in item and item['icon'] not in ('S', ''):
+                    # Use provided icon if it's not the default 'S'
+                    icon_str = item['icon']
+                    if not icon_str.endswith('.'): icon_str += "."
+                else:
+                    # Use track number if available, otherwise use calculated display index
+                    track_num = item.get('track', 0)
+                    icon_val = track_num if track_num else display_idx
+                    icon_str = f"{icon_val}."
             else:
-                if itype == 'dir':
+                if 'icon' in item:
+                    icon_str = item['icon']
+                elif itype == 'dir':
                     icon_str = icons.get('dir', 'Ⓕ')
                 elif itype == 'artist':
                     icon_str = icons.get('artist', 'Ⓐ')
@@ -251,13 +277,6 @@ class MusicViewRenderer(RenderBase):
                     icon_str = icons.get('playlist', 'Ⓛ')
                     if "Fav" in item.get('name', ""):
                         icon_str = icons.get('fav', 'Ⓗ')
-                elif itype == 'file':
-                    if 'icon' in item and item['icon'] == 'P':
-                        icon_str = icons.get('playing', 'Ⓟ')
-                    else:
-                        # Use track number if available, otherwise use index
-                        track_num = item.get('track', 0)
-                        icon_str = f"{track_num}." if track_num else f"{abs_idx}."
                 else:
                     icon_str = item.get('icon', '★')
 
