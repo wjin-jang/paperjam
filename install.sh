@@ -1,7 +1,6 @@
 #!/bin/bash
 # PaperJam Installation Script
-# Copy this entire script and paste into: nano install.sh
-# Then run: chmod +x install.sh && ./install.sh
+# Run: curl -fsSL https://raw.githubusercontent.com/wjin-jang/paperjam/main/install.sh | bash
 
 set -e
 
@@ -19,7 +18,7 @@ if [ ! -f /proc/device-tree/model ]; then
     [[ ! $REPLY =~ ^[Yy]$ ]] && exit 1
 fi
 
-# Get username
+# Get username and paths
 USER_NAME=$(whoami)
 HOME_DIR=$(eval echo ~$USER_NAME)
 INSTALL_DIR="$HOME_DIR/paperjam"
@@ -27,6 +26,13 @@ INSTALL_DIR="$HOME_DIR/paperjam"
 echo "Installing for user: $USER_NAME"
 echo "Install directory: $INSTALL_DIR"
 echo
+
+# Determine config.txt location (Bookworm uses /boot/firmware/, older uses /boot/)
+if [ -f /boot/firmware/config.txt ]; then
+    CONFIG_FILE="/boot/firmware/config.txt"
+else
+    CONFIG_FILE="/boot/config.txt"
+fi
 
 # --- System Packages ---
 echo "[1/8] Installing system packages..."
@@ -43,33 +49,24 @@ sudo apt install -y \
     git \
     pulseaudio \
     pulseaudio-module-bluetooth \
-    alsa-utils
+    alsa-utils \
+    wireless-tools
 
 # --- Enable Interfaces ---
 echo
 echo "[2/8] Enabling I2C and SPI..."
 
 # Enable I2C
-if ! grep -q "^dtparam=i2c_arm=on" /boot/config.txt 2>/dev/null && \
-   ! grep -q "^dtparam=i2c_arm=on" /boot/firmware/config.txt 2>/dev/null; then
-    if [ -f /boot/firmware/config.txt ]; then
-        sudo bash -c 'echo "dtparam=i2c_arm=on" >> /boot/firmware/config.txt'
-    else
-        sudo bash -c 'echo "dtparam=i2c_arm=on" >> /boot/config.txt'
-    fi
+if ! grep -q "^dtparam=i2c_arm=on" "$CONFIG_FILE" 2>/dev/null; then
+    sudo bash -c "echo 'dtparam=i2c_arm=on' >> $CONFIG_FILE"
     echo "  I2C enabled"
 else
     echo "  I2C already enabled"
 fi
 
 # Enable SPI
-if ! grep -q "^dtparam=spi=on" /boot/config.txt 2>/dev/null && \
-   ! grep -q "^dtparam=spi=on" /boot/firmware/config.txt 2>/dev/null; then
-    if [ -f /boot/firmware/config.txt ]; then
-        sudo bash -c 'echo "dtparam=spi=on" >> /boot/firmware/config.txt'
-    else
-        sudo bash -c 'echo "dtparam=spi=on" >> /boot/config.txt'
-    fi
+if ! grep -q "^dtparam=spi=on" "$CONFIG_FILE" 2>/dev/null; then
+    sudo bash -c "echo 'dtparam=spi=on' >> $CONFIG_FILE"
     echo "  SPI enabled"
 else
     echo "  SPI already enabled"
@@ -110,9 +107,9 @@ pip install --upgrade pip
 pip install pillow mutagen python-vlc smbus2 evdev numpy
 echo "  Python dependencies installed"
 
-# --- Waveshare EPD library ---
+# --- Waveshare EPD Library ---
 echo
-echo "[7/8] Installing Waveshare EPD library..."
+echo "[7/8] Installing Waveshare e-Paper driver..."
 if [ -d "lib/waveshare" ]; then
     echo "  Directory exists, pulling latest..."
     cd "lib/waveshare"
@@ -122,10 +119,8 @@ else
     mkdir -p lib
     git clone https://github.com/waveshare/e-Paper.git "lib/waveshare"
 fi
-# A little cursed, but the waveshare library has some weird pathing issues
-# that are easiest to solve by installing it this way.
-# See: https://github.com/waveshare/e-Paper/issues/322
-(cd lib/waveshare/RaspberryPi_JetsonNano/python && pip install .)
+pip install lib/waveshare/RaspberryPi_JetsonNano/python/
+echo "  Waveshare driver installed"
 
 # --- Systemd Service ---
 echo
@@ -133,15 +128,15 @@ echo "[8/8] Setting up auto-start service..."
 
 mkdir -p "$HOME_DIR/.config/systemd/user"
 
-cat > "$HOME_DIR/.config/systemd/user/paperjam.service" << EOF
+cat > "$HOME_DIR/.config/systemd/user/paperjam.service" << 'EOF'
 [Unit]
 Description=PaperJam Music Player
 After=pulseaudio.service
 
 [Service]
 Type=simple
-WorkingDirectory=$INSTALL_DIR
-ExecStart=$INSTALL_DIR/venv/bin/python main.py
+WorkingDirectory=%h/paperjam
+ExecStart=%h/paperjam/venv/bin/python main.py
 Restart=on-failure
 RestartSec=5
 
@@ -163,7 +158,7 @@ echo "=========================================="
 echo "  Installation Complete!"
 echo "=========================================="
 echo
-echo "IMPORTANT: A reboot is required for I2C/SPI changes."
+echo "A reboot is required for I2C/SPI changes to take effect."
 echo
 echo "After reboot:"
 echo "  - Edit music path: nano $INSTALL_DIR/config.py"
