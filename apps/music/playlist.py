@@ -75,20 +75,36 @@ class PlaylistManager:
         """Clear the manual queue."""
         self.manual_queue.clear()
 
-    def next_track(self) -> Optional[str]:
-        """Move to next track and return its path."""
+    def next_track(self, auto_advance=False) -> Optional[str]:
+        """
+        Move to next track and return its path.
+        
+        Args:
+            auto_advance: True if advancing automatically (track finished), 
+                         False if user requested next.
+        """
         # Priority 1: Manual Queue
         if self.manual_queue:
             return self.manual_queue.popleft()
 
-        # Priority 2: Auto Queue (Playlist/Album)
+        # Priority 2: Auto Queue
         if not self.queue:
             return None
 
-        if self.loop_mode == 2:  # Loop one - stay on same track
-            return self.get_current_path()
-
-        self.queue_idx = (self.queue_idx + 1) % len(self.queue)
+        # Loop One handled by caller (usually replaying current path)
+        # But if caller calls this, it means we WANT the next track.
+        # Except if Loop One logic was missed? No, let's assume caller handles Loop One repeat.
+        
+        next_idx = (self.queue_idx + 1) % len(self.queue)
+        at_end = next_idx == 0
+        
+        if at_end and auto_advance:
+            if self.loop_mode == 0: # Loop Off
+                self.queue_idx = 0 # Reset to start
+                return None
+            # Loop All (1) -> Wrap to start (next_idx is 0)
+            
+        self.queue_idx = next_idx
         return self.get_current_path()
 
 
@@ -97,9 +113,7 @@ class PlaylistManager:
         if not self.queue:
             return None
 
-        if self.loop_mode == 2:  # Loop one - stay on same track
-            return self.get_current_path()
-
+        # User navigation overrides Loop One, so we always move back
         self.queue_idx = (self.queue_idx - 1) % len(self.queue)
         return self.get_current_path()
 

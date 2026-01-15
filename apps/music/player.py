@@ -300,40 +300,28 @@ class MusicPlayerApp:
             self._play_media(self.state.playing_path)
             return
 
-        # Check Manual Queue first
-        if self.playlist.manual_queue:
-            path = self.playlist.manual_queue.popleft()
+        # Get next track from playlist manager
+        next_path = self.playlist.next_track(auto_advance=not from_user)
+        
+        if next_path:
             if from_user:
                 self.state.set_status_message("NEXT")
-            self._play_media(path)
+            self._play_media(next_path)
             return
 
-        if not self.playlist.has_queue:
-            return
-
-        # Check if we're about to wrap around to the beginning
-        next_idx = (self.playlist.queue_idx + 1) % len(self.playlist.queue)
-        at_end = next_idx == 0 and not from_user
-
-        if at_end:
-            # Endless playback check
-            if self._settings and self._settings.get('endless_playback', False):
-                self._play_random_album()
-                return
-            
-            # Loop Off check - Stop playback and reset to start
-            if self.state.loop_mode == 0:
-                self.playlist.queue_idx = 0
-                real_idx = self.playlist.queue[0]
-                self._load_track(real_idx, play=False)
-                self.state.set_status_message("IDLE")
-                return
-
-        self.playlist.queue_idx = next_idx
-        real_idx = self.playlist.queue[self.playlist.queue_idx]
-        if from_user:
-            self.state.set_status_message("NEXT")
-        self._load_track(real_idx, play=True)
+        # Queue finished (Loop Off + Auto)
+        if self._settings and self._settings.get('endless_playback', False):
+            self._play_random_album()
+        else:
+            self.audio.stop()
+            self.state.is_playing = False
+            self.state.set_status_message("IDLE")
+            # Ensure we load the first track (reset) so user can play again
+            if self.playlist.queue:
+                # PlaylistManager.next_track already reset queue_idx to 0 if it returned None
+                path = self.playlist.get_current_path()
+                if path:
+                    self._play_media(path, play=False)
 
     def prev_track(self):
         if not self.state.screensaver_image:
@@ -346,13 +334,10 @@ class MusicPlayerApp:
                 self.state.controls_index = max(0, self.state.controls_index - 1)
                 return
 
-        if not self.playlist.has_queue:
-            return
-
-        self.playlist.queue_idx = (self.playlist.queue_idx - 1) % len(self.playlist.queue)
-        real_idx = self.playlist.queue[self.playlist.queue_idx]
-        self.state.set_status_message("PREVIOUS")
-        self._load_track(real_idx)
+        path = self.playlist.prev_track()
+        if path:
+            self.state.set_status_message("PREVIOUS")
+            self._play_media(path)
 
     def _load_track(self, real_idx, play=True):
         """Load a track by its index. If play is True, start playback."""

@@ -54,7 +54,8 @@ class LibraryManager:
                 with open(cfg.CACHE_FILE, 'r') as f:
                     data = json.load(f)
                     self._deserialize_library(data)
-            except: pass  # Don't auto-scan, let main.py handle first-run
+            except (json.JSONDecodeError, OSError) as e:
+                print(f"Cache load error: {e}")
         # Don't auto-scan here - let main.py handle welcome screen
 
     def scan_async(self, force=False):
@@ -113,7 +114,9 @@ class LibraryManager:
                     self.scan_track_count += 1
                     self.scan_album_count = len(temp_albums)
                     self.scan_artist_count = len(temp_artists)
-                except: continue
+                except Exception as e:
+                    print(f"Scan error processing {p}: {e}")
+                    continue
 
         with self._lock:
             self.artists = dict(sorted(temp_artists.items(), key=lambda x: x[0].lower()))
@@ -150,7 +153,8 @@ class LibraryManager:
     def delete_playlist(self, path):
         try:
             if path.exists(): os.remove(path)
-        except: pass
+        except OSError as e:
+            print(f"Error deleting playlist {path}: {e}")
 
     def add_to_playlist(self, playlist_path, track_path):
         try:
@@ -161,7 +165,8 @@ class LibraryManager:
             if str_path not in content:
                 content.append(str_path)
                 with open(playlist_path, 'w') as f: json.dump(content, f)
-        except: pass
+        except (OSError, json.JSONDecodeError) as e:
+            print(f"Error updating playlist {playlist_path}: {e}")
 
     def get_playlist_tracks(self, playlist_path):
         tracks = []
@@ -178,7 +183,8 @@ class LibraryManager:
                                 'title': track.title, 'year': track.year,
                                 'duration': track.duration
                             })
-            except: pass
+            except (OSError, json.JSONDecodeError) as e:
+                print(f"Error reading playlist {playlist_path}: {e}")
         return tracks
 
     def get_artist_tracks(self, artist):
@@ -216,13 +222,17 @@ class LibraryManager:
             try:
                 with open(cfg.RECENTS_FILE, 'r') as f:
                     self.recents = [Path(p) for p in json.load(f) if Path(p).exists()]
-            except: self.recents = []
+            except (OSError, json.JSONDecodeError):
+                self.recents = []
 
     def add_recent(self, path):
         if path in self.recents: self.recents.remove(path)
         self.recents.insert(0, path)
         if len(self.recents) > cfg.RECENTS_LIMIT: self.recents.pop()
-        with open(cfg.RECENTS_FILE, 'w') as f: json.dump([str(p) for p in self.recents], f)
+        try:
+            with open(cfg.RECENTS_FILE, 'w') as f: json.dump([str(p) for p in self.recents], f)
+        except OSError as e:
+            print(f"Error saving recents: {e}")
 
     def load_favs(self):
         if cfg.FAVS_FILE.exists():
@@ -237,7 +247,8 @@ class LibraryManager:
                         self.fav_tracks = set(d.get('tracks', []))
                         self.fav_albums = set(d.get('albums', []))
                         self.fav_artists = set(d.get('artists', []))
-            except: pass
+            except (OSError, json.JSONDecodeError) as e:
+                print(f"Error loading favorites: {e}")
 
     def toggle_fav_track(self, path_str):
         if path_str in self.fav_tracks: self.fav_tracks.remove(path_str)
