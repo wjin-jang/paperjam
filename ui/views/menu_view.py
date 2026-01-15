@@ -10,9 +10,19 @@ from ui.graphics import create_dithered_strip
 class MenuViewRenderer(RenderBase):
     """Renderer for menu views."""
 
-    def render_menu(self, title, items, sel_idx, scroll_idx):
-        """Render a menu with title and items."""
+    def render_menu(self, title, items, sel_idx, scroll_idx, info_indices=None):
+        """Render a menu with title and items.
+
+        Args:
+            title: Menu title
+            items: List of menu items
+            sel_idx: Selected index (-1 for no selection)
+            scroll_idx: Scroll offset
+            info_indices: List of indices that are info-only (non-selectable, rendered as columns)
+        """
         self.clear()
+        if info_indices is None:
+            info_indices = []
 
         box_w = 160
         full_content_h = (len(items) * cfg.ROW_HEIGHT) + cfg.ROW_HEIGHT
@@ -37,10 +47,38 @@ class MenuViewRenderer(RenderBase):
                 break
             draw_h = min(cfg.ROW_HEIGHT, remaining_h)
 
-            is_selected = (sel_idx == scroll_idx + i)
+            abs_idx = scroll_idx + i
+            is_selected = (sel_idx == abs_idx)
             text = item_obj if isinstance(item_obj, str) else item_obj.get('name', str(item_obj))
 
-            self.draw_text_box(text, box_x, y_pos, item_draw_w, draw_h, invert=is_selected, center=False)
+            # Info items: render as columns if contains ":"
+            if abs_idx in info_indices and ':' in text:
+                # Split on first colon, then further split right side on commas for multiple columns
+                parts = text.split(':', 1)
+                label = parts[0].strip()
+                right_text = parts[1].strip() if len(parts) > 1 else ''
+                right_cols = [c.strip() for c in right_text.split(',')] if ',' in right_text else [right_text]
+
+                # Calculate widths for right columns
+                right_widths = []
+                for col in right_cols:
+                    col_w = max(20, len(col) * 6 + 8)
+                    right_widths.append(col_w)
+
+                total_right = sum(right_widths)
+                label_w = item_draw_w - total_right
+
+                # Render label (left column)
+                self.draw_text_box(label, box_x, y_pos, label_w, draw_h, invert=False, center=False)
+
+                # Render right columns
+                col_x = box_x + label_w
+                for i, col in enumerate(right_cols):
+                    col_w = right_widths[i]
+                    self.draw_text_box(col, col_x, y_pos, col_w, draw_h, invert=False, center=True)
+                    col_x += col_w
+            else:
+                self.draw_text_box(text, box_x, y_pos, item_draw_w, draw_h, invert=is_selected, center=False)
 
         if needs_scrollbar:
             sb_h = avail_list_h

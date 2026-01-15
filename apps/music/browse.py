@@ -190,6 +190,15 @@ class BrowseHandler:
         actual_tracks = [t for t in tracks if t.get('type') != 'heading']
         track_count = f"{len(actual_tracks)} tracks"
         duration = format_duration(LibraryManager.get_total_duration(actual_tracks))
+
+        # Add pinned info item at the beginning
+        info_item = {
+            'type': 'info',
+            'pinned': True,
+            'columns': [track_count, duration]
+        }
+        tracks = [info_item] + tracks
+
         return str(artist), tracks, track_count, duration, cover
 
     def get_album_tracks(self, album: str) -> Tuple[str, List[dict], str, str, Optional[object]]:
@@ -198,11 +207,13 @@ class BrowseHandler:
         cover = None
         artist = ""
         year = ""
+        duration = ""
         if tracks:
             covers = get_cover(Path(tracks[0]['path']))
             cover = covers[0] if covers else None
             artist = tracks[0].get('artist', '')
-            year = str(tracks[0].get('year', ''))
+            year = str(tracks[0].get('year', '') or '')
+            duration = format_duration(LibraryManager.get_total_duration(tracks))
 
             # Check if album has multiple discs
             discs = set(t.get('disc', 1) for t in tracks)
@@ -220,6 +231,14 @@ class BrowseHandler:
                         })
                     tracks_with_headings.append(t)
                 tracks = tracks_with_headings
+
+        # Add pinned info item at the beginning
+        info_item = {
+            'type': 'info',
+            'pinned': True,
+            'columns': [artist, year, duration] if year else [artist, duration]
+        }
+        tracks = [info_item] + tracks
 
         return str(album), tracks, artist, year, cover
 

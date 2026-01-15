@@ -70,6 +70,41 @@ class MusicViewRenderer(RenderBase):
                 outline=cfg.BLACK
             )
 
+    def _render_info_columns(self, item, x, y, w, h):
+        """Render an info item with multiple columns.
+
+        Columns are sized to fit their content, with the first column
+        taking remaining space. Right columns are right-aligned.
+        """
+        columns = item.get('columns', [])
+        if not columns:
+            # Single text info item
+            name_str = sanitize_text(item.get('name', ''))
+            self.draw_text_box(name_str, x, y, w, h)
+            return
+
+        # Calculate width needed for each right column (all except first)
+        right_widths = []
+        for col_text in columns[1:]:
+            text = sanitize_text(str(col_text))
+            # ~6px per char + padding, minimum 20px
+            col_w = max(20, len(text) * 6 + 8)
+            right_widths.append(col_w)
+
+        # First column gets remaining space
+        total_right = sum(right_widths)
+        left_w = w - total_right
+
+        # Render first column (left-aligned)
+        self.draw_text_box(sanitize_text(str(columns[0])), x, y, left_w, h)
+
+        # Render right columns
+        col_x = x + left_w
+        for i, col_text in enumerate(columns[1:]):
+            col_w = right_widths[i]
+            self.draw_text_box(sanitize_text(str(col_text)), col_x, y, col_w, h, center=True)
+            col_x += col_w
+
     def render_scrollbar(self, total, current, page_size, x, y, h):
         """Render scrollbar."""
         if total <= page_size:
@@ -122,56 +157,50 @@ class MusicViewRenderer(RenderBase):
         header_text = "Scanning..." if state.is_scanning else state.album
         self.draw_panel(cfg.PANEL_X, cfg.PANEL_Y, cfg.PANEL_W, cfg.PANEL_H, header=header_text)
 
-        info_y = cfg.PANEL_Y + cfg.ROW_HEIGHT
-        if state.artist:
-            # Calculate year/duration box width - expand left in multiples of 4
-            base_year_w = 28
-            year_text = state.year or ""
-            # Estimate width: ~6px per character + padding
-            needed_w = len(year_text) * 6 + 8
-            # Round up to next multiple of 4, minimum base_year_w
-            year_w = max(base_year_w, ((needed_w + 3) // 4) * 4)
-            artist_w = cfg.PANEL_W - year_w
+        list_start_y = cfg.PANEL_Y + cfg.ROW_HEIGHT
 
-            self.draw_text_box(state.artist, cfg.PANEL_X, info_y, artist_w, 12)
-            self.draw_text_box(year_text, cfg.PANEL_X + artist_w, info_y, year_w, 12, center=True)
-            list_start_y = info_y + cfg.ROW_HEIGHT
-        else:
-            list_start_y = info_y
+        # Separate header, pinned, and scrollable items
+        header_items = [item for item in view_items if item.get('type') == 'header']
+        pinned_items = [item for item in view_items if item.get('pinned')]
+        scrollable_items = [item for item in view_items
+                           if item.get('type') != 'header' and not item.get('pinned')]
+
+        header_count = len(header_items)
+        pinned_count = len(pinned_items)
+        fixed_count = header_count + pinned_count
+
+        # Render header first
+        for item in header_items:
+            self.render_header_icons(list_start_y, state)
+            list_start_y += cfg.ROW_HEIGHT
+
+        # Render pinned info items (always visible below header)
+        for item in pinned_items:
+            self._render_info_columns(item, cfg.PANEL_X, list_start_y, cfg.PANEL_W, cfg.ROW_HEIGHT)
+            list_start_y += cfg.ROW_HEIGHT
 
         avail_h = (cfg.PANEL_Y + cfg.PANEL_H) - list_start_y
-        has_scrollbar = state.total_items * cfg.ROW_HEIGHT > avail_h
+        # Scrollbar based on scrollable items only
+        scrollable_total = state.total_items - fixed_count
+        has_scrollbar = scrollable_total * cfg.ROW_HEIGHT > avail_h
         item_w = 120 if has_scrollbar else 128
 
-        for i, item in enumerate(view_items):
+        for i, item in enumerate(scrollable_items):
             y_pos = list_start_y + (i * cfg.ROW_HEIGHT)
             remaining_h = (cfg.PANEL_Y + cfg.PANEL_H) - y_pos
             if remaining_h <= 0:
                 break
             draw_h = min(cfg.ROW_HEIGHT, remaining_h)
 
-            abs_idx = state.view_start_index + i
+            # Index accounts for header + pinned + scroll position
+            abs_idx = state.view_start_index + i + fixed_count
             is_selected = (abs_idx == state.selection_index)
 
             itype = item.get('type')
 
-            if itype == 'header':
-                self.render_header_icons(y_pos, state)
-                continue
-
             # Info items - non-selectable, can have columns
             if itype == 'info':
-                columns = item.get('columns', [])
-                if columns:
-                    # Render columns evenly distributed
-                    col_w = item_w // len(columns)
-                    for col_i, col_text in enumerate(columns):
-                        col_x = cfg.PANEL_X + 12 + (col_i * col_w)
-                        self.draw_text_box(sanitize_text(str(col_text)), col_x, y_pos, col_w, draw_h)
-                else:
-                    # Single text info item
-                    name_str = sanitize_text(item.get('name', ''))
-                    self.draw_text_box(name_str, cfg.PANEL_X, y_pos, item_w + 12, draw_h)
+                self._render_info_columns(item, cfg.PANEL_X, y_pos, item_w + 12, draw_h)
                 continue
 
             # Heading items - uppercase, white on black, inner box when selected
@@ -214,7 +243,9 @@ class MusicViewRenderer(RenderBase):
                     if 'icon' in item and item['icon'] == 'P':
                         icon_str = icons.get('playing', 'Ⓟ')
                     else:
-                        icon_str = f"{abs_idx}."
+                        # Use track number if available, otherwise use index
+                        track_num = item.get('track', 0)
+                        icon_str = f"{track_num}." if track_num else f"{abs_idx}."
                 else:
                     icon_str = item.get('icon', '★')
 
@@ -223,8 +254,10 @@ class MusicViewRenderer(RenderBase):
             self.draw_text_box(name_str, cfg.PANEL_X + 12, y_pos, item_w, draw_h, invert=is_selected)
 
         if has_scrollbar:
+            # Adjust scrollbar for header + pinned items
+            adjusted_selection = max(0, state.selection_index - fixed_count)
             self.render_scrollbar(
-                state.total_items, state.selection_index, state.page_size,
+                scrollable_total, adjusted_selection, state.page_size,
                 cfg.PANEL_X + cfg.PANEL_W - 8, list_start_y, avail_h + 1
             )
 

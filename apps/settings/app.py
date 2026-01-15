@@ -361,7 +361,8 @@ class SettingsApp:
             return self.renderer.render_menu("SETTINGS", self.main_menu, self.idx, 0)
 
         elif self.view == 'SUBMENU':
-            return self.renderer.render_menu(self.current_category, self.current_submenu, self.submenu_idx, 0)
+            info_indices = self._get_info_indices()
+            return self.renderer.render_menu(self.current_category, self.current_submenu, self.submenu_idx, 0, info_indices=info_indices)
 
         elif self.view == 'BT_SAVED':
             display_list = []

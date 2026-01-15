@@ -16,6 +16,8 @@ class PlayerState:
     album: str = "Library"
     artist: str = ""
     year: str = ""
+    duration: str = ""
+    track_count: str = ""
     has_header: bool = False
     is_playing: bool = False
     shuffle_active: bool = False
@@ -66,6 +68,8 @@ class PlayerState:
         self.items = []
         self.artist = ""
         self.year = ""
+        self.duration = ""
+        self.track_count = ""
         self.has_header = False
         self.browsing_cover_s = None
 

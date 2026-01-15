@@ -393,8 +393,9 @@ class MusicPlayerApp:
         self.state.has_header = True
         self.state.items = [{'type': 'header'}]
         for t in tracks:
-            # Pass through heading items as-is
-            if t.get('type') == 'heading':
+            item_type = t.get('type')
+            # Pass through heading and info items as-is
+            if item_type in ('heading', 'info'):
                 self.state.items.append(t)
                 continue
             # Convert track dicts to item format
@@ -405,7 +406,8 @@ class MusicPlayerApp:
                 'path': t.get('path'),
                 'icon': icon,
                 'artist': t.get('artist'),
-                'album': t.get('album')
+                'album': t.get('album'),
+                'track': t.get('track', 0)
             })
 
     def _open_context_menu(self, item):
@@ -575,17 +577,27 @@ class MusicPlayerApp:
         if self.state.screensaver_image:
             return self.renderer.render_screensaver(self.state)
 
-        current_list_y = cfg.PANEL_Y + cfg.ROW_HEIGHT
-        if self.state.artist:
-            current_list_y += cfg.ROW_HEIGHT
+        # Separate header, pinned items, and scrollable items
+        header_items = [item for item in self.state.items if item.get('type') == 'header']
+        pinned_items = [item for item in self.state.items if item.get('pinned')]
+        scrollable_items = [item for item in self.state.items
+                           if item.get('type') != 'header' and not item.get('pinned')]
+
+        pinned_count = len(pinned_items)
+        header_count = len(header_items)
+        fixed_count = header_count + pinned_count
+
+        current_list_y = cfg.PANEL_Y + cfg.ROW_HEIGHT + (pinned_count * cfg.ROW_HEIGHT)
         avail_h = (cfg.PANEL_Y + cfg.PANEL_H) - current_list_y
         self.state.page_size = max(1, avail_h // cfg.ROW_HEIGHT)
 
         page = self.state.page_size
-        sel = self.state.selection_index
+        # Selection index relative to scrollable items (after header + pinned)
+        sel = max(0, self.state.selection_index - fixed_count)
         start = (sel // page) * page
         self.state.view_start_index = start
 
-        view_items = self.state.items[start: start + page + 1]
+        # Order: header, pinned items, then slice of scrollable items
+        view_items = header_items + pinned_items + scrollable_items[start: start + page + 1]
 
         return self.renderer.render_music_view(self.state, view_items)
