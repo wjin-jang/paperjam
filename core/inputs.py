@@ -117,7 +117,10 @@ class InputHandler:
         now = time.time()
 
         # Keys that support long press
-        long_press_keys = [ecodes.KEY_ENTER, ecodes.KEY_KPENTER, ecodes.KEY_KPDOT, ecodes.KEY_BACKSPACE]
+        long_press_keys = [
+            ecodes.KEY_ENTER, ecodes.KEY_KPENTER, ecodes.KEY_KPDOT, ecodes.KEY_BACKSPACE,
+            ecodes.KEY_PLAYPAUSE, ecodes.KEY_P, ecodes.KEY_KP0, ecodes.KEY_PLAYCD, ecodes.KEY_PAUSECD
+        ]
 
         # 1. KEY DOWN: Start Timer
         if val == 1:
