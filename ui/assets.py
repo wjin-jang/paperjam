@@ -73,14 +73,12 @@ class AssetManager:
             'back': 'back.png',
             'shuffle': 'shuffle.png',
             'loop': 'loop.png',
-            'fav': 'heart.png'
+            'fav': 'heart.png',
+            'clear': 'trash.png'
         }
 
         for name, filename in icon_files.items():
             self._icons[name] = self._load_icon(name, filename)
-
-        # Manually create clear icon
-        self._icons['clear'] = self._create_clear_icon()
 
     def get_icon(self, name: str) -> Image.Image:
         """

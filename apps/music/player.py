@@ -507,12 +507,11 @@ class MusicPlayerApp:
                     count += 1
             
             if not manual_items and not auto_items:
-                self.state.items = [{'name': '(Queue Empty)', 'type': 'info'}]
+                self.state.items = [{'type': 'controls'}, {'name': '(Queue Empty)', 'type': 'info'}]
                 self.state.scrollable_items = self.state.items
             else:
-                self.state.items = manual_items + auto_items
-                # Add controls bar
-                self.state.items.append({'type': 'controls'})
+                # Add controls bar at the top
+                self.state.items = [{'type': 'controls'}] + manual_items + auto_items
                 self.state.scrollable_items = self.state.items
             
             self.state.album = "QUEUE"
