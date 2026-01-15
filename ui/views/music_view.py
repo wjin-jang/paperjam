@@ -62,7 +62,7 @@ class MusicViewRenderer(RenderBase):
                 icon = ImageOps.invert(icon.convert('L')).convert('1')
 
             self.draw.rectangle(
-                (bx + 1, y_pos + 1, bx + btn_w, y_pos + cfg.ROW_HEIGHT),
+                (bx, y_pos, bx + btn_w, y_pos + cfg.ROW_HEIGHT),
                 fill=cfg.BLACK if icon_inverted else cfg.WHITE,
                 outline=cfg.BLACK
             )
@@ -73,7 +73,7 @@ class MusicViewRenderer(RenderBase):
 
             if key == 'loop' and state.loop_mode == 2:
                 txt_col = cfg.BLACK if not icon_inverted else cfg.WHITE
-                self.draw.text((bx + 2, y_pos + 1), "1", font=cfg.FONT_MAIN, fill=txt_col)
+                self.draw.text((bx + 3, y_pos + 2), "1", font=cfg.FONT_MAIN, fill=txt_col)
 
             if draw_inner_box:
                 self.draw.rectangle(
