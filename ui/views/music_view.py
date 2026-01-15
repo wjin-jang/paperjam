@@ -184,7 +184,7 @@ class MusicViewRenderer(RenderBase):
         # Scrollbar based on scrollable items only
         scrollable_total = state.total_items - pinned_count
         has_scrollbar = scrollable_total * cfg.ROW_HEIGHT > avail_h
-        item_w = 120 if has_scrollbar else 128
+        item_w = cfg.PANEL_W-8 if has_scrollbar else cfg.PANEL_W
 
         for i, item in enumerate(scrollable_items):
             y_pos = list_start_y + (i * cfg.ROW_HEIGHT)
@@ -201,7 +201,7 @@ class MusicViewRenderer(RenderBase):
 
             # Controls bar - scrollable row with icons
             if itype == 'controls':
-                self.render_controls(y_pos, item_w + 8, state, is_selected)
+                self.render_controls(y_pos, item_w + 9, state, is_selected)
                 continue
 
             # Info items - non-selectable, can have columns
