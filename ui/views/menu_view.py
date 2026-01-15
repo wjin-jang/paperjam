@@ -112,8 +112,8 @@ class MenuViewRenderer:
         else:
             menu.cursor.row = -1  # No selection
 
-        # Set scroll offset
-        menu.scroll_offset = scroll_idx
+        # Set scroll offset (scroll_idx is a row index)
+        menu.set_scroll_to_row(scroll_idx)
 
         # Render panel to canvas
         panel.render(self.canvas)

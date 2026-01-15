@@ -53,7 +53,7 @@ class Menu:
         self.height = height
         self.items: List[Item] = []
         self.cursor = Cursor()
-        self.scroll_offset: int = 0  # Row offset for scrolling
+        self.scroll_offset: int = 0  # Pixel offset for scrolling
 
     def set_items(self, items: List[Item]):
         """Set menu items and reset cursor."""
@@ -79,6 +79,25 @@ class Menu:
     def needs_scrollbar(self) -> bool:
         """Check if menu needs a scrollbar."""
         return self.get_total_height() > self.height
+
+    def set_scroll_to_row(self, row_idx: int):
+        """Set scroll offset to show a specific row at the top.
+
+        Args:
+            row_idx: Row index to scroll to
+        """
+        if row_idx <= 0:
+            self.scroll_offset = 0
+            return
+
+        # Calculate pixel offset for the row
+        y = 0
+        for i, item in enumerate(self.items):
+            if i >= row_idx:
+                break
+            y += item.get_height()
+
+        self.scroll_offset = y
 
     # Navigation
 
@@ -185,13 +204,11 @@ class Menu:
         if not self.items or self.cursor.row < 0:
             return
 
-        # Calculate row positions
-        visible_rows = self.height // cfg.ROW_HEIGHT
+        # Calculate cursor item position in pixels
         y = 0
         for i, item in enumerate(self.items):
             h = item.get_height()
             if i == self.cursor.row:
-                # Found cursor row
                 row_top = y
                 row_bottom = y + h
                 break
@@ -199,15 +216,13 @@ class Menu:
         else:
             return
 
-        # Adjust scroll to keep cursor visible
-        scroll_y = self.scroll_offset * cfg.ROW_HEIGHT
-
-        if row_top < scroll_y:
-            # Scroll up
-            self.scroll_offset = row_top // cfg.ROW_HEIGHT
-        elif row_bottom > scroll_y + self.height:
-            # Scroll down
-            self.scroll_offset = (row_bottom - self.height) // cfg.ROW_HEIGHT + 1
+        # Adjust scroll to keep cursor visible (scroll_offset is in pixels)
+        if row_top < self.scroll_offset:
+            # Scroll up - align item top with viewport top
+            self.scroll_offset = row_top
+        elif row_bottom > self.scroll_offset + self.height:
+            # Scroll down - align item bottom with viewport bottom
+            self.scroll_offset = row_bottom - self.height
 
     def render(self) -> Image.Image:
         """Render menu items to a frame buffer.
@@ -218,10 +233,8 @@ class Menu:
         frame = Image.new('1', (self.width, self.height), cfg.WHITE)
         draw = ImageDraw.Draw(frame)
 
-        # Calculate visible range
-        scroll_y = self.scroll_offset * cfg.ROW_HEIGHT
-        current_y = 0
-        render_y = -scroll_y
+        # scroll_offset is in pixels
+        render_y = -self.scroll_offset
 
         for i, item in enumerate(self.items):
             h = item.get_height()
@@ -232,18 +245,12 @@ class Menu:
                 is_selected = (i == self.cursor.row)
                 selected_col = self.cursor.col if is_selected else -1
 
-                # Clip rendering to visible area
-                clip_y = max(0, render_y)
-                clip_h = min(h, self.height - clip_y)
+                item.render(
+                    draw, frame,
+                    x=0, y=render_y, w=self.width, h=h,
+                    selected=is_selected, selected_col=selected_col
+                )
 
-                if clip_h > 0:
-                    item.render(
-                        draw, frame,
-                        x=0, y=render_y, w=self.width, h=h,
-                        selected=is_selected, selected_col=selected_col
-                    )
-
-            current_y += h
             render_y += h
 
             # Stop if we're past visible area
@@ -369,17 +376,18 @@ class Panel:
         strip = create_dithered_strip(8, sb_h)
         canvas.paste(strip, (sb_x, sb_y))
 
-        # Calculate handle
+        # Calculate handle size and position
         total_h = self.menu.get_total_height()
         if total_h <= 0:
             return
 
+        # Handle size proportional to visible area
         visible_ratio = self.content_height / total_h
         handle_h = max(6, int(sb_h * visible_ratio))
 
-        scroll_y = self.menu.scroll_offset * cfg.ROW_HEIGHT
+        # Handle position based on scroll offset (already in pixels)
         max_scroll = max(1, total_h - self.content_height)
-        scroll_ratio = min(1.0, scroll_y / max_scroll)
+        scroll_ratio = min(1.0, self.menu.scroll_offset / max_scroll)
 
         handle_y = sb_y + int((sb_h - handle_h) * scroll_ratio)
 
