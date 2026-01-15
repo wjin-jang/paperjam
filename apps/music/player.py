@@ -113,13 +113,22 @@ class MusicPlayerApp:
 
         return was_active
 
+    def _sync_context_state(self):
+        """Sync context menu state to player state."""
+        self.state.context_menu_active = self.context_menu.active
+        self.state.context_options = self.context_menu.options
+        self.state.context_index = self.context_menu.index
+        self.state.context_target_item = self.context_menu.target_item
+        self.state.context_layer = self.context_menu.layer
+
     # --- Navigation Keys ---
     def nav_up(self):
         if self._wake_from_screensaver():
             return
 
         if self.state.context_menu_active:
-            self.state.context_index = nav_index_up(self.state.context_index, len(self.state.context_options))
+            self.context_menu.select_up()
+            self._sync_context_state()
         else:
             if not self.state.items:
                 return
@@ -130,7 +139,8 @@ class MusicPlayerApp:
             return
 
         if self.state.context_menu_active:
-            self.state.context_index = nav_index_down(self.state.context_index, len(self.state.context_options))
+            self.context_menu.select_down()
+            self._sync_context_state()
         else:
             if not self.state.items:
                 return
@@ -141,7 +151,15 @@ class MusicPlayerApp:
             return
 
         if self.state.context_menu_active:
-            self._handle_context_action()
+            nav_req = self.context_menu.execute_action(self.mode, self.refresh_list)
+            self._sync_context_state()
+            
+            if nav_req:
+                self.history.append((self.mode, self.current_path, self.state.selection_index))
+                self.mode = nav_req['mode']
+                self.current_path = nav_req['path']
+                self.state.selection_index = 0
+                self.refresh_list()
             return
 
         item = self.state.items[self.state.selection_index]
@@ -182,10 +200,8 @@ class MusicPlayerApp:
             return
 
         if self.state.context_menu_active:
-            if self.state.context_layer == 1:
-                self._open_context_menu(self.state.context_target_item)
-            else:
-                self.state.context_menu_active = False
+            self.context_menu.go_back()
+            self._sync_context_state()
             return
 
         if not self.history:
@@ -203,8 +219,10 @@ class MusicPlayerApp:
             return
 
         item = self.state.items[self.state.selection_index]
-        if item['type'] == 'file' or (self.mode == 'PLAYLISTS_ROOT' and item['type'] == 'playlist'):
-            self._open_context_menu(item)
+        # Allow context menu for artists and albums too now
+        if item['type'] in ['file', 'playlist', 'artist', 'album']:
+            self.context_menu.open(item)
+            self._sync_context_state()
 
     def toggle_play(self):
         if not self.state.screensaver_image:
@@ -428,73 +446,6 @@ class MusicPlayerApp:
                 'album': t.get('album'),
                 'track': t.get('track', 0)
             })
-
-    def _open_context_menu(self, item):
-        """Open context menu for an item."""
-        self.state.context_menu_active = True
-        self.state.context_index = 0
-        self.state.context_target_item = item
-        self.state.context_layer = 0
-
-        opts = []
-        if item['type'] == 'playlist':
-            opts = ["Delete Playlist", "Cancel"]
-        elif item['type'] == 'file':
-            opts = ["Favourite Song", "Add to Playlist"]
-            if item.get('artist'):
-                opts.append("Go to Artist")
-            if item.get('album'):
-                opts.append("Go to Album")
-            opts.append("Cancel")
-        self.state.context_options = opts
-
-    def _handle_context_action(self):
-        """Handle context menu action selection."""
-        idx = self.state.context_index
-        opt = self.state.context_options[idx]
-        target = self.state.context_target_item
-
-        if self.state.context_layer == 0:
-            if opt == "Cancel":
-                self.state.context_menu_active = False
-            elif opt == "Favourite Song":
-                self.lib.toggle_fav_track(str(target['path']))
-                self.state.context_menu_active = False
-                if self.mode == 'FAV_TRACKS_VIEW':
-                    self.refresh_list()
-            elif opt == "Delete Playlist":
-                self.lib.delete_playlist(target['path'])
-                self.state.context_menu_active = False
-                self.refresh_list()
-            elif opt == "Add to Playlist":
-                self.state.context_layer = 1
-                self.state.context_index = 0
-                pl_files = self.lib.get_playlists()
-                self.state.context_options = ["New Playlist"] + [f"Add to: {p.stem}" for p in pl_files]
-            elif opt == "Go to Artist":
-                self.state.context_menu_active = False
-                self.history.append((self.mode, self.current_path, self.state.selection_index))
-                self.mode = 'ARTIST_VIEW'
-                self.current_path = target['artist']
-                self.state.selection_index = 0
-                self.refresh_list()
-            elif opt == "Go to Album":
-                self.state.context_menu_active = False
-                self.history.append((self.mode, self.current_path, self.state.selection_index))
-                self.mode = 'ALBUM_VIEW'
-                self.current_path = target['album']
-                self.state.selection_index = 0
-                self.refresh_list()
-
-        elif self.state.context_layer == 1:
-            if opt == "New Playlist":
-                p = self.lib.create_playlist()
-                self.lib.add_to_playlist(p, target['path'])
-            else:
-                pl_name = opt.replace("Add to: ", "")
-                p = cfg.PLAYLIST_DIR / f"{pl_name}.json"
-                self.lib.add_to_playlist(p, target['path'])
-            self.state.context_menu_active = False
 
     def _play_screensaver_album(self):
         """Play the album shown on the screensaver."""

@@ -68,6 +68,13 @@ class LibraryManager:
         t.daemon = True
         t.start()
 
+    def _normalize_name(self, raw_name: str, case_map: dict) -> str:
+        """Normalize name while preserving first-seen case."""
+        key = raw_name.strip().lower()
+        if key not in case_map:
+            case_map[key] = raw_name
+        return case_map[key]
+
     def _scan_worker(self):
         temp_artists = {}
         temp_albums = {}
@@ -83,21 +90,9 @@ class LibraryManager:
 
                     track = extract_track_info(p)
 
-                    # 1. Normalize Artist
-                    raw_artist = track.artist
-                    art_key = raw_artist.strip().lower()
-
-                    if art_key not in artist_case_map:
-                        artist_case_map[art_key] = raw_artist
-                    canonical_artist = artist_case_map[art_key]
-
-                    # 2. Normalize Album
-                    raw_album = track.album
-                    alb_key = raw_album.strip().lower()
-
-                    if alb_key not in album_case_map:
-                        album_case_map[alb_key] = raw_album
-                    canonical_album = album_case_map[alb_key]
+                    # Normalize names
+                    canonical_artist = self._normalize_name(track.artist, artist_case_map)
+                    canonical_album = self._normalize_name(track.album, album_case_map)
 
                     data = {
                         'path': str(p),

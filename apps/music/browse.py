@@ -38,41 +38,41 @@ class BrowseHandler:
             {'name': 'Files', 'type': 'dir', 'mode': 'FILES', 'path': cfg.MUSIC_PATH, 'icon': icons['dir']}
         ]
 
-    def get_artists_list(self) -> Tuple[str, List[dict]]:
-        """Get list of all artists, organized alphabetically with headings."""
+    def _create_alphabetical_list(self, data_dict: dict, item_type: str, item_mode: str) -> List[dict]:
+        """Create a list with alphabetical headings if needed."""
         items = []
         current_letter = None
-        use_headings = len(self.lib.artists) > 24
+        use_headings = len(data_dict) > 24
 
-        for k in self.lib.artists.keys():
+        for k in data_dict.keys():
             if use_headings:
-                # Get first letter (uppercase)
                 first_char = k[0].upper() if k else '#'
                 if not first_char.isalpha():
                     first_char = '#'
-                # Add heading when letter changes
                 if first_char != current_letter:
                     current_letter = first_char
                     items.append({'name': first_char, 'type': 'heading'})
-            items.append({'name': k, 'type': 'artist', 'mode': 'ARTIST_VIEW'})
-        return "ARTISTS", items
+            items.append({'name': k, 'type': item_type, 'mode': item_mode})
+        return items
+
+    def _process_track_list(self, title: str, tracks: List[dict]) -> Tuple[str, List[dict], str, str, Optional[object]]:
+        """Helper to process a raw list of tracks into the view format."""
+        cover = None
+        if tracks:
+            covers = get_cover(Path(tracks[0]['path']))
+            cover = covers[0] if covers else None
+
+        track_count = f"{len(tracks)} tracks"
+        duration = format_duration(LibraryManager.get_total_duration(tracks))
+        return title, tracks, track_count, duration, cover
+
+    def get_artists_list(self) -> Tuple[str, List[dict]]:
+        """Get list of all artists, organized alphabetically with headings."""
+        return "ARTISTS", self._create_alphabetical_list(self.lib.artists, 'artist', 'ARTIST_VIEW')
 
     def get_albums_list(self) -> Tuple[str, List[dict]]:
         """Get list of all albums."""
-        items = []
-        current_letter = None
-        use_headings = len(self.lib.albums) > 24
-
-        for k in self.lib.albums.keys():
-            if use_headings:
-                first_char = k[0].upper() if k else '#'
-                if not first_char.isalpha():
-                    first_char = '#'
-                if first_char != current_letter:
-                    current_letter = first_char
-                    items.append({'name': first_char, 'type': 'heading'})
-            items.append({'name': k, 'type': 'album', 'mode': 'ALBUM_VIEW'})
-        return "ALBUMS", items
+        return "ALBUMS", self._create_alphabetical_list(self.lib.albums, 'album', 'ALBUM_VIEW')
 
     def get_fav_artists_list(self) -> Tuple[str, List[dict]]:
         """Get list of favorite artists."""
@@ -113,15 +113,8 @@ class BrowseHandler:
             Tuple of (title, tracks, track_count, duration, cover)
         """
         tracks = self.lib.get_all_tracks(shuffle=shuffle)
-        cover = None
-        if tracks:
-            covers = get_cover(Path(tracks[0]['path']))
-            cover = covers[0] if covers else None
-
         title = "SHUFFLE ALL" if shuffle else "ALL TRACKS"
-        track_count = f"{len(tracks)} Tracks"
-        duration = format_duration(LibraryManager.get_total_duration(tracks))
-        return title, tracks, track_count, duration, cover
+        return self._process_track_list(title, tracks)
 
     def get_recents_tracks(self) -> Tuple[str, List[dict], str, str, Optional[object]]:
         """
@@ -145,39 +138,17 @@ class BrowseHandler:
                         'path': p, 'title': p.stem, 'artist': None,
                         'year': None, 'album': None, 'duration': 0
                     })
-
-        cover = None
-        if tracks:
-            covers = get_cover(Path(tracks[0]['path']))
-            cover = covers[0] if covers else None
-
-        track_count = f"{len(tracks)} tracks"
-        duration = format_duration(LibraryManager.get_total_duration(tracks))
-        return "RECENTS", tracks, track_count, duration, cover
+        return self._process_track_list("RECENTS", tracks)
 
     def get_fav_tracks(self) -> Tuple[str, List[dict], str, str, Optional[object]]:
         """Get favorite tracks."""
         tracks = self.lib.get_fav_tracks_list()
-        cover = None
-        if tracks:
-            covers = get_cover(Path(tracks[0]['path']))
-            cover = covers[0] if covers else None
-
-        track_count = f"{len(tracks)} tracks"
-        duration = format_duration(LibraryManager.get_total_duration(tracks))
-        return "FAVOURITES", tracks, track_count, duration, cover
+        return self._process_track_list("FAVOURITES", tracks)
 
     def get_playlist_tracks(self, playlist_path: Path) -> Tuple[str, List[dict], str, str, Optional[object]]:
         """Get tracks from a playlist."""
         tracks = self.lib.get_playlist_tracks(playlist_path)
-        cover = None
-        if tracks:
-            covers = get_cover(Path(tracks[0]['path']))
-            cover = covers[0] if covers else None
-
-        track_count = f"{len(tracks)} tracks"
-        duration = format_duration(LibraryManager.get_total_duration(tracks))
-        return playlist_path.stem, tracks, track_count, duration, cover
+        return self._process_track_list(playlist_path.stem, tracks)
 
     def get_artist_tracks(self, artist: str) -> Tuple[str, List[dict], str, str, Optional[object]]:
         """Get tracks by an artist, organized by album with headings."""
