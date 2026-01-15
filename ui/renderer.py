@@ -6,6 +6,7 @@ from PIL import Image
 from ui.views.music_view import MusicViewRenderer
 from ui.views.menu_view import MenuViewRenderer
 from ui.views.screensaver_view import ScreensaverRenderer
+from ui.overlays import OverlayRenderer
 
 
 class UIRenderer:
@@ -20,6 +21,7 @@ class UIRenderer:
         self._music_view = MusicViewRenderer()
         self._menu_view = MenuViewRenderer()
         self._screensaver_view = ScreensaverRenderer()
+        self.overlays = OverlayRenderer()
 
     def render_volume(self, title, volume_level) -> Image.Image:
         """Render volume control view."""

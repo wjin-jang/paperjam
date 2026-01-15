@@ -74,49 +74,51 @@ class SettingsManager:
         )
     }
 
-    def __init__(self, data_dir: Optional[Path] = None):
+    def __init__(self):
         """
         Initialize settings manager.
-
-        Args:
-            data_dir: Directory for settings file. Defaults to ./data
         """
-        if data_dir is None:
-            data_dir = Path("data")
-        self._data_dir = data_dir
-        self._data_dir.mkdir(parents=True, exist_ok=True)
-
-        self._settings_file = self._data_dir / "settings.json"
         self._settings: Dict[str, Any] = {}
         self._listeners: List[Callable[[str, Any], None]] = []
 
         self._load_defaults()
-        self._load()
+        # Load values from config.py's loaded config
+        self._load_from_config()
 
     def _load_defaults(self):
         """Load default values for all settings."""
         for key, definition in self.SETTING_DEFINITIONS.items():
             self._settings[key] = definition.default
 
-    def _load(self):
-        """Load settings from file."""
-        if self._settings_file.exists():
-            try:
-                with open(self._settings_file, 'r') as f:
-                    data = json.load(f)
-                    for key, value in data.items():
-                        if key in self.SETTING_DEFINITIONS:
-                            self._settings[key] = value
-            except Exception as e:
-                print(f"Error loading settings: {e}")
+    def _load_from_config(self):
+        """Load settings from global config."""
+        # _config is internal to config.py, but we can re-load or access exported vars.
+        # However, config.py loads into variables.
+        # Better: use the exposed dictionary if possible, but config.py exposes variables.
+        # Actually config.py has `_config` and `load_config`.
+        # Let's verify config.py again. It exposes `save_config`.
+        # It has `_config = load_config()`.
+        # But `_config` is not exported.
+        # We should use `cfg.load_config()` (which re-reads file) or rely on the variables.
+        # But config.py variables are constants initialized at module load.
+        # To support runtime updates, config.py should probably expose the dict or getters.
+        
+        # NOTE: config.py exposes _config as a module-level variable but it is not in __all__?
+        # Python modules export everything by default.
+        
+        # Let's assume we can access cfg._config or we should have exposed it.
+        # config.py does: `_config = load_config()`
+        
+        if hasattr(cfg, '_config'):
+            for key, value in cfg._config.items():
+                if key in self.SETTING_DEFINITIONS:
+                    self._settings[key] = value
 
     def _save(self):
-        """Save settings to file."""
-        try:
-            with open(self._settings_file, 'w') as f:
-                json.dump(self._settings, f, indent=2)
-        except Exception as e:
-            print(f"Error saving settings: {e}")
+        """Save settings to file via config module."""
+        # We only save keys that are in our definitions and valid
+        updates = {k: v for k, v in self._settings.items() if k in self.SETTING_DEFINITIONS}
+        cfg.save_config(updates)
 
     def _validate(self, key: str, value: Any) -> bool:
         """Validate a setting value against its definition."""

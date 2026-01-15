@@ -139,16 +139,23 @@ Or via pip:
 pip install waveshare-epd
 ```
 
-### 9. Configure Music Path
+### 9. Configure PaperJam
 
-Edit `config.py`:
-```python
-MUSIC_PATH = Path("/home/pi/Music")
-```
+Run the installation script to interactively configure the music path.
 
-Or symlink:
-```bash
-ln -s /path/to/music ~/paperjam/music
+For manual configuration, create `~/.config/paperjam/config.json`:
+
+```json
+{
+    "music_path": "/home/pi/Music",
+    "screensaver_timeout": 60,
+    "long_press_duration": 0.5,
+    "recents_limit": 50,
+    "invert_colors": false,
+    "font_main": "BMmini.ttf",
+    "font_header": "Nintendo-DS-BIOS.ttf",
+    "font_icons": "Icons.ttf"
+}
 ```
 
 ### 10. Run Manually

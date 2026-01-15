@@ -115,9 +115,47 @@ ln -sf /usr/lib/python3/dist-packages/lgpio.py "$VENV_SITE/"
 ln -sf /usr/lib/python3/dist-packages/_lgpio*.so "$VENV_SITE/" 2>/dev/null || true
 echo "  Python dependencies installed"
 
+# --- Configuration ---
+echo
+echo "[7/8] Configuring PaperJam..."
+CONFIG_DIR="$HOME_DIR/.config/paperjam"
+mkdir -p "$CONFIG_DIR"
+CONFIG_FILE="$CONFIG_DIR/config.json"
+
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Creating configuration..."
+    
+    # Prompt for Music Path
+    read -p "Enter path to music directory (default: $HOME_DIR/Music): " INPUT_PATH
+    MUSIC_PATH=${INPUT_PATH:-"$HOME_DIR/Music"}
+    
+    # Create Python script to write JSON
+    $INSTALL_DIR/venv/bin/python3 -c "
+import json
+import os
+from pathlib import Path
+
+config = {
+    'music_path': '$MUSIC_PATH',
+    'screensaver_timeout': 60,
+    'long_press_duration': 0.5,
+    'recents_limit': 50,
+    'invert_colors': False
+}
+
+config_path = Path('$CONFIG_FILE')
+with open(config_path, 'w') as f:
+    json.dump(config, f, indent=4)
+
+print(f'Configuration saved to {config_path}')
+"
+else
+    echo "  Configuration already exists at $CONFIG_FILE"
+fi
+
 # --- Waveshare EPD Library ---
 echo
-echo "[7/8] Installing Waveshare e-Paper driver..."
+echo "[8/9] Installing Waveshare e-Paper driver..."
 if [ -d "lib/waveshare" ]; then
     echo "  Directory exists, pulling latest..."
     cd "lib/waveshare"
@@ -132,7 +170,7 @@ echo "  Waveshare driver installed"
 
 # --- Systemd Service ---
 echo
-echo "[8/8] Setting up auto-start service..."
+echo "[9/9] Setting up auto-start service..."
 
 mkdir -p "$HOME_DIR/.config/systemd/user"
 

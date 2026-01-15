@@ -1,144 +1,79 @@
 import time
 import sys
 import traceback
-import subprocess
-import os
-from PIL import Image, ImageOps, ImageDraw
+from PIL import Image
 
 import config as cfg
-
-
-def _git_pull_on_startup():
-    """Pull latest changes from git on startup."""
-    try:
-        # Get the directory where main.py is located
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        result = subprocess.run(
-            ["git", "pull", "--ff-only"],
-            cwd=script_dir,
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-        if result.returncode == 0:
-            output = result.stdout.strip()
-            if "Already up to date" not in output:
-                print(f"Git pull: {output}")
-        else:
-            print(f"Git pull failed: {result.stderr.strip()}")
-    except Exception as e:
-        print(f"Git pull error: {e}")
-
-
 from core.audio import AudioEngine
 from core.inputs import InputHandler
-from core.battery import get_battery_monitor
-from apps.music import MusicPlayerApp  # Now imports from the package
-from apps.settings import SettingsApp
+from core.system import SystemManager
+from core.logger import setup_logger
+from core.app_registry import AppRegistry
 from ui.renderer import UIRenderer
 
-try:
-    from waveshare_epd import epd2in13_V4
-    HAS_EPAPER = True
-except ImportError:
-    HAS_EPAPER = False
-    print("WARNING: E-Paper drivers not found. Running in headless/text mode.")
+from apps.music import MusicPlayerApp
+from apps.settings import SettingsApp
 
-class Launcher:
+logger = setup_logger()
+
+class MainApp:
     def __init__(self):
+        logger.info("Initializing PaperJam...")
+        
+        # Core Systems
+        self.sys = SystemManager()
         self.audio = AudioEngine()
         self.inputs = InputHandler()
-
-        self.music_app = MusicPlayerApp(self.audio, self.inputs)
-        self.settings_app = SettingsApp(self.music_app.lib, self.audio, self.inputs)
-        # Share settings manager with music player for endless playback feature
-        self.music_app.set_settings(self.settings_app.settings)
-        # Set callback for screen clear shutdown
-        self.settings_app.categories['SYSTEM'].set_screen_clear_callback(self._perform_screen_clear_shutdown)
-
         self.renderer = UIRenderer()
-        self.epd = self._init_hardware()
+        self.registry = AppRegistry()
 
-        # Set display callback for loading overlays
-        self.music_app.set_display_callback(lambda img: self._display(img))
+        # Apps
+        self.music_app = MusicPlayerApp(self.audio, self.inputs)
+        # Give settings app access to library
+        self.settings_app = SettingsApp(self.music_app.lib, self.audio, self.inputs)
+        
+        # Link settings to music app (for endless playback, etc)
+        self.music_app.set_settings(self.settings_app.settings)
+        
+        # Register Apps
+        self.music_app.name = "Music Player"
+        self.settings_app.name = "System Settings"
+        self.registry.register("music", self.music_app)
+        self.registry.register("settings", self.settings_app)
 
-        # Set volume callbacks for music player
-        self.music_app.set_volume_callbacks(
-            lambda: self.settings_app.categories['AUDIO'].set_volume(5),
-            lambda: self.settings_app.categories['AUDIO'].set_volume(-5)
-        )
-
-        self.apps = ["Music Player", "System Settings", "Reboot", "Shut Down"]
-        self.idx = 0
+        # UI State
         self.current_app = None
-        self.first_render = True
-
-        self.view = 'HOME'
+        self.view = 'HOME' # HOME, APP, CONFIRM
+        self.menu_idx = 0
         self.confirm_target = None
         self.confirm_idx = 0
-        self.input_lock_time = 0
+        
+        # Display/Overlay State
+        self.first_render = True
+        self.volume_display_time = 0
+        self.volume_display_duration = 1.5
 
-        self.inputs.set_callbacks(self._get_launcher_cb())
+        # Setup Global Callbacks
+        self.sys.on_shutdown_request = self._handle_shutdown_request
+        self.settings_app.categories['SYSTEM'].set_screen_clear_callback(self._perform_screen_clear_shutdown)
+        
+        # Music App Display Callback
+        self.music_app.set_display_callback(lambda img: self._display(img))
+        
+        # Volume Callbacks (Global)
+        self.music_app.set_volume_callbacks(self._vol_up, self._vol_down)
 
-        # Low battery shutdown
-        self._last_battery_check = 0
-        self._low_battery_threshold = 12  # Shutdown at 12% (lowest non-zero level)
+        # Initial Input Setup
+        self.inputs.set_callbacks(self._get_home_callbacks())
 
-        # Volume overlay
-        self._volume_display_time = 0
-        self._volume_display_duration = 1.5  # Show volume for 1.5 seconds
-
-        # First run check
-        self._is_first_run = self.music_app.lib.is_first_run()
-
-    def _init_hardware(self):
-        if HAS_EPAPER:
-            try:
-                epd = epd2in13_V4.EPD()
-                epd.init()
-                epd.Clear(0xFF)
-                return epd
-            except Exception as e:
-                print(f"EPD Init Error: {e}")
-        return None
-
-    def _check_low_battery(self):
-        """Check battery and shutdown if critically low."""
-        now = time.time()
-        if now - self._last_battery_check < 60:  # Check every 60 seconds
-            return
-        self._last_battery_check = now
-
-        battery = get_battery_monitor()
-        pct = battery.percentage
-        if pct >= 0 and pct <= self._low_battery_threshold and not battery.charging:
-            print(f"LOW BATTERY ({pct}%) - Initiating safe shutdown...")
-            self._perform_low_battery_shutdown()
-
-    def _perform_low_battery_shutdown(self):
-        """Perform safe shutdown due to low battery."""
-        frame = self.renderer.render_menu("LOW BATTERY", ["Shutting down..."], 0, 0)
-        # Show empty battery icon during low battery shutdown
-        frame = self._draw_battery(frame, show_empty=True)
-        self._display(frame, full_refresh=True, skip_battery=True, skip_status=True)
-        time.sleep(2)
-        if self.epd:
-            try:
-                self.epd.init()
-                self.epd.Clear(0xFF)
-                self.epd.sleep()
-            except:
-                pass
-        subprocess.run(["sudo", "shutdown", "now"])
+        # First Run
+        if self.music_app.lib.is_first_run():
+            self._run_first_startup()
 
     def _run_first_startup(self):
-        """Handle first startup: show welcome screen and scan library."""
-        print("First startup detected. Scanning library...")
-
-        # Start the scan
+        logger.info("First run detected")
         self.music_app.lib.scan_async(force=True)
-
-        # Show welcome screen while scanning
+        
         while self.music_app.lib.is_scanning:
             lib = self.music_app.lib
             items = [
@@ -146,362 +81,242 @@ class Launcher:
                 "read your library.",
                 "",
                 f"Tracks: {lib.scan_track_count}",
-                f"Albums: {lib.scan_album_count}",
-                f"Artists: {lib.scan_artist_count}",
+                f"Albums: {lib.scan_album_count}"
             ]
             if lib.scan_current_file:
                 items.append(f"{lib.scan_current_file[:24]}")
-
-            frame = self.renderer.render_menu("WELCOME TO PAPERJAM", items, -1, 0)
+            
+            frame = self.renderer.render_menu("WELCOME", items, -1, 0)
             self._display(frame, full_refresh=self.first_render)
-
             time.sleep(0.1)
-
-        # Scan complete - show final count briefly
-        lib = self.music_app.lib
-        items = [
-            "Library scan complete!",
-            "",
-            f"Tracks: {lib.get_total_tracks()}",
-            f"Albums: {len(lib.albums)}",
-            f"Artists: {len(lib.artists)}",
-        ]
-        frame = self.renderer.render_menu("WELCOME TO PAPERJAM", items, -1, 0)
-        self._display(frame, full_refresh=True)
-        time.sleep(2)
-
-        self._is_first_run = False
+        
         self.first_render = True
 
     def run(self):
-        print("System Ready. Entering main loop...")
-
-        # Handle first startup
-        if self._is_first_run:
-            self._run_first_startup()
-
+        logger.info("Entering main loop")
         try:
             while True:
-                if not self.inputs.check_inputs(): break
-                self._check_low_battery()
+                if not self.inputs.check_inputs():
+                    break
+                
+                self.sys.check_battery()
+                
                 frame = None
-
                 force_full = False
                 
-                try:
-                    # Check if volume overlay should be shown
-                    show_volume = time.time() - self._volume_display_time < self._volume_display_duration
+                # Check Overlays
+                show_volume = time.time() - self.volume_display_time < self.volume_display_duration
+                
+                # Update Running App
+                if self.current_app:
+                    is_running = False
+                    try:
+                        is_running = self.current_app.update()
+                    except Exception as e:
+                        logger.error(f"App Update Error: {e}")
+                        traceback.print_exc()
 
-                    if self.current_app:
-                        is_running = False
-                        if hasattr(self.current_app, 'update'):
-                            is_running = self.current_app.update()
+                    if hasattr(self.current_app, 'state') and getattr(self.current_app.state, 'needs_refresh', False):
+                        force_full = True
+                        self.current_app.state.needs_refresh = False
 
-                        if hasattr(self.current_app, 'state') and getattr(self.current_app.state, 'needs_refresh', False):
-                            force_full = True
-                            self.current_app.state.needs_refresh = False
-
-                        if not is_running:
-                            self.current_app = None
-                            self.view = 'HOME'
-                            self.inputs.set_callbacks(self._get_launcher_cb())
-                            self.first_render = True
-                        else:
-                            # Show volume overlay if recently changed, otherwise show app frame
-                            if show_volume and self.current_app != self.settings_app:
-                                volume = self.settings_app.categories['AUDIO'].volume_level
-                                frame = self.renderer.render_volume("VOLUME", volume)
-                            else:
-                                frame = self.current_app.get_frame()
+                    if not is_running:
+                        self.close_app()
                     else:
-                        if show_volume:
-                            volume = self.settings_app.categories['AUDIO'].volume_level
-                            frame = self.renderer.render_volume("VOLUME", volume)
-                        elif self.view == 'HOME':
-                            frame = self.renderer.render_menu("HOME MENU", self.apps, self.idx, 0)
-                        elif self.view == 'CONFIRM':
-                            title = f"CONFIRM {self.confirm_target}?"
-                            opts = ["No", "Yes"]
-                            frame = self.renderer.render_menu(title, opts, self.confirm_idx, 0)
+                        # Render App or Overlay
+                        if show_volume and self.current_app != self.settings_app:
+                            vol = self.settings_app.categories['AUDIO'].volume_level
+                            frame = self.renderer.render_volume("VOLUME", vol)
+                        else:
+                            frame = self.current_app.get_frame()
+                else:
+                    # Home Menu Logic
+                    if show_volume:
+                        vol = self.settings_app.categories['AUDIO'].volume_level
+                        frame = self.renderer.render_volume("VOLUME", vol)
+                    elif self.view == 'HOME':
+                        items = [n for _, n in self.registry.get_app_names()] + ["Reboot", "Shut Down"]
+                        frame = self.renderer.render_menu("HOME MENU", items, self.menu_idx, 0)
+                    elif self.view == 'CONFIRM':
+                        frame = self._render_confirm()
 
-                    if frame: self._display(frame, force_full)
+                if frame:
+                    self._display(frame, force_full)
 
-                except Exception as e:
-                    print(f"Runtime Error: {e}")
-                    traceback.print_exc()
-
+                # Background updates
                 if self.current_app != self.music_app:
                     self.music_app.update()
 
-                time.sleep(0.05) 
+                time.sleep(0.05)
 
         except KeyboardInterrupt:
-            print("Shutting down...")
+            logger.info("Keyboard Interrupt")
+        except Exception as e:
+            logger.critical(f"Critical Error: {e}")
+            traceback.print_exc()
         finally:
-            if self.epd: self.epd.sleep()
+            self.sys.sleep_display()
+
+    def launch_app(self, app_id):
+        app = self.registry.get_app(app_id)
+        if app:
+            logger.info(f"Launching app: {app_id}")
+            self.current_app = app
+            self.inputs.set_callbacks(app.get_callbacks())
+            if hasattr(app, 'on_enter'):
+                app.on_enter()
+            if hasattr(app, 'refresh_list'):
+                app.refresh_list()
+            self.first_render = True
+
+    def close_app(self):
+        if self.current_app:
+            if hasattr(self.current_app, 'on_exit'):
+                self.current_app.on_exit()
+        self.current_app = None
+        self.view = 'HOME'
+        self.inputs.set_callbacks(self._get_home_callbacks())
+        self.first_render = True
 
     def _vol_up(self):
-        """Global volume up handler."""
         self.settings_app.categories['AUDIO'].set_volume(5)
-        self._volume_display_time = time.time()
+        self.volume_display_time = time.time()
 
     def _vol_down(self):
-        """Global volume down handler."""
         self.settings_app.categories['AUDIO'].set_volume(-5)
-        self._volume_display_time = time.time()
+        self.volume_display_time = time.time()
 
-    def _get_launcher_cb(self):
+    # --- Home Menu Interaction ---
+    def _get_home_callbacks(self):
         return {
-            'up': lambda: setattr(self, 'idx', (self.idx - 1) % len(self.apps)),
-            'down': lambda: setattr(self, 'idx', (self.idx + 1) % len(self.apps)),
-            'enter': self._launch,
+            'up': lambda: setattr(self, 'menu_idx', (self.menu_idx - 1) % (len(self.registry.get_all_apps()) + 2)),
+            'down': lambda: setattr(self, 'menu_idx', (self.menu_idx + 1) % (len(self.registry.get_all_apps()) + 2)),
+            'enter': self._handle_home_selection,
             'vol_up': self._vol_up,
             'vol_down': self._vol_down
         }
 
-    def _get_confirm_cb(self):
+    def _handle_home_selection(self):
+        apps = self.registry.get_app_names()
+        count = len(apps)
+        
+        if self.menu_idx < count:
+            app_id, _ = apps[self.menu_idx]
+            self.launch_app(app_id)
+        elif self.menu_idx == count: # Reboot
+            self._start_confirm("REBOOT")
+        elif self.menu_idx == count + 1: # Shutdown
+            self._start_confirm("SHUTDOWN")
+
+    # --- Confirmation Dialog ---
+    def _start_confirm(self, target):
+        self.view = 'CONFIRM'
+        self.confirm_target = target
+        self.confirm_idx = 0
+        self.inputs.set_callbacks(self._get_confirm_callbacks())
+
+    def _get_confirm_callbacks(self):
         return {
             'up': lambda: setattr(self, 'confirm_idx', 1 - self.confirm_idx),
             'down': lambda: setattr(self, 'confirm_idx', 1 - self.confirm_idx),
-            'enter': self._handle_confirm_selection,
+            'enter': self._handle_confirm,
             'back': self._cancel_confirm,
             'vol_up': self._vol_up,
             'vol_down': self._vol_down
         }
 
-    def _launch(self):
-        name = self.apps[self.idx]
-        print(f"Launching: {name}")
-        
-        if name == "Music Player":
-            self.current_app = self.music_app
-            self.inputs.set_callbacks(self.music_app.get_callbacks())
-            self.music_app.refresh_list()
-            self.first_render = True 
-            
-        elif name == "System Settings":
-            self.current_app = self.settings_app
-            self.settings_app.running = True 
-            self.inputs.set_callbacks(self.settings_app.get_callbacks())
-            self.first_render = True 
+    def _render_confirm(self):
+        title = f"CONFIRM {self.confirm_target}?"
+        opts = ["No", "Yes"]
+        return self.renderer.render_menu(title, opts, self.confirm_idx, 0)
 
-        elif name == "Reboot":
-            self._start_confirmation("REBOOT")
-
-        elif name == "Shut Down":
-            self._start_confirmation("SHUTDOWN")
-
-    def _start_confirmation(self, target):
-        self.view = 'CONFIRM'
-        self.confirm_target = target
-        self.confirm_idx = 0 
-        self.input_lock_time = time.time() 
-        self.inputs.set_callbacks(self._get_confirm_cb())
-
-    def _handle_confirm_selection(self):
-        if time.time() - self.input_lock_time < 0.5:
-            return 
-
-        if self.confirm_idx == 1: 
+    def _handle_confirm(self):
+        if self.confirm_idx == 1:
             if self.confirm_target == "REBOOT":
-                self._perform_system_action("REBOOTING...", ["sudo", "reboot"])
+                self._perform_system_action("REBOOTING...", self.sys.reboot)
             elif self.confirm_target == "SHUTDOWN":
-                self._perform_shutdown()
+                self.sys.shutdown()
         else:
             self._cancel_confirm()
 
     def _cancel_confirm(self):
         self.view = 'HOME'
-        self.inputs.set_callbacks(self._get_launcher_cb())
+        self.inputs.set_callbacks(self._get_home_callbacks())
 
-    def _perform_system_action(self, message, command, clear_screen=True):
-        frame = self.renderer.render_menu("SYSTEM", [message], 0, 0)
+    def _perform_system_action(self, msg, action):
+        frame = self.renderer.render_menu("SYSTEM", [msg], 0, 0)
         self._display(frame, full_refresh=True)
-        time.sleep(2.5) 
-        if clear_screen and self.epd:
-            try:
-                self.epd.init()
-                self.epd.Clear(0xFF)
-                self.epd.sleep()
-            except: pass
-        subprocess.run(command)
+        time.sleep(2)
+        action()
 
-    def _perform_shutdown(self):
-        print("Initiating Shutdown Sequence...")
-        cover = self.music_app.lib.get_random_cover()
-        frame = self.renderer.render_shutdown(cover)
-        self._display(frame, full_refresh=True, skip_battery=True, skip_status=True)
-        time.sleep(3)
-        if self.epd:
-            try: self.epd.sleep()
-            except: pass
-        subprocess.run(["sudo", "shutdown", "now"])
+    def _handle_shutdown_request(self, reason="User Request"):
+        logger.info(f"Shutdown requested: {reason}")
+        if reason == "LOW BATTERY":
+             frame = self.renderer.render_menu("LOW BATTERY", ["Shutting down..."], 0, 0)
+             # Manually force draw battery empty
+             self._display(frame, full_refresh=True, skip_battery=False) 
+             time.sleep(2)
+        self.sys.shutdown()
 
     def _perform_screen_clear_shutdown(self):
-        """Clear the screen and shutdown - useful for screen removal/replacement."""
-        print("Clearing screen and shutting down...")
-        if self.epd:
-            try:
-                self.epd.init()
-                self.epd.Clear(0xFF)  # Clear to white
-                self.epd.sleep()
-            except Exception as e:
-                print(f"Screen clear error: {e}")
-        subprocess.run(["sudo", "shutdown", "now"])
+        logger.info("Clearing screen for shutdown")
+        self.sys.clear_display()
+        self.sys.shutdown()
 
-    def _is_audio_device_connected(self):
-        """Check if an external audio device (headphones, bluetooth) is connected."""
-        # Try PulseAudio first
-        try:
-            result = subprocess.check_output(
-                ["pactl", "get-default-sink"],
-                text=True, stderr=subprocess.DEVNULL, timeout=1
-            ).strip()
-            # Check if it's a bluetooth or USB device
-            if 'bluez' in result.lower() or 'usb' in result.lower() or 'headphone' in result.lower():
-                return True
-            # Also check if bluetooth audio is connected
-            bt_result = subprocess.check_output(
-                ["pactl", "list", "short", "sinks"],
-                text=True, stderr=subprocess.DEVNULL, timeout=1
-            )
-            if 'bluez' in bt_result.lower():
-                return True
-        except Exception:
-            pass
-        # Fallback: check if any bluetooth audio device is connected via bluetoothctl
-        try:
-            result = subprocess.check_output(
-                ["bluetoothctl", "info"],
-                text=True, stderr=subprocess.DEVNULL, timeout=1
-            )
-            if 'Connected: yes' in result and ('audio' in result.lower() or 'headset' in result.lower()):
-                return True
-        except Exception:
-            pass
-        return False
-
-    def _is_wifi_connected(self):
-        """Check if WiFi is connected."""
-        try:
-            # Check if wlan0 has an IP address
-            result = subprocess.check_output(
-                ["iwgetid", "-r"],
-                text=True, stderr=subprocess.DEVNULL, timeout=1
-            ).strip()
-            return len(result) > 0
-        except Exception:
-            pass
-        return False
-
-    def _is_bluetooth_enabled(self):
-        """Check if Bluetooth is enabled (not soft-blocked)."""
-        try:
-            result = subprocess.check_output(
-                ["rfkill", "list", "bluetooth"],
-                text=True, stderr=subprocess.DEVNULL, timeout=1
-            )
-            return "Soft blocked: no" in result
-        except Exception:
-            pass
-        return False
-
-    def _draw_status_icons(self, img):
-        """Draw status icons (headphones, wifi, bluetooth) on top left corner."""
-        if not cfg.FONT_ICONS:
-            return img
-
-        icons = ""
-        # H = Headphones (audio device connected)
-        if self._is_audio_device_connected():
-            icons += "H"
-        # W = WiFi connected
-        if self._is_wifi_connected():
-            icons += "W"
-        # B = Bluetooth enabled
-        if self._is_bluetooth_enabled():
-            icons += "B"
-
-        if icons:
-            draw = ImageDraw.Draw(img)
-            x = 8  # Padding from left
-            y = 0
-            draw.text((x, y), icons, font=cfg.FONT_ICONS, fill=cfg.BLACK)
-
-        return img
-
-    def _draw_battery(self, img, show_empty=False):
-        """Overlay battery icon on top right corner.
-
-        Args:
-            img: Image to draw on
-            show_empty: If True, allow showing icon 0 (empty battery).
-                       Otherwise minimum icon is 1.
-        """
-        battery = get_battery_monitor()
-        pct = battery.percentage
-        if pct < 0:
-            return img
-
-        # Use battery icon font if available
-        if cfg.FONT_ICONS:
-            # Map percentage to icon 0-8
-            icon_num = min(8, max(0, round(pct / 12.5)))
-            # Don't show empty battery icon (0) unless explicitly allowed
-            # (e.g., during safe shutdown)
-            if not show_empty and icon_num == 0:
-                icon_num = 1
-            icon = str(icon_num)
-            if battery.charging:
-                icon = "C" + icon
-
-            draw = ImageDraw.Draw(img)
-            bbox = draw.textbbox((0, 0), icon, font=cfg.FONT_ICONS)
-            text_w = bbox[2] - bbox[0]
-            x = cfg.SCREEN_WIDTH - text_w - 8
-            y = 0
-
-            draw.text((x, y), icon, font=cfg.FONT_ICONS, fill=cfg.BLACK)
-        else:
-            # Fallback to text
-            text = battery.get_display_text()
-            if not text:
-                return img
-
-            draw = ImageDraw.Draw(img)
-            bbox = draw.textbbox((0, 0), text, font=cfg.FONT_MAIN)
-            text_w = bbox[2] - bbox[0]
-            x = cfg.SCREEN_WIDTH - text_w - 4
-            y = 0
-
-            draw.text((x, y), text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
-
-        return img
-
+    # --- Display Wrapper ---
     def _display(self, img, full_refresh=False, skip_battery=False, skip_status=False):
-        # Overlay status icons (headphones, wifi, bluetooth) on top left
+        # Apply Overlays
         if not skip_status:
-            img = self._draw_status_icons(img)
-        # Overlay battery indicator on top right
+            img = self.renderer.overlays.draw_status_icons(
+                img, 
+                self._check_audio_device(), 
+                self._check_wifi(), 
+                self._check_bluetooth()
+            )
         if not skip_battery:
-            img = self._draw_battery(img)
-
-        # Invert colors if enabled
+            img = self.renderer.overlays.draw_battery(img)
+            
         if self.settings_app.invert_colors:
+            from PIL import ImageOps
             img = ImageOps.invert(img.convert('L')).convert('1')
 
-        if self.epd:
+        epd = self.sys.get_display()
+        if epd:
             try:
-                buffer = self.epd.getbuffer(img.rotate(180))
+                buffer = epd.getbuffer(img.rotate(180))
                 if self.first_render or full_refresh:
-                    self.epd.init()
-                    self.epd.displayPartBaseImage(buffer)
+                    epd.init()
+                    epd.displayPartBaseImage(buffer)
                     self.first_render = False
                 else:
-                    self.epd.displayPartial(buffer)
+                    epd.displayPartial(buffer)
             except Exception as e:
-                print(f"Display Error: {e}")
+                logger.error(f"Display Error: {e}")
+
+    # --- System Checks (Helpers) ---
+    def _check_audio_device(self):
+        # This could be moved to SystemManager too
+        import subprocess
+        try:
+            r = subprocess.check_output(["pactl", "get-default-sink"], text=True, stderr=subprocess.DEVNULL).strip()
+            if any(x in r.lower() for x in ['bluez', 'usb', 'headphone']): return True
+        except: pass
+        return False
+
+    def _check_wifi(self):
+        import subprocess
+        try:
+            r = subprocess.check_output(["iwgetid", "-r"], text=True, stderr=subprocess.DEVNULL).strip()
+            return len(r) > 0
+        except: return False
+
+    def _check_bluetooth(self):
+        import subprocess
+        try:
+            r = subprocess.check_output(["rfkill", "list", "bluetooth"], text=True, stderr=subprocess.DEVNULL)
+            return "Soft blocked: no" in r
+        except: return False
 
 if __name__ == "__main__":
-    _git_pull_on_startup()
-    Launcher().run()
+    app = MainApp()
+    app.run()
