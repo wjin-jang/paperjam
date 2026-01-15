@@ -29,7 +29,7 @@ class MusicViewRenderer(RenderBase):
         icon_keys = ['back', 'shuffle', 'loop', 'fav']
 
         for b_i, key in enumerate(icon_keys):
-            bx = cfg.PANEL_X + (b_i * btn_w)
+            bx = cfg.PANEL_X + (b_i * btn_w) + 1
             is_active = False
 
             if key == 'shuffle' and state.shuffle_active:
@@ -60,7 +60,7 @@ class MusicViewRenderer(RenderBase):
             if icon_inverted:
                 icon = ImageOps.invert(icon.convert('L')).convert('1')
 
-            ix = bx + (btn_w - icon.width) // 2 + 1
+            ix = bx + (btn_w - icon.width) // 2
             iy = y_pos + (12 - icon.height) // 2
             self.canvas.paste(icon, (ix, iy), mask=icon if not icon_inverted else None)
 
@@ -184,7 +184,7 @@ class MusicViewRenderer(RenderBase):
         # Scrollbar based on scrollable items only
         scrollable_total = state.total_items - pinned_count
         has_scrollbar = scrollable_total * cfg.ROW_HEIGHT > avail_h
-        item_w = cfg.PANEL_W-8 if has_scrollbar else cfg.PANEL_W
+        item_w = cfg.PANEL_W - 16 if has_scrollbar else cfg.PANEL_W - 8
 
         for i, item in enumerate(scrollable_items):
             y_pos = list_start_y + (i * cfg.ROW_HEIGHT)
