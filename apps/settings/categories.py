@@ -135,13 +135,15 @@ class AudioCategory(SettingsCategory):
         """Get the display name of the current audio output."""
         if self._audio_sinks and 0 <= self._current_sink_index < len(self._audio_sinks):
             return self._audio_sinks[self._current_sink_index]['display']
-        return "Default"
+        return "None"
 
     def _cycle_audio_output(self) -> str:
         """Cycle to the next audio output device."""
         self._refresh_audio_sinks()
-        if not self._audio_sinks or len(self._audio_sinks) <= 1:
-            return self._audio_sinks[0]['display'] if self._audio_sinks else "Default"
+        if not self._audio_sinks:
+            return "None"
+        if len(self._audio_sinks) == 1:
+            return self._audio_sinks[0]['display']
 
         # Cycle to next sink
         self._current_sink_index = (self._current_sink_index + 1) % len(self._audio_sinks)
@@ -177,14 +179,19 @@ class AudioCategory(SettingsCategory):
     def build_menu(self) -> List[str]:
         self._refresh_audio_sinks()
         output_name = self._get_current_output_name()
+        num_outputs = len(self._audio_sinks)
         endless = self.settings.get('endless_playback', False)
         endless_state = "ON" if endless else "OFF"
         return [
+            f"Outputs: {num_outputs} available",
             f"Output: {output_name}",
             "Volume",
             f"Endless Play: {endless_state}",
             "Bluetooth Manager"
         ]
+
+    def get_info_indices(self) -> List[int]:
+        return [0]  # Output count is info-only
 
     def handle_action(self, item_index: int) -> Optional[str]:
         item_text = self.items[item_index]
@@ -194,7 +201,7 @@ class AudioCategory(SettingsCategory):
         elif "Volume" in item_text:
             self._init_volume()
             return 'VOLUME'
-        elif "Output" in item_text:
+        elif item_text.startswith("Output:"):
             new_output = self._cycle_audio_output()
             self.items[item_index] = f"Output: {new_output}"
             return None
@@ -220,16 +227,17 @@ class LibraryCategory(SettingsCategory):
     def build_menu(self) -> List[str]:
         status = " (Scanning...)" if self.lib.is_scanning else ""
         recents_limit = self.settings.get('recents_limit', 50)
+        tracks = self.lib.get_total_tracks()
+        albums = len(self.lib.albums)
+        artists = len(self.lib.artists)
         return [
+            f"Tracks: {tracks}{status}, Albums: {albums}, Artists: {artists}",
             "Reload Library",
-            f"Recents Limit: {recents_limit}",
-            f"Tracks: {self.lib.get_total_tracks()}{status}",
-            f"Albums: {len(self.lib.albums)}",
-            f"Artists: {len(self.lib.artists)}"
+            f"Recents Limit: {recents_limit}"
         ]
 
     def get_info_indices(self) -> List[int]:
-        return [2, 3, 4]  # Tracks, Albums, Artists are info-only
+        return [0]  # Stats line is info-only
 
     def handle_action(self, item_index: int) -> Optional[str]:
         item_text = self.items[item_index]
@@ -440,27 +448,30 @@ class NetworkCategory(SettingsCategory):
     def build_menu(self) -> List[str]:
         wifi_state = "ON" if self._is_wifi_enabled() else "OFF"
         bt_state = "ON" if self._is_bt_enabled() else "OFF"
+        wifi_info = self._get_wifi_info()
+        bt_info = self._get_bt_status()
         return [
-            f"WiFi: {wifi_state}",
-            f"  {self._get_wifi_info()}",
+            f"WiFi: {wifi_info}",
+            f"Bluetooth: {bt_info}",
+            f"Toggle WiFi: {wifi_state}",
             "WiFi Networks",
-            f"Bluetooth: {bt_state}",
-            f"  {self._get_bt_status()}"
+            f"Toggle BT: {bt_state}"
         ]
 
     def get_info_indices(self) -> List[int]:
-        return [1, 4]  # WiFi info and BT status are info-only
+        return [0, 1]  # WiFi info and BT status at top are info-only
 
     def handle_action(self, item_index: int) -> Optional[str]:
-        if item_index == 0:
+        item_text = self.items[item_index]
+
+        if item_text.startswith("Toggle WiFi"):
             self._toggle_wifi()
             self.refresh()
-        elif item_index == 2:
-            # WiFi Networks menu
+        elif "WiFi Networks" in item_text:
             self.wifi_networks = self.get_known_wifi_networks()
             self.wifi_idx = 0
             return 'WIFI_NETWORKS'
-        elif item_index == 3:
+        elif item_text.startswith("Toggle BT"):
             self._toggle_bt()
             self.refresh()
         return None
@@ -517,17 +528,17 @@ class SystemCategory(SettingsCategory):
         long_press = self.settings.get('long_press_duration', 0.5)
         cpu_gov = self._get_cpu_governor()
         cpu_mode = "Powersave" if cpu_gov == "powersave" else "Normal"
+        disk = self._get_disk_usage()
         return [
+            f"Disk: {disk}, Version: {cfg.VERSION}",
             f"CPU Mode: {cpu_mode}",
-            self._get_disk_usage(),
             f"Long Press: {long_press}s",
-            f"Version {cfg.VERSION}",
             "Restart System",
             "Clear Screen + Shut Down"
         ]
 
     def get_info_indices(self) -> List[int]:
-        return [1, 3]  # Disk usage and Version are info-only
+        return [0]  # Disk/Version line is info-only
 
     def handle_action(self, item_index: int) -> Optional[str]:
         item_text = self.items[item_index]

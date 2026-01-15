@@ -12,13 +12,20 @@ from core.metadata import sanitize_text
 class MusicViewRenderer(RenderBase):
     """Renderer for music player view."""
 
-    def render_header_icons(self, y_pos, state):
-        """Render the header icon bar."""
+    def render_controls(self, y_pos, w, state, is_selected):
+        """Render the controls bar with icons.
+
+        Args:
+            y_pos: Y position to render at
+            w: Width of the controls bar
+            state: Player state
+            is_selected: Whether this item is currently selected
+        """
         self.draw.rectangle(
-            (cfg.PANEL_X, y_pos, cfg.PANEL_X + cfg.PANEL_W, y_pos + cfg.ROW_HEIGHT),
+            (cfg.PANEL_X, y_pos, cfg.PANEL_X + w, y_pos + cfg.ROW_HEIGHT),
             fill=cfg.WHITE
         )
-        btn_w = 33
+        btn_w = w // 4
         icon_keys = ['back', 'shuffle', 'loop', 'fav']
 
         for b_i, key in enumerate(icon_keys):
@@ -35,7 +42,8 @@ class MusicViewRenderer(RenderBase):
                 elif state.fav_albums and state.album in state.fav_albums:
                     is_active = True
 
-            is_focused = (state.selection_index == state.view_start_index) and (state.top_bar_index == b_i)
+            # Button is focused when controls bar is selected AND this button is active
+            is_focused = is_selected and (state.controls_index == b_i)
 
             draw_inner_box = False
             icon_inverted = False
@@ -65,10 +73,12 @@ class MusicViewRenderer(RenderBase):
                     (bx + 2, y_pos + 2, bx + btn_w - 1, y_pos + cfg.ROW_HEIGHT - 1),
                     outline=cfg.WHITE
                 )
-            self.draw.rectangle(
-                (bx + btn_w, y_pos, bx + btn_w + 8, y_pos + cfg.ROW_HEIGHT),
-                outline=cfg.BLACK
-            )
+            # Draw separator between buttons (except last)
+            if b_i < 3:
+                self.draw.line(
+                    (bx + btn_w, y_pos + 2, bx + btn_w, y_pos + cfg.ROW_HEIGHT - 2),
+                    fill=cfg.BLACK
+                )
 
     def _render_info_columns(self, item, x, y, w, h):
         """Render an info item with multiple columns.
@@ -159,29 +169,20 @@ class MusicViewRenderer(RenderBase):
 
         list_start_y = cfg.PANEL_Y + cfg.ROW_HEIGHT
 
-        # Separate header, pinned, and scrollable items
-        header_items = [item for item in view_items if item.get('type') == 'header']
+        # Separate pinned and scrollable items
         pinned_items = [item for item in view_items if item.get('pinned')]
-        scrollable_items = [item for item in view_items
-                           if item.get('type') != 'header' and not item.get('pinned')]
+        scrollable_items = [item for item in view_items if not item.get('pinned')]
 
-        header_count = len(header_items)
         pinned_count = len(pinned_items)
-        fixed_count = header_count + pinned_count
 
-        # Render header first
-        for item in header_items:
-            self.render_header_icons(list_start_y, state)
-            list_start_y += cfg.ROW_HEIGHT
-
-        # Render pinned info items (always visible below header)
+        # Render pinned info items (always visible at top)
         for item in pinned_items:
             self._render_info_columns(item, cfg.PANEL_X, list_start_y, cfg.PANEL_W, cfg.ROW_HEIGHT)
             list_start_y += cfg.ROW_HEIGHT
 
         avail_h = (cfg.PANEL_Y + cfg.PANEL_H) - list_start_y
         # Scrollbar based on scrollable items only
-        scrollable_total = state.total_items - fixed_count
+        scrollable_total = state.total_items - pinned_count
         has_scrollbar = scrollable_total * cfg.ROW_HEIGHT > avail_h
         item_w = 120 if has_scrollbar else 128
 
@@ -192,15 +193,20 @@ class MusicViewRenderer(RenderBase):
                 break
             draw_h = min(cfg.ROW_HEIGHT, remaining_h)
 
-            # Index accounts for header + pinned + scroll position
-            abs_idx = state.view_start_index + i + fixed_count
+            # Index accounts for pinned + scroll position
+            abs_idx = state.view_start_index + i + pinned_count
             is_selected = (abs_idx == state.selection_index)
 
             itype = item.get('type')
 
+            # Controls bar - scrollable row with icons
+            if itype == 'controls':
+                self.render_controls(y_pos, item_w + 8, state, is_selected)
+                continue
+
             # Info items - non-selectable, can have columns
             if itype == 'info':
-                self._render_info_columns(item, cfg.PANEL_X, y_pos, item_w + 12, draw_h)
+                self._render_info_columns(item, cfg.PANEL_X, y_pos, item_w + 8, draw_h)
                 continue
 
             # Heading items - uppercase, white on black, inner box when selected
@@ -208,16 +214,16 @@ class MusicViewRenderer(RenderBase):
                 name_str = sanitize_text(item.get('name', '')).upper()
                 # Draw black background
                 self.draw.rectangle(
-                    (cfg.PANEL_X, y_pos, cfg.PANEL_X + item_w + 12, y_pos + draw_h - 1),
+                    (cfg.PANEL_X, y_pos, cfg.PANEL_X + item_w + 8, y_pos + draw_h - 1),
                     fill=cfg.BLACK
                 )
                 # Draw white text
-                self.draw_text_box(name_str, cfg.PANEL_X, y_pos, item_w + 12, draw_h,
+                self.draw_text_box(name_str, cfg.PANEL_X, y_pos, item_w + 8, draw_h,
                                    invert=True, center=False, font=cfg.FONT_MAIN)
                 # Draw inner box when selected
                 if is_selected:
                     self.draw.rectangle(
-                        (cfg.PANEL_X + 2, y_pos + 2, cfg.PANEL_X + item_w + 10, y_pos + draw_h - 2),
+                        (cfg.PANEL_X + 2, y_pos + 2, cfg.PANEL_X + item_w + 6, y_pos + draw_h - 2),
                         outline=cfg.WHITE
                     )
                 continue
@@ -251,11 +257,11 @@ class MusicViewRenderer(RenderBase):
 
             self.draw_text_box(icon_str, cfg.PANEL_X, y_pos, 12, draw_h, invert=is_selected, center=True)
             name_str = sanitize_text(item.get('title', item.get('name', '')))
-            self.draw_text_box(name_str, cfg.PANEL_X + 12, y_pos, item_w, draw_h, invert=is_selected)
+            self.draw_text_box(name_str, cfg.PANEL_X + 12, y_pos, item_w - 4, draw_h, invert=is_selected)
 
         if has_scrollbar:
-            # Adjust scrollbar for header + pinned items
-            adjusted_selection = max(0, state.selection_index - fixed_count)
+            # Adjust scrollbar for pinned items
+            adjusted_selection = max(0, state.selection_index - pinned_count)
             self.render_scrollbar(
                 scrollable_total, adjusted_selection, state.page_size,
                 cfg.PANEL_X + cfg.PANEL_W - 8, list_start_y, avail_h + 1

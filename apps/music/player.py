@@ -143,19 +143,22 @@ class MusicPlayerApp:
         if self.state.context_menu_active:
             self._handle_context_action()
             return
-        if self.state.has_header and self.state.selection_index == 0:
-            self._handle_header_action()
-            return
 
         item = self.state.items[self.state.selection_index]
+        item_type = item.get('type')
+
+        # Controls bar - handle button press
+        if item_type == 'controls':
+            self._handle_controls_action()
+            return
 
         # Clicking a heading jumps to the next heading
-        if item.get('type') == 'heading':
+        if item_type == 'heading':
             self.state.selection_index = find_next_heading(self.state.selection_index, self.state.items)
             return
 
         # Info items are non-interactive
-        if item.get('type') == 'info':
+        if item_type == 'info':
             return
 
         if item['type'] in ['playlist', 'dir', 'artist', 'album']:
@@ -222,9 +225,12 @@ class MusicPlayerApp:
         if from_user and not self.state.screensaver_image:
             self.last_input_time = time.time()
 
-        if from_user and not self.state.screensaver_image and self.state.has_header and self.state.selection_index == 0:
-            self.state.top_bar_index = min(3, self.state.top_bar_index + 1)
-            return
+        # Navigate controls bar buttons with next/prev when on controls item
+        if from_user and not self.state.screensaver_image:
+            item = self.state.items[self.state.selection_index] if self.state.items else None
+            if item and item.get('type') == 'controls':
+                self.state.controls_index = min(3, self.state.controls_index + 1)
+                return
 
         if not self.playlist.has_queue:
             return
@@ -248,9 +254,12 @@ class MusicPlayerApp:
         if not self.state.screensaver_image:
             self.last_input_time = time.time()
 
-        if not self.state.screensaver_image and self.state.has_header and self.state.selection_index == 0:
-            self.state.top_bar_index = max(0, self.state.top_bar_index - 1)
-            return
+        # Navigate controls bar buttons with next/prev when on controls item
+        if not self.state.screensaver_image:
+            item = self.state.items[self.state.selection_index] if self.state.items else None
+            if item and item.get('type') == 'controls':
+                self.state.controls_index = max(0, self.state.controls_index - 1)
+                return
 
         if not self.playlist.has_queue:
             return
@@ -389,10 +398,20 @@ class MusicPlayerApp:
         self.state.total_items = len(self.state.items)
 
     def _load_tracks(self, tracks):
-        """Convert track list to state items with header."""
-        self.state.has_header = True
-        self.state.items = [{'type': 'header'}]
-        for t in tracks:
+        """Convert track list to state items with controls bar."""
+        # Separate pinned items from the rest
+        pinned_items = [t for t in tracks if t.get('pinned')]
+        other_items = [t for t in tracks if not t.get('pinned')]
+
+        # Build items: pinned first, then controls bar, then tracks
+        self.state.items = list(pinned_items)
+        controls_idx = len(self.state.items)  # Index of controls bar
+        self.state.items.append({'type': 'controls'})
+
+        # Set initial selection to controls bar (first selectable item)
+        self.state.selection_index = controls_idx
+
+        for t in other_items:
             item_type = t.get('type')
             # Pass through heading and info items as-is
             if item_type in ('heading', 'info'):
@@ -546,9 +565,9 @@ class MusicPlayerApp:
 
         self._load_track(real_idx)
 
-    def _handle_header_action(self):
-        """Handle header bar button actions."""
-        idx = self.state.top_bar_index
+    def _handle_controls_action(self):
+        """Handle controls bar button actions."""
+        idx = self.state.controls_index
         if idx == 0:
             self.nav_back()
         elif idx == 1:
@@ -577,27 +596,24 @@ class MusicPlayerApp:
         if self.state.screensaver_image:
             return self.renderer.render_screensaver(self.state)
 
-        # Separate header, pinned items, and scrollable items
-        header_items = [item for item in self.state.items if item.get('type') == 'header']
+        # Separate pinned items and scrollable items
         pinned_items = [item for item in self.state.items if item.get('pinned')]
-        scrollable_items = [item for item in self.state.items
-                           if item.get('type') != 'header' and not item.get('pinned')]
+        scrollable_items = [item for item in self.state.items if not item.get('pinned')]
 
         pinned_count = len(pinned_items)
-        header_count = len(header_items)
-        fixed_count = header_count + pinned_count
 
+        # Calculate available height for scrollable content
         current_list_y = cfg.PANEL_Y + cfg.ROW_HEIGHT + (pinned_count * cfg.ROW_HEIGHT)
         avail_h = (cfg.PANEL_Y + cfg.PANEL_H) - current_list_y
         self.state.page_size = max(1, avail_h // cfg.ROW_HEIGHT)
 
         page = self.state.page_size
-        # Selection index relative to scrollable items (after header + pinned)
-        sel = max(0, self.state.selection_index - fixed_count)
+        # Selection index relative to scrollable items (after pinned)
+        sel = max(0, self.state.selection_index - pinned_count)
         start = (sel // page) * page
         self.state.view_start_index = start
 
-        # Order: header, pinned items, then slice of scrollable items
-        view_items = header_items + pinned_items + scrollable_items[start: start + page + 1]
+        # Order: pinned items first, then slice of scrollable items
+        view_items = pinned_items + scrollable_items[start: start + page + 1]
 
         return self.renderer.render_music_view(self.state, view_items)

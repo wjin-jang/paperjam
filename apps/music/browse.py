@@ -207,13 +207,11 @@ class BrowseHandler:
         cover = None
         artist = ""
         year = ""
-        duration = ""
         if tracks:
             covers = get_cover(Path(tracks[0]['path']))
             cover = covers[0] if covers else None
             artist = tracks[0].get('artist', '')
             year = str(tracks[0].get('year', '') or '')
-            duration = format_duration(LibraryManager.get_total_duration(tracks))
 
             # Check if album has multiple discs
             discs = set(t.get('disc', 1) for t in tracks)
@@ -236,7 +234,7 @@ class BrowseHandler:
         info_item = {
             'type': 'info',
             'pinned': True,
-            'columns': [artist, year, duration] if year else [artist, duration]
+            'columns': [artist, year] if year else [artist]
         }
         tracks = [info_item] + tracks
 

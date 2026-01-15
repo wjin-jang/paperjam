@@ -12,13 +12,10 @@ class PlayerState:
     items: List[dict] = field(default_factory=list)
     selection_index: int = 0
     view_start_index: int = 0
-    top_bar_index: int = 0
+    controls_index: int = 0  # Selected button in controls bar (0=back, 1=shuffle, 2=loop, 3=fav)
     album: str = "Library"
     artist: str = ""
     year: str = ""
-    duration: str = ""
-    track_count: str = ""
-    has_header: bool = False
     is_playing: bool = False
     shuffle_active: bool = False
     loop_mode: int = 0
@@ -68,9 +65,7 @@ class PlayerState:
         self.items = []
         self.artist = ""
         self.year = ""
-        self.duration = ""
-        self.track_count = ""
-        self.has_header = False
+        self.controls_index = 0
         self.browsing_cover_s = None
 
     def set_status_message(self, message: str, duration: float = 1.5):

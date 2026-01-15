@@ -106,7 +106,7 @@ cd paperjam
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
-pip install pillow mutagen python-vlc smbus2 evdev numpy spidev RPi.GPIO gpiozero
+pip install pillow mutagen python-vlc smbus2 evdev numpy spidev RPi.GPIO gpiozero pykakasi korean_romanizer
 
 # Symlink system lgpio into venv (can't be pip installed)
 ln -s /usr/lib/python3/dist-packages/lgpio.py ~/paperjam/venv/lib/python3.*/site-packages/
