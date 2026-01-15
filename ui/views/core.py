@@ -239,6 +239,8 @@ class Menu:
         frame = Image.new('1', (self.width, self.height), cfg.WHITE)
         draw = ImageDraw.Draw(frame)
 
+        draw.rectangle((0,0,self.width,self.height) outline=cfg.BLACK)
+
         # scroll_offset is in pixels
         render_y = -self.scroll_offset
 
@@ -375,12 +377,12 @@ class Panel:
             return
 
         sb_x = self.x + self.width - 8
-        sb_y = self.y + self.content_y + 1
+        sb_y = self.y + self.content_y - 1
         sb_h = self.content_height
         sb_w = 8
 
         # Dithered background
-        strip = create_dithered_strip(8, sb_h)
+        strip = create_dithered_strip(sb_w + 1, sb_h)
         canvas.paste(strip, (sb_x, sb_y))
 
         # Calculate handle size and position

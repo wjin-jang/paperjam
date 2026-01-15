@@ -282,7 +282,6 @@ class ImageItem(Item):
     def render(self, draw: ImageDraw.Draw, canvas: Image.Image,
                x: int, y: int, w: int, h: int,
                selected: bool = False, selected_col: int = -1):
-        draw.rectangle((x, y, x + w, y + h), outline=cfg.BLACK)
         """Render image item."""
         if self.image:
             # Paste image (assumes it's already sized correctly)
