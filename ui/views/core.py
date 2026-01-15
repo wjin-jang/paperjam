@@ -244,7 +244,7 @@ class Menu:
         frame = Image.new('1', (self.width, self.height), cfg.WHITE)
         draw = ImageDraw.Draw(frame)
 
-        draw.rectangle((0,0,self.width,self.height) outline=cfg.BLACK)
+        draw.rectangle((0,0,self.width,self.height), outline=cfg.BLACK)
 
         # scroll_offset is in pixels
         render_y = -self.scroll_offset
