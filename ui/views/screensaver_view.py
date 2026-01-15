@@ -36,10 +36,10 @@ class ScreensaverRenderer:
             panel.render(self.canvas)
         else:
             # Show album art in a panel
-            x = (cfg.SCREEN_WIDTH - img.width + 1) // 2
-            y = (cfg.SCREEN_HEIGHT - img.height + 1) // 2
+            x = (cfg.SCREEN_WIDTH - img.width) // 2
+            y = (cfg.SCREEN_HEIGHT - img.height) // 2
 
-            art_panel = Panel(x - 1, y - 1, img.width + 2, img.height + 2)
+            art_panel = Panel(x, y, img.width, img.height)
             art_menu = art_panel.create_menu()
             art_item = ImageItem(image=img)
             art_item.set_height(img.height)
@@ -50,8 +50,8 @@ class ScreensaverRenderer:
             raw_status = state.get_status_text()
             icon = cfg.STATUS_ICONS.get(raw_status, 'Ⓘ')
 
-            pw = cfg.ROW_HEIGHT + 2  # Add 2 for borders
-            ph = cfg.ROW_HEIGHT + 2
+            pw = cfg.ROW_HEIGHT
+            ph = cfg.ROW_HEIGHT
             px = x + img.width + 8
             py = y + img.height - ph
 

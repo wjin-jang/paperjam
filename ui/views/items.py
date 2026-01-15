@@ -285,7 +285,7 @@ class ImageItem(Item):
         """Render image item."""
         if self.image:
             # Paste image (assumes it's already sized correctly)
-            canvas.paste(self.image, (x + 1, y + 1))
+            canvas.paste(self.image, (x, y))
         else:
             # Show placeholder text
             placeholder_y = y + (h // 2) - (cfg.ROW_HEIGHT // 2)

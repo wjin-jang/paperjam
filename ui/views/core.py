@@ -331,14 +331,14 @@ class Panel:
 
         # Draw shadow (offset by 1 pixel)
         draw.rectangle(
-            (self.x + 1, self.y + 1,
+            (self.x, self.y,
              self.x + self.width + 1, self.y + self.height + 1),
             outline=cfg.BLACK
         )
 
         # Draw panel border and fill
         draw.rectangle(
-            (self.x, self.y, self.x + self.width, self.y + self.height),
+            (self.x - 1, self.y - 1, self.x + self.width, self.y + self.height),
             fill=cfg.WHITE, outline=cfg.BLACK
         )
 

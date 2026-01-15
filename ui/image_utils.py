@@ -56,7 +56,7 @@ def extract_cover_art(file_path: Path) -> Tuple[Optional[Image.Image], Optional[
         try:
             img_obj = Image.open(io.BytesIO(cover_bytes))
             final_small = dither_image(img_obj.copy(), target_size=(83, 83))
-            final_large = dither_image(img_obj.copy(), target_size=(111, 111))
+            final_large = dither_image(img_obj.copy(), target_size=(112, 112))
         except Exception:
             pass
 
