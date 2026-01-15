@@ -26,16 +26,26 @@ class LibraryManager:
         self.fav_tracks = set()
         self.fav_albums = set()
         self.fav_artists = set()
-        
+
         self.is_scanning = False
         self._lock = threading.Lock()
-        
+
+        # Scan progress tracking
+        self.scan_current_file = ""
+        self.scan_track_count = 0
+        self.scan_album_count = 0
+        self.scan_artist_count = 0
+
         cfg.DATA_DIR.mkdir(exist_ok=True)
         cfg.PLAYLIST_DIR.mkdir(parents=True, exist_ok=True)
-        
+
         self.load_recents()
         self.load_favs()
         self.load_cache()
+
+    def is_first_run(self) -> bool:
+        """Check if this is the first run (no cache file exists)."""
+        return not cfg.CACHE_FILE.exists()
 
     def load_cache(self):
         if cfg.CACHE_FILE.exists():
@@ -43,13 +53,17 @@ class LibraryManager:
                 with open(cfg.CACHE_FILE, 'r') as f:
                     data = json.load(f)
                     self._deserialize_library(data)
-            except: self.scan_async(force=True)
-        else:
-            self.scan_async(force=True)
+            except: pass  # Don't auto-scan, let main.py handle first-run
+        # Don't auto-scan here - let main.py handle welcome screen
 
     def scan_async(self, force=False):
         if self.is_scanning: return
         self.is_scanning = True
+        # Reset progress tracking
+        self.scan_current_file = ""
+        self.scan_track_count = 0
+        self.scan_album_count = 0
+        self.scan_artist_count = 0
         t = threading.Thread(target=self._scan_worker)
         t.daemon = True
         t.start()
@@ -64,6 +78,9 @@ class LibraryManager:
         for ext in cfg.VALID_EXTS:
             for p in cfg.MUSIC_PATH.rglob(f"*{ext}"):
                 try:
+                    # Update progress
+                    self.scan_current_file = p.name[:30]
+
                     track = extract_track_info(p)
 
                     # 1. Normalize Artist
@@ -95,13 +112,19 @@ class LibraryManager:
 
                     temp_artists.setdefault(canonical_artist, []).append(data)
                     temp_albums.setdefault(canonical_album, []).append(data)
+
+                    # Update counts
+                    self.scan_track_count += 1
+                    self.scan_album_count = len(temp_albums)
+                    self.scan_artist_count = len(temp_artists)
                 except: continue
-        
+
         with self._lock:
             self.artists = dict(sorted(temp_artists.items(), key=lambda x: x[0].lower()))
             self.albums = dict(sorted(temp_albums.items(), key=lambda x: x[0].lower()))
             self._save_cache()
-            
+
+        self.scan_current_file = ""
         self.is_scanning = False
 
     def _save_cache(self):

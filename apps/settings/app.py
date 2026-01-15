@@ -69,8 +69,6 @@ class SettingsApp:
             'NETWORK': NetworkCategory(self.settings),
             'SYSTEM': SystemCategory(self.settings)
         }
-        # Set popup handler for library category
-        self.categories['LIBRARY'].set_popup_handler(self._show_popup)
 
     def get_callbacks(self):
         return {

@@ -179,19 +179,14 @@ class AudioCategory(SettingsCategory):
     def build_menu(self) -> List[str]:
         self._refresh_audio_sinks()
         output_name = self._get_current_output_name()
-        num_outputs = len(self._audio_sinks)
         endless = self.settings.get('endless_playback', False)
         endless_state = "ON" if endless else "OFF"
         return [
-            f"Outputs: {num_outputs} available",
             f"Output: {output_name}",
             "Volume",
             f"Endless Play: {endless_state}",
             "Bluetooth Manager"
         ]
-
-    def get_info_indices(self) -> List[int]:
-        return [0]  # Output count is info-only
 
     def handle_action(self, item_index: int) -> Optional[str]:
         item_text = self.items[item_index]
@@ -219,33 +214,43 @@ class LibraryCategory(SettingsCategory):
     def __init__(self, settings_manager, library_manager):
         super().__init__("LIBRARY", settings_manager)
         self.lib = library_manager
-        self._show_popup: Optional[Callable] = None
-
-    def set_popup_handler(self, handler: Callable):
-        self._show_popup = handler
 
     def build_menu(self) -> List[str]:
-        status = " (Scanning...)" if self.lib.is_scanning else ""
         recents_limit = self.settings.get('recents_limit', 50)
-        tracks = self.lib.get_total_tracks()
-        albums = len(self.lib.albums)
-        artists = len(self.lib.artists)
-        return [
-            f"Tracks: {tracks}{status}, Albums: {albums}, Artists: {artists}",
-            "Reload Library",
-            f"Recents Limit: {recents_limit}"
-        ]
+
+        if self.lib.is_scanning:
+            # Show scan progress
+            return [
+                f"Scanning: {self.lib.scan_current_file}",
+                f"Tracks: {self.lib.scan_track_count}",
+                f"Albums: {self.lib.scan_album_count}",
+                f"Artists: {self.lib.scan_artist_count}",
+                f"Recents Limit: {recents_limit}"
+            ]
+        else:
+            # Show library stats
+            tracks = self.lib.get_total_tracks()
+            albums = len(self.lib.albums)
+            artists = len(self.lib.artists)
+            return [
+                f"Tracks: {tracks}",
+                f"Albums: {albums}",
+                f"Artists: {artists}",
+                "Rescan Library",
+                f"Recents Limit: {recents_limit}"
+            ]
 
     def get_info_indices(self) -> List[int]:
-        return [0]  # Stats line is info-only
+        if self.lib.is_scanning:
+            return [0, 1, 2, 3]  # All scan info is info-only
+        else:
+            return [0, 1, 2]  # Stats are info-only
 
     def handle_action(self, item_index: int) -> Optional[str]:
         item_text = self.items[item_index]
 
-        if "Reload Library" in item_text:
+        if "Rescan Library" in item_text:
             self.lib.scan_async(force=True)
-            if self._show_popup:
-                self._show_popup("Rescanning...")
         elif "Recents Limit" in item_text:
             self.settings.cycle('recents_limit')
             self.refresh()

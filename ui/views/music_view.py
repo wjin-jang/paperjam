@@ -60,7 +60,7 @@ class MusicViewRenderer(RenderBase):
             if icon_inverted:
                 icon = ImageOps.invert(icon.convert('L')).convert('1')
 
-            ix = bx + (btn_w - icon.width) // 2
+            ix = bx + (btn_w - icon.width) // 2 + 1
             iy = y_pos + (12 - icon.height) // 2
             self.canvas.paste(icon, (ix, iy), mask=icon if not icon_inverted else None)
 
@@ -201,7 +201,7 @@ class MusicViewRenderer(RenderBase):
 
             # Controls bar - scrollable row with icons
             if itype == 'controls':
-                self.render_controls(y_pos, item_w + 9, state, is_selected)
+                self.render_controls(y_pos, item_w + 8, state, is_selected)
                 continue
 
             # Info items - non-selectable, can have columns

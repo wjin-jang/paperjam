@@ -23,7 +23,7 @@ class Launcher:
     def __init__(self):
         self.audio = AudioEngine()
         self.inputs = InputHandler()
-        
+
         self.music_app = MusicPlayerApp(self.audio, self.inputs)
         self.settings_app = SettingsApp(self.music_app.lib, self.audio, self.inputs)
         # Share settings manager with music player for endless playback feature
@@ -42,17 +42,17 @@ class Launcher:
             lambda: self.settings_app.categories['AUDIO'].set_volume(5),
             lambda: self.settings_app.categories['AUDIO'].set_volume(-5)
         )
-        
+
         self.apps = ["Music Player", "System Settings", "Reboot", "Shut Down"]
         self.idx = 0
         self.current_app = None
         self.first_render = True
-        
+
         self.view = 'HOME'
         self.confirm_target = None
         self.confirm_idx = 0
         self.input_lock_time = 0
-        
+
         self.inputs.set_callbacks(self._get_launcher_cb())
 
         # Low battery shutdown
@@ -62,6 +62,9 @@ class Launcher:
         # Volume overlay
         self._volume_display_time = 0
         self._volume_display_duration = 1.5  # Show volume for 1.5 seconds
+
+        # First run check
+        self._is_first_run = self.music_app.lib.is_first_run()
 
     def _init_hardware(self):
         if HAS_EPAPER:
@@ -103,8 +106,55 @@ class Launcher:
                 pass
         subprocess.run(["sudo", "shutdown", "now"])
 
+    def _run_first_startup(self):
+        """Handle first startup: show welcome screen and scan library."""
+        print("First startup detected. Scanning library...")
+
+        # Start the scan
+        self.music_app.lib.scan_async(force=True)
+
+        # Show welcome screen while scanning
+        while self.music_app.lib.is_scanning:
+            lib = self.music_app.lib
+            items = [
+                "Please wait whilst we",
+                "read your library.",
+                "",
+                f"Tracks: {lib.scan_track_count}",
+                f"Albums: {lib.scan_album_count}",
+                f"Artists: {lib.scan_artist_count}",
+            ]
+            if lib.scan_current_file:
+                items.append(f"{lib.scan_current_file[:24]}")
+
+            frame = self.renderer.render_menu("WELCOME TO PAPERJAM", items, -1, 0)
+            self._display(frame, full_refresh=self.first_render)
+
+            time.sleep(0.1)
+
+        # Scan complete - show final count briefly
+        lib = self.music_app.lib
+        items = [
+            "Library scan complete!",
+            "",
+            f"Tracks: {lib.get_total_tracks()}",
+            f"Albums: {len(lib.albums)}",
+            f"Artists: {len(lib.artists)}",
+        ]
+        frame = self.renderer.render_menu("WELCOME TO PAPERJAM", items, -1, 0)
+        self._display(frame, full_refresh=True)
+        time.sleep(2)
+
+        self._is_first_run = False
+        self.first_render = True
+
     def run(self):
         print("System Ready. Entering main loop...")
+
+        # Handle first startup
+        if self._is_first_run:
+            self._run_first_startup()
+
         try:
             while True:
                 if not self.inputs.check_inputs(): break
