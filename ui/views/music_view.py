@@ -77,7 +77,7 @@ class MusicViewRenderer(RenderBase):
 
             if draw_inner_box:
                 self.draw.rectangle(
-                    (bx + 2, y_pos + 2, bx + btn_w - 1, y_pos + cfg.ROW_HEIGHT - 1),
+                    (bx + 1, y_pos + 1, bx + btn_w - 1, y_pos + cfg.ROW_HEIGHT - 1),
                     outline=cfg.WHITE
                 )
 
@@ -224,7 +224,7 @@ class MusicViewRenderer(RenderBase):
                 # Draw inner box when selected
                 if is_selected:
                     self.draw.rectangle(
-                        (cfg.PANEL_X + 2, y_pos + 2, cfg.PANEL_X + item_w + 6, y_pos + draw_h - 2),
+                        (cfg.PANEL_X + 1, y_pos + 1, cfg.PANEL_X + item_w + 7, y_pos + draw_h - 1),
                         outline=cfg.WHITE
                     )
                 continue
