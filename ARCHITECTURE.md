@@ -101,7 +101,7 @@ paperjam/
 
 **Optimization strategies**:
 - Partial refresh for smooth updates
-- Periodic full refresh (every 30 partials or 180s)
+- Periodic full refresh (every 30 partials)
 - Frame change detection to skip redundant refreshes
 - Display sleep during screensaver
 

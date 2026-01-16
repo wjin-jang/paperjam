@@ -37,7 +37,10 @@ class OverlayRenderer:
             return img
 
         if cfg.FONT_ICONS:
-            icon_num = min(8, max(0, round(pct / 12.5)))
+            adjusted_pct = pct - cfg.BATTERY_SHUTDOWN_THRESHOLD
+            steps = ((100-cfg.BATTERY_SHUTDOWN_THRESHOLD)/8) # 8 battery icons
+            
+            icon_num = min(8, max(0, round(adjusted_pct / steps)))
             if icon_num == 0: 
                 icon_num = 1  # Avoid empty unless critical
             

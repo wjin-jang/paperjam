@@ -97,6 +97,9 @@ LONG_PRESS_OPTIONS = [0.3, 0.5, 0.8, 1.0, 1.5, 2.0]
 RECENTS_LIMIT_OPTIONS = [10, 30, 50, 100]
 VALID_EXTS = {'.mp3', '.flac', '.wav', '.m4a'}
 
+# --- Sys Constants ---
+BATTERY_SHUTDOWN_THRESHOLD = 12
+
 # --- Fonts ---
 def load_fonts():
     base_path = Path(__file__).parent / "assets"

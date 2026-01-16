@@ -38,7 +38,7 @@ class SystemManager:
         self.epd = self._init_display()
         self.battery = get_battery_monitor()
         self._last_battery_check = 0
-        self._low_battery_threshold = 12  # Shutdown at 12%
+        self._low_battery_threshold = cfg.BATTERY_SHUTDOWN_THRESHOLD  # Shutdown at 12%
 
         # Shutdown callback
         self.on_shutdown_request = None

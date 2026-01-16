@@ -8,7 +8,7 @@ Main application entry point. Handles:
 - Global callbacks (volume, shutdown, battery monitoring)
 
 E-paper display considerations:
-- Periodic full refresh prevents ghosting (every 30 partials or 180s)
+- Periodic full refresh prevents ghosting (every 30 partials)
 - Frame change detection skips redundant refreshes
 - Display sleeps during screensaver to save power
 - Wake on user input with full refresh
@@ -69,8 +69,6 @@ class MainApp:
         self.first_render = True
         self._last_frame_hash = None  # For change detection
         self._partial_refresh_count = 0  # Track partial refreshes for periodic full refresh
-        self._last_full_refresh_time = time.time()  # Track time since last full refresh
-        self._full_refresh_interval = 180  # Seconds between full refreshes (Waveshare recommendation)
         self._max_partial_refreshes = 30  # Max partials before forced full refresh
         self._display_sleeping = False  # Track display sleep state for screensaver
 
@@ -495,11 +493,7 @@ class MainApp:
         self._last_frame_hash = frame_hash
 
         # Check if periodic full refresh is needed (Waveshare e-paper precaution)
-        now = time.time()
-        needs_periodic_full = (
-            self._partial_refresh_count >= self._max_partial_refreshes or
-            (now - self._last_full_refresh_time) >= self._full_refresh_interval
-        )
+        needs_periodic_full = self._partial_refresh_count >= self._max_partial_refreshes
 
         epd = self.sys.get_display()
         if epd:
@@ -510,7 +504,6 @@ class MainApp:
                     epd.displayPartBaseImage(buffer)
                     self.first_render = False
                     self._partial_refresh_count = 0
-                    self._last_full_refresh_time = now
                 else:
                     epd.displayPartial(buffer)
                     self._partial_refresh_count += 1
