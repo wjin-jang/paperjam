@@ -4,6 +4,7 @@
 # Main menu
 menu:
   home: "HOME MENU"
+  main_menu: "MAIN MENU"
   music: "Music"
   settings: "Settings"
 
@@ -24,21 +25,30 @@ player:
 
   browse:
     library: "Library"
-    artists: "Artists"
-    albums: "Albums"
+    artists: "ARTISTS"
+    albums: "ALBUMS"
     tracks: "All Tracks"
-    playlists: "Playlists"
-    favourites: "Favourites"
-    fav_albums: "Fav Albums"
-    fav_artists: "Fav Artists"
-    fav_tracks: "Fav Tracks"
-    recent: "Recently Played"
+    shuffle_all: "SHUFFLE ALL"
+    all_tracks: "ALL TRACKS"
+    playlists: "PLAYLISTS"
+    favourites: "FAVOURITES"
+    fav_albums: "FAV ALBUMS"
+    fav_artists: "FAV ARTISTS"
+    fav_tracks: "Favourite Tracks"
+    recent: "RECENTS"
     files: "Files"
     queue: "QUEUE"
+    manual_queue: "MANUAL QUEUE"
+    auto_queue: "AUTO QUEUE"
     queue_empty: "(Queue Empty)"
     no_tracks: "(No Tracks)"
+    no_fav_artists: "(No Fav Artists)"
+    no_fav_albums: "(No Fav Albums)"
     unknown_album: "Unknown Album"
     unknown_artist: "Unknown Artist"
+    unknown: "Unknown"
+    disc: "Disc {num}"
+    no_image: "NO IMAGE"
 
   context:
     options: "OPTIONS"
@@ -56,45 +66,50 @@ player:
     move_up: "Move Up"
     move_down: "Move Down"
     cancel: "Cancel"
+    add_to: "Add to: {name}"
 
 # Settings
 settings:
   categories:
-    audio: "Audio"
-    library: "Library"
-    network: "Network"
-    system: "System"
-    display: "Display"
+    audio: "AUDIO"
+    library: "LIBRARY"
+    network: "NETWORK"
+    system: "SYSTEM"
+    display: "DISPLAY"
 
   audio:
     volume: "Volume"
     output: "Output"
-    bluetooth: "Bluetooth"
+    bluetooth: "Bluetooth Manager"
     endless_play: "Endless Play"
 
   library:
-    scan: "Scan Library"
-    scanning: "Scanning..."
-    clear_recents: "Clear Recents"
-    clear_favs: "Clear Favourites"
+    tracks: "Tracks"
+    albums: "Albums"
+    artists: "Artists"
+    rescan: "Rescan Library"
+    scanning: "Scanning"
+    recents_limit: "Recents Limit"
 
   network:
     wifi: "WiFi"
-    wifi_network: "WiFi Network"
-    select_network: "Select Network"
-    connecting: "Connecting..."
-    connected: "Connected"
-    failed: "Failed"
-    saved_networks: "Saved Networks"
+    bluetooth: "Bluetooth"
+    toggle_wifi: "Toggle WiFi"
+    toggle_bt: "Toggle BT"
+    wifi_networks: "WiFi Networks"
+    disconnected: "Disconnected"
+    not_connected: "Not Connected"
+    unavailable: "Unavailable"
 
   display:
     invert_colors: "Invert Colors"
     screensaver: "Screensaver"
-    hdmi_output: "HDMI Output"
 
   system:
     disk: "Disk"
     version: "Ver"
+    free: "Free"
+    unknown: "Unknown"
     power_mode: "Power Mode"
     power_optimised: "Optimised"
     power_normal: "Normal"
@@ -106,6 +121,7 @@ settings:
     shutdown: "Clear Screen + Shut Down"
 
   bluetooth:
+    manager: "Bluetooth Manager"
     scan: "Scan"
     scanning: "Scanning..."
     connect: "Connect"
@@ -114,12 +130,18 @@ settings:
     pairing: "Pairing..."
     paired: "Paired"
     no_devices: "No devices found"
+    default: "Default"
+    none: "None"
 
 # Welcome screen
 welcome:
   title: "WELCOME TO PAPERJAM"
   continue: "Continue..."
   scanning: "Scanning library..."
+  music_found: "Your music was found at {path}"
+  scan_now: "Scan Library Now"
+  shutdown_add_music: "Shutdown (Add Music)"
+  scanning_tracks: "Scanning: {count} tracks"
 
 # General
 general:
@@ -131,6 +153,7 @@ general:
   loading: "Loading..."
   error: "Error"
   power_off: "POWER OFF"
+  default: "Default"
 
 # Update messages
 updates:

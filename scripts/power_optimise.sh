@@ -10,11 +10,6 @@ case "$ACTION" in
     enable)
         echo "Enabling power optimizations..."
 
-        # Disable HDMI output
-        if command -v tvservice &> /dev/null; then
-            tvservice -o 2>/dev/null || true
-        fi
-
         # Disable onboard LEDs (Pi Zero/3/4)
         echo none | sudo tee /sys/class/leds/led0/trigger 2>/dev/null || true
         echo 0 | sudo tee /sys/class/leds/led0/brightness 2>/dev/null || true
@@ -38,14 +33,6 @@ case "$ACTION" in
 
     disable)
         echo "Disabling power optimizations..."
-
-        # Enable HDMI output
-        if command -v tvservice &> /dev/null; then
-            tvservice -p 2>/dev/null || true
-            # Restore framebuffer
-            fbset -depth 8 2>/dev/null || true
-            fbset -depth 16 2>/dev/null || true
-        fi
 
         # Restore LED defaults
         echo mmc0 | sudo tee /sys/class/leds/led0/trigger 2>/dev/null || true

@@ -53,7 +53,7 @@ class InputHandler:
             name = dev.name.lower()
 
             # Skip non-input audio/video devices
-            if any(x in name for x in ['hdmi', 'vc4', 'video']):
+            if any(x in name for x in ['vc4', 'video']):
                 continue
 
             cap = dev.capabilities()

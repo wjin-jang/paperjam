@@ -3,6 +3,7 @@ Music player view rendering using Panel → Menu → Item hierarchy.
 """
 from PIL import Image, ImageDraw
 import config as cfg
+from core.i18n import t
 from ui.views.core import Panel, Menu
 from ui.views.items import TextItem, ImageItem, HeadingItem, InfoItem, ColumnItem, Column
 from ui.graphics import UI_ICONS
@@ -178,7 +179,7 @@ class MusicViewRenderer:
 
         # Get appropriate cover art
         art = state.playing_cover_s if state.playing_path else state.browsing_cover_s
-        art_item = ImageItem(image=art, placeholder="NO IMAGE")
+        art_item = ImageItem(image=art, placeholder=t('player.browse.no_image'))
         art_item.set_height(art_size)  # Account for border
         art_menu.items = [art_item]
 

@@ -32,7 +32,6 @@ class SystemManager:
     - E-Paper Display initialization
     - Battery monitoring
     - Shutdown/Reboot
-    - HDMI control
     """
     def __init__(self):
         self.epd = self._init_display()
@@ -42,9 +41,6 @@ class SystemManager:
 
         # Shutdown callback
         self.on_shutdown_request = None
-
-        # Disable HDMI by default to save power
-        self.disable_hdmi()
 
     def _init_display(self):
         if HAS_EPAPER:
@@ -98,55 +94,6 @@ class SystemManager:
                 self.epd.Clear(0xFF)
             except Exception:
                 pass
-
-    def is_hdmi_enabled(self) -> bool:
-        """Check if HDMI output is enabled."""
-        try:
-            result = subprocess.check_output(
-                ["tvservice", "-s"], text=True, stderr=subprocess.DEVNULL, timeout=2
-            ).strip()
-            # "state 0x120006" means off, other states mean on
-            return "off" not in result.lower() and "0x120006" not in result
-        except (subprocess.SubprocessError, OSError):
-            return True  # Assume on if we can't check
-
-    def disable_hdmi(self):
-        """Disable HDMI output to save power."""
-        try:
-            subprocess.run(
-                ["sudo", "tvservice", "-o"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
-            )
-            logger.debug("HDMI disabled")
-        except (subprocess.SubprocessError, OSError):
-            pass  # tvservice may not be available on all systems
-
-    def enable_hdmi(self):
-        """Enable HDMI output."""
-        try:
-            subprocess.run(
-                ["sudo", "tvservice", "-p"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
-            )
-            # Restore framebuffer after turning on
-            subprocess.run(
-                ["sudo", "fbset", "-depth", "8"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
-            )
-            subprocess.run(
-                ["sudo", "fbset", "-depth", "16"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
-            )
-            logger.debug("HDMI enabled")
-        except (subprocess.SubprocessError, OSError):
-            pass
-
-    def toggle_hdmi(self):
-        """Toggle HDMI output on/off."""
-        if self.is_hdmi_enabled():
-            self.disable_hdmi()
-        else:
-            self.enable_hdmi()
 
     def shutdown(self):
         logger.info("System shutting down")

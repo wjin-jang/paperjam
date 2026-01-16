@@ -7,6 +7,7 @@ from pathlib import Path
 from PIL import Image
 
 from core.library import LibraryManager
+from core.i18n import t
 from ui.image_utils import get_cover
 from core.track_info import extract_track_info
 from core.navigation import nav_skip_info_up, nav_skip_info_down, find_next_heading
@@ -71,9 +72,9 @@ class MusicPlayerApp:
         """Set settings manager reference for features like endless playback."""
         self._settings = settings_manager
 
-    def _show_loading(self, message: str = "Loading..."):
+    def _show_loading(self, message: str = None):
         """Show loading overlay and force display update."""
-        self.state.loading_message = message
+        self.state.loading_message = message or t('general.loading')
         if self._display_callback:
             self._display_callback(self.get_frame())
 
@@ -293,9 +294,9 @@ class MusicPlayerApp:
 
         self.state.is_playing = self.audio.toggle_pause()
         if self.state.is_playing:
-            self.state.set_status_message("PLAYING")
+            self.state.set_status_message(t('player.status.playing'))
         else:
-            self.state.set_status_message("PAUSED")
+            self.state.set_status_message(t('player.status.paused'))
 
     def next_track(self, from_user=True):
         if from_user and not self.state.screensaver_image:
@@ -315,10 +316,10 @@ class MusicPlayerApp:
 
         # Get next track from playlist manager
         next_path = self.playlist.next_track(auto_advance=not from_user)
-        
+
         if next_path:
             if from_user:
-                self.state.set_status_message("NEXT")
+                self.state.set_status_message(t('player.status.next'))
             self._play_media(next_path)
             return
 
@@ -328,7 +329,7 @@ class MusicPlayerApp:
         else:
             self.audio.stop()
             self.state.is_playing = False
-            self.state.set_status_message("IDLE")
+            self.state.set_status_message(t('player.status.idle'))
             # Don't auto-reset to the first track; stay on the current (last) track
 
     def prev_track(self):
@@ -344,7 +345,7 @@ class MusicPlayerApp:
 
         path = self.playlist.prev_track()
         if path:
-            self.state.set_status_message("PREVIOUS")
+            self.state.set_status_message(t('player.status.previous'))
             self._play_media(path)
 
     def _load_track(self, real_idx, play=True):
@@ -553,7 +554,7 @@ class MusicPlayerApp:
 
         # Load and play first track
         self._load_track(self.playlist.queue[0])
-        self.state.set_status_message("PLAYING")
+        self.state.set_status_message(t('player.status.playing'))
 
     def _play_random_album(self):
         """Play a random album (used for endless playback)."""
@@ -582,7 +583,7 @@ class MusicPlayerApp:
 
         # Load and play first track
         self._load_track(self.playlist.queue[0])
-        self.state.set_status_message("ENDLESS")
+        self.state.set_status_message(t('player.status.endless'))
 
     def _play_from_list(self, path):
         """Start playing from the current list."""
@@ -618,24 +619,28 @@ class MusicPlayerApp:
         elif idx == 1:
             self.state.shuffle_active = not self.state.shuffle_active
             self.playlist.toggle_shuffle() # Sync with playlist manager
-            
+
             if self.state.shuffle_active:
-                self.state.set_status_message("SHUFFLE ON")
+                self.state.set_status_message(t('player.status.shuffle_on'))
                 if not self.state.playing_path:
                     files = [item for item in self.state.items if item.get('type') == 'file']
                     if files:
                         target = random.choice(files)
                         self._play_from_list(target['path'])
             else:
-                self.state.set_status_message("SHUFFLE OFF")
-            
+                self.state.set_status_message(t('player.status.shuffle_off'))
+
             if self.mode == 'QUEUE_VIEW':
                 self.refresh_list(reset_selection=False)
 
         elif idx == 2:
             self.state.loop_mode = (self.state.loop_mode + 1) % 3
             self.playlist.loop_mode = self.state.loop_mode # Sync with playlist manager
-            loop_messages = ["LOOP OFF", "LOOP ALL", "LOOP ONE"]
+            loop_messages = [
+                t('player.status.loop_off'),
+                t('player.status.loop_all'),
+                t('player.status.loop_one')
+            ]
             self.state.set_status_message(loop_messages[self.state.loop_mode])
             
             if self.mode == 'QUEUE_VIEW':

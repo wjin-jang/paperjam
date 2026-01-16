@@ -26,7 +26,7 @@ paperjam/
 │   ├── inputs.py        # Input device handling (evdev)
 │   ├── library.py       # Music library scanner/manager
 │   ├── metadata.py      # Audio file metadata extraction
-│   ├── system.py        # System operations (shutdown, display, HDMI)
+│   ├── system.py        # System operations (shutdown, display)
 │   ├── battery.py       # I2C battery monitor
 │   └── i18n.py          # Internationalization (translations)
 ├── ui/                  # UI rendering
@@ -77,10 +77,9 @@ paperjam/
 **Item Types** (`ui/views/items.py`):
 - `TextItem`: Simple text with optional icon prefix
 - `HeadingItem`: Section heading (always inverted)
-- `InfoItem`: Non-selectable info with columns/lines
+- `InfoItem`: Non-selectable info with auto-wrapping text, columns, or lines
 - `ColumnItem`: Multiple columns for horizontal navigation
 - `ImageItem`: Album art display with placeholder
-- `MultilineItem`: Text that wraps across multiple lines
 - `VolumeBarItem`: Volume control with -/+ buttons and progress bar
 
 **Popup System** (`ui/views/popup.py`):
@@ -101,7 +100,7 @@ paperjam/
 
 **Optimization strategies**:
 - Partial refresh for smooth updates
-- Periodic full refresh (every 30 partials)
+- Periodic full refresh (every 120 partials)
 - Frame change detection to skip redundant refreshes
 - Display sleep during screensaver
 

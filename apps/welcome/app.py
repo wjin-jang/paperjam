@@ -11,6 +11,7 @@ from typing import Callable, Optional, Dict
 
 from ui.renderer import UIRenderer
 import config as cfg
+from core.i18n import t
 from core.logger import setup_logger
 
 logger = setup_logger()
@@ -98,7 +99,7 @@ class WelcomeApp:
             return self._render_scanning()
         elif self.view == 'WELCOME':
             return self._render_welcome()
-        return self.renderer.render_menu("WELCOME", ["Loading..."], 0, 0)
+        return self.renderer.render_menu("WELCOME", [t('general.loading')], 0, 0)
 
     def _render_choice(self):
         """Render choice screen with multi-line info."""
@@ -108,12 +109,9 @@ class WelcomeApp:
             music_path = music_path[:22]
 
         items = [
-            {"type": "info", "lines": [
-                "Music Library:",
-                music_path
-            ]},
-            "Scan Library Now",
-            "Shutdown (Add Music)"
+            {"type": "info", "text": t('welcome.music_found', path=music_path)},
+            t('welcome.scan_now'),
+            t('welcome.shutdown_add_music')
         ]
 
         # Map choice_idx (0-1) to actual menu indices (1-2)
@@ -127,9 +125,9 @@ class WelcomeApp:
     def _render_scanning(self):
         """Render scanning progress."""
         items = [
-            f"Scanning: {self.lib.scan_track_count} tracks",
-            f"Albums: {self.lib.scan_album_count}",
-            f"Artists: {self.lib.scan_artist_count}"
+            t('welcome.scanning_tracks', count=self.lib.scan_track_count),
+            f"{t('settings.library.albums')}: {self.lib.scan_album_count}",
+            f"{t('settings.library.artists')}: {self.lib.scan_artist_count}"
         ]
 
         if self.lib.scan_current_file:
@@ -137,7 +135,7 @@ class WelcomeApp:
             items.append(f"File: {current}")
 
         return self.renderer.render_menu(
-            "SCANNING", items, -1, 0,
+            t('settings.library.scanning').upper(), items, -1, 0,
             info_indices=[0, 1, 2, 3]
         )
 
@@ -149,8 +147,8 @@ class WelcomeApp:
 
         return self.renderer.render_welcome_tiled(
             self._welcome_covers,
-            dialog_text="WELCOME TO PAPERJAM",
-            button_text="Continue..."
+            dialog_text=t('welcome.title'),
+            button_text=t('welcome.continue')
         )
 
     def on_enter(self):

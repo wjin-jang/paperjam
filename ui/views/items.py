@@ -1,7 +1,28 @@
 """
-Item classes for the Menu rendering system.
+Menu item classes for the UI rendering system.
 
-All items share a common interface for rendering and navigation.
+This module provides the building blocks for menu-based UIs. All items
+inherit from the abstract Item base class and implement a consistent
+rendering interface.
+
+Item Types:
+    TextItem: Simple text with optional icon prefix
+    HeadingItem: Section heading with inverted background
+    InfoItem: Non-selectable info with auto-wrapping text, columns, or lines
+    ColumnItem: Multiple columns supporting horizontal navigation
+    ImageItem: Image display (for album art) with placeholder
+    VolumeBarItem: Volume control with -/+ buttons and progress bar
+
+Usage:
+    Items are typically added to a Menu, which handles scrolling and
+    cursor navigation. The Menu renders items within a Panel container.
+
+    menu.items = [
+        HeadingItem("SECTION"),
+        TextItem("Option 1", icon="1."),
+        TextItem("Option 2", icon="2."),
+        InfoItem(text="Status message here"),
+    ]
 """
 from __future__ import annotations
 from dataclasses import dataclass
@@ -333,106 +354,16 @@ class HeadingItem(Item):
             draw.rectangle((x + 1, y + 1, x + w - 1, y + h - 1), outline=cfg.WHITE)
 
 
-class MultilineItem(Item):
-    """Item that wraps text across multiple lines based on available width."""
-
-    def __init__(self, text: str, selectable: bool = False, pinned: bool = False,
-                 font=None, padding: tuple = None):
-        """Create a multiline item.
-
-        Args:
-            text: Text to wrap across lines
-            selectable: Whether item can be selected
-            pinned: Whether item stays at top
-            font: Optional font override
-            padding: Optional (x, y) padding tuple
-        """
-        super().__init__(selectable, pinned, font, padding)
-        self.text = text
-        self._wrapped_lines: List[str] = []
-        self._last_width: int = 0
-
-    def _wrap_text(self, width: int) -> List[str]:
-        """Wrap text to fit within given width."""
-        if width == self._last_width and self._wrapped_lines:
-            return self._wrapped_lines
-
-        font = self.font if self.font else cfg.FONT_MAIN
-        padding_x = self.padding[0] if self.padding else 5
-        max_text_width = width - (padding_x * 2)
-
-        words = self.text.split()
-        lines = []
-        current_line = []
-
-        # Estimate char width (approximate)
-        from PIL import Image, ImageDraw
-        temp = Image.new('1', (1, 1))
-        temp_draw = ImageDraw.Draw(temp)
-
-        for word in words:
-            test_line = ' '.join(current_line + [word])
-            bbox = temp_draw.textbbox((0, 0), test_line, font=font)
-            text_width = bbox[2] - bbox[0]
-
-            if text_width <= max_text_width:
-                current_line.append(word)
-            else:
-                if current_line:
-                    lines.append(' '.join(current_line))
-                current_line = [word]
-
-        if current_line:
-            lines.append(' '.join(current_line))
-
-        self._wrapped_lines = lines if lines else [self.text]
-        self._last_width = width
-        return self._wrapped_lines
-
-    def get_height(self) -> int:
-        """Get item height based on wrapped line count."""
-        # Use a default estimate if not yet wrapped
-        if not self._wrapped_lines:
-            # Estimate based on text length
-            estimated_lines = max(1, len(self.text) // 20)
-            return estimated_lines * cfg.ROW_HEIGHT
-        return len(self._wrapped_lines) * cfg.ROW_HEIGHT
-
-    def render(self, draw: ImageDraw.Draw, canvas: Image.Image,
-               x: int, y: int, w: int, h: int,
-               selected: bool = False, selected_col: int = -1):
-        """Render multiline item."""
-        lines = self._wrap_text(w)
-        font = self.font if self.font else cfg.FONT_MAIN
-        padding = self.padding if self.padding else (5, 3)
-        padding_x, padding_y = padding
-
-        invert = selected and self.selectable
-        bg = cfg.BLACK if invert else cfg.WHITE
-        fg = cfg.WHITE if invert else cfg.BLACK
-
-        total_h = len(lines) * cfg.ROW_HEIGHT
-        layer = Image.new('1', (w + 1, total_h + 1), bg)
-        layer_draw = ImageDraw.Draw(layer)
-        layer_draw.rectangle((0, 0, w, total_h), outline=cfg.BLACK)
-
-        for i, line in enumerate(lines):
-            line_y = i * cfg.ROW_HEIGHT + padding_y
-            layer_draw.text((padding_x, line_y), sanitize_text(line), font=font, fill=fg)
-
-        canvas.paste(layer, (x, y))
-
-
 class VolumeBarItem(Item):
-    """Volume bar item with -/+ buttons and progress bar."""
+    """Volume bar with -/+ buttons and progress indicator."""
 
     def __init__(self, level: int = 0, selectable: bool = False, pinned: bool = False):
-        """Create a volume bar item.
+        """Create a volume bar.
 
         Args:
-            level: Volume level 0-100
+            level: Volume level (0-100)
             selectable: Whether item can be selected
-            pinned: Whether item stays at top
+            pinned: Whether item stays at top when scrolling
         """
         super().__init__(selectable, pinned)
         self.level = level
@@ -440,7 +371,6 @@ class VolumeBarItem(Item):
     def render(self, draw: ImageDraw.Draw, canvas: Image.Image,
                x: int, y: int, w: int, h: int,
                selected: bool = False, selected_col: int = -1):
-        """Render volume bar with -/+ buttons."""
         btn_w = cfg.ROW_HEIGHT
         bar_w = w - (btn_w * 2)
         bar_x = x + btn_w
@@ -464,72 +394,167 @@ class VolumeBarItem(Item):
 
 
 class InfoItem(Item):
-    """Non-selectable info item with optional columns."""
+    """Non-selectable information display with automatic text wrapping.
 
-    def __init__(self, columns: List[str] = None, lines: List = None,
-                 text: str = None, pinned: bool = False,
+    Supports three display modes:
+    - Simple text: Auto-wraps to multiple lines if needed
+    - Columns: Single row with multiple aligned columns
+    - Lines: Multiple rows, each can be text or column list
+
+    Text wrapping is automatic - long text will wrap to fit the available
+    width. The item height adjusts dynamically based on content.
+
+    Examples:
+        # Simple text (auto-wraps if needed)
+        InfoItem(text="This is a long message that will wrap")
+
+        # Columns in a single row
+        InfoItem(columns=["Label", "Value1", "Value2"])
+
+        # Multiple lines
+        InfoItem(lines=["Line 1", "Line 2", ["Col1", "Col2"]])
+    """
+
+    def __init__(self, text: str = None, columns: List[str] = None,
+                 lines: List = None, pinned: bool = False,
                  font=None, padding: tuple = None):
         """Create an info item.
 
         Args:
-            columns: Single row of column strings
+            text: Simple text (auto-wraps if too long)
+            columns: Single row of column strings [left, right1, right2, ...]
             lines: Multiple rows, each a string or list of column strings
-            text: Simple text (if no columns/lines)
-            pinned: Whether item stays at top
-            font: Optional font override
-            padding: Optional (x, y) padding tuple
+            pinned: Whether item stays at top when scrolling
+            font: Optional font override (default: FONT_MAIN)
+            padding: Optional (x, y) padding tuple (default: (5, 3))
         """
         super().__init__(selectable=False, pinned=pinned, font=font, padding=padding)
+        self.text = text
         self.columns = columns
         self.lines = lines
-        self.text = text
+        self._wrapped_lines: List[str] = []
+        self._last_width: int = 0
+
+    def _wrap_text(self, text: str, width: int) -> List[str]:
+        """Wrap text to fit within given width.
+
+        Args:
+            text: Text to wrap
+            width: Available width in pixels
+
+        Returns:
+            List of wrapped lines
+        """
+        font = self.font if self.font else cfg.FONT_MAIN
+        padding_x = self.padding[0] if self.padding else 5
+        max_text_width = width - (padding_x * 2)
+
+        # Create temp surface for text measurement
+        temp = Image.new('1', (1, 1))
+        temp_draw = ImageDraw.Draw(temp)
+
+        words = text.split()
+        if not words:
+            return [text]
+
+        lines = []
+        current_line = []
+
+        for word in words:
+            test_line = ' '.join(current_line + [word])
+            bbox = temp_draw.textbbox((0, 0), test_line, font=font)
+            text_width = bbox[2] - bbox[0]
+
+            if text_width <= max_text_width:
+                current_line.append(word)
+            else:
+                if current_line:
+                    lines.append(' '.join(current_line))
+                current_line = [word]
+
+        if current_line:
+            lines.append(' '.join(current_line))
+
+        return lines if lines else [text]
 
     def get_height(self) -> int:
-        """Get item height based on line count."""
+        """Get item height based on content."""
         if self.lines:
             return len(self.lines) * cfg.ROW_HEIGHT
+        if self._wrapped_lines:
+            return len(self._wrapped_lines) * cfg.ROW_HEIGHT
         return cfg.ROW_HEIGHT
 
     def render(self, draw: ImageDraw.Draw, canvas: Image.Image,
                x: int, y: int, w: int, h: int,
                selected: bool = False, selected_col: int = -1):
-        """Render info item."""
         if self.lines:
-            # Draw one box spanning all lines (no internal borders)
-            total_h = len(self.lines) * cfg.ROW_HEIGHT
-            info_layer = Image.new('1', (w + 1, total_h + 1), cfg.WHITE)
-            info_draw = ImageDraw.Draw(info_layer)
-            # Outer border only
-            info_draw.rectangle((0, 0, w, total_h), outline=cfg.BLACK)
-
-            for i, line in enumerate(self.lines):
-                line_y = i * cfg.ROW_HEIGHT
-                if isinstance(line, list):
-                    self._render_line_columns(info_draw, line, 0, line_y, w)
-                else:
-                    # Draw text without box
-                    text = sanitize_text(str(line))
-                    info_draw.text((5, line_y + 3), text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
-
-            canvas.paste(info_layer, (x, y))
+            self._render_lines(draw, canvas, x, y, w)
         elif self.columns:
             self._render_columns(draw, canvas, self.columns, x, y, w)
         elif self.text:
-            self._draw_text_box(draw, canvas, sanitize_text(self.text),
-                               x, y, w, cfg.ROW_HEIGHT)
+            self._render_text(draw, canvas, x, y, w)
+
+    def _render_text(self, draw: ImageDraw.Draw, canvas: Image.Image,
+                     x: int, y: int, w: int):
+        """Render text with automatic wrapping."""
+        font = self.font if self.font else cfg.FONT_MAIN
+        padding = self.padding if self.padding else (5, 3)
+        padding_x, padding_y = padding
+
+        # Check if wrapping needed (cache result)
+        if w != self._last_width:
+            self._wrapped_lines = self._wrap_text(sanitize_text(self.text), w)
+            self._last_width = w
+
+        lines = self._wrapped_lines
+
+        if len(lines) == 1:
+            # Single line - use standard text box
+            self._draw_text_box(draw, canvas, lines[0], x, y, w, cfg.ROW_HEIGHT)
+        else:
+            # Multiple lines - draw in unified box
+            total_h = len(lines) * cfg.ROW_HEIGHT
+            layer = Image.new('1', (w + 1, total_h + 1), cfg.WHITE)
+            layer_draw = ImageDraw.Draw(layer)
+            layer_draw.rectangle((0, 0, w, total_h), outline=cfg.BLACK)
+
+            for i, line in enumerate(lines):
+                line_y = i * cfg.ROW_HEIGHT + padding_y
+                layer_draw.text((padding_x, line_y), line, font=font, fill=cfg.BLACK)
+
+            canvas.paste(layer, (x, y))
+
+    def _render_lines(self, draw: ImageDraw.Draw, canvas: Image.Image,
+                      x: int, y: int, w: int):
+        """Render multiple lines in a unified box."""
+        total_h = len(self.lines) * cfg.ROW_HEIGHT
+        layer = Image.new('1', (w + 1, total_h + 1), cfg.WHITE)
+        layer_draw = ImageDraw.Draw(layer)
+        layer_draw.rectangle((0, 0, w, total_h), outline=cfg.BLACK)
+
+        for i, line in enumerate(self.lines):
+            line_y = i * cfg.ROW_HEIGHT
+            if isinstance(line, list):
+                self._render_line_columns(layer_draw, line, 0, line_y, w)
+            else:
+                text = sanitize_text(str(line))
+                layer_draw.text((5, line_y + 3), text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+
+        canvas.paste(layer, (x, y))
 
     def _render_line_columns(self, draw: ImageDraw.Draw, columns: List[str],
                              x: int, y: int, w: int):
-        """Render a row of text columns without drawing boxes."""
+        """Render columns within a line (no individual boxes)."""
         if not columns:
             return
 
         if len(columns) == 1:
-            text = sanitize_text(str(columns[0]))
-            draw.text((x + 5, y + 3), text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+            draw.text((x + 5, y + 3), sanitize_text(str(columns[0])),
+                     font=cfg.FONT_MAIN, fill=cfg.BLACK)
             return
 
-        # Calculate widths for right columns
+        # Calculate column widths
         right_widths = []
         for col in columns[1:]:
             text = sanitize_text(str(col))
@@ -539,23 +564,21 @@ class InfoItem(Item):
         total_right = sum(right_widths)
         left_w = w - total_right
 
-        # Scale if needed
+        # Scale if columns exceed width
         if total_right + 20 > w:
             scale = (w - 20) / total_right if total_right > 0 else 1
             right_widths = [max(10, int(cw * scale)) for cw in right_widths]
-            total_right = sum(right_widths)
-            left_w = max(20, w - total_right)
+            left_w = max(20, w - sum(right_widths))
 
-        # Render left column
+        # Draw left column
         draw.text((x + 5, y + 3), sanitize_text(str(columns[0])),
                   font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
-        # Render right columns (centered)
+        # Draw right columns (centered)
         col_x = x + left_w
         for i, col in enumerate(columns[1:]):
             col_w = right_widths[i]
             text = sanitize_text(str(col))
-            # Center the text in column
             bbox = draw.textbbox((0, 0), text, font=cfg.FONT_MAIN)
             text_w = bbox[2] - bbox[0]
             text_x = col_x + (col_w - text_w) // 2
@@ -564,7 +587,7 @@ class InfoItem(Item):
 
     def _render_columns(self, draw: ImageDraw.Draw, canvas: Image.Image,
                         columns: List[str], x: int, y: int, w: int):
-        """Render a row of text columns."""
+        """Render a single row of columns with boxes."""
         if not columns:
             return
 
@@ -573,7 +596,7 @@ class InfoItem(Item):
                                x, y, w, cfg.ROW_HEIGHT)
             return
 
-        # Calculate widths for right columns
+        # Calculate column widths
         right_widths = []
         for col in columns[1:]:
             text = sanitize_text(str(col))
@@ -583,18 +606,17 @@ class InfoItem(Item):
         total_right = sum(right_widths)
         left_w = w - total_right
 
-        # Scale if needed
+        # Scale if columns exceed width
         if total_right + 20 > w:
             scale = (w - 20) / total_right if total_right > 0 else 1
             right_widths = [max(10, int(cw * scale)) for cw in right_widths]
-            total_right = sum(right_widths)
-            left_w = max(20, w - total_right)
+            left_w = max(20, w - sum(right_widths))
 
-        # Render left column
+        # Draw left column
         self._draw_text_box(draw, canvas, sanitize_text(str(columns[0])),
                            x, y, left_w, cfg.ROW_HEIGHT)
 
-        # Render right columns (centered)
+        # Draw right columns (centered)
         col_x = x + left_w
         for i, col in enumerate(columns[1:]):
             col_w = right_widths[i]

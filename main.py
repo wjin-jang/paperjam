@@ -69,7 +69,7 @@ class MainApp:
         self.first_render = True
         self._last_frame_hash = None  # For change detection
         self._partial_refresh_count = 0  # Track partial refreshes for periodic full refresh
-        self._max_partial_refreshes = 30  # Max partials before forced full refresh
+        self._max_partial_refreshes = 120  # Max partials before forced full refresh
         self._display_sleeping = False  # Track display sleep state for screensaver
 
         # Setup Global Callbacks

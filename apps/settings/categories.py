@@ -12,6 +12,7 @@ import config as cfg
 import version
 from core.settings_manager import format_duration
 from core.logger import setup_logger
+from core.i18n import t
 
 logger = setup_logger()
 
@@ -52,7 +53,7 @@ class AudioCategory(SettingsCategory):
     """Audio settings category."""
 
     def __init__(self, settings_manager, audio_engine):
-        super().__init__("AUDIO", settings_manager)
+        super().__init__(t('settings.categories.audio'), settings_manager)
         self.audio = audio_engine
         self.volume_level = cfg.DEFAULT_VOLUME
         self._audio_sinks = []
@@ -185,14 +186,14 @@ class AudioCategory(SettingsCategory):
                     break
         except Exception:
             # PulseAudio not available, add a default entry
-            self._audio_sinks = [{'id': '0', 'name': 'default', 'display': 'Default'}]
+            self._audio_sinks = [{'id': '0', 'name': 'default', 'display': t('general.default')}]
             self._current_sink_index = 0
 
     def _get_current_output_name(self) -> str:
         """Get the display name of the current audio output."""
         if self._audio_sinks and 0 <= self._current_sink_index < len(self._audio_sinks):
             return self._audio_sinks[self._current_sink_index]['display']
-        return "None"
+        return t('settings.bluetooth.none')
 
     def _cycle_audio_output(self) -> str:
         """Cycle to the next audio output device."""
@@ -233,28 +234,29 @@ class AudioCategory(SettingsCategory):
         self._refresh_audio_sinks()
         output_name = self._get_current_output_name()
         endless = self.settings.get('endless_playback', False)
-        endless_state = "ON" if endless else "OFF"
+        endless_state = t('general.on') if endless else t('general.off')
         return [
-            f"Output: {output_name}",
-            "Volume",
-            f"Endless Play: {endless_state}",
-            "Bluetooth Manager"
+            f"{t('settings.audio.output')}: {output_name}",
+            t('settings.audio.volume'),
+            f"{t('settings.audio.endless_play')}: {endless_state}",
+            t('settings.audio.bluetooth')
         ]
 
     def handle_action(self, item_index: int) -> Optional[str]:
         item_text = self.items[item_index]
 
-        if "Bluetooth" in item_text:
+        if t('settings.audio.bluetooth') in item_text:
             return 'BT_SAVED'
-        elif "Volume" in item_text:
+        elif t('settings.audio.volume') in item_text:
             return 'VOLUME'
-        elif item_text.startswith("Output:"):
+        elif item_text.startswith(t('settings.audio.output')):
             new_output = self._cycle_audio_output()
-            self.items[item_index] = f"Output: {new_output}"
+            self.items[item_index] = f"{t('settings.audio.output')}: {new_output}"
             return None
-        elif "Endless" in item_text:
+        elif t('settings.audio.endless_play') in item_text:
             new_val = self.settings.toggle('endless_playback')
-            self.items[item_index] = f"Endless Play: {'ON' if new_val else 'OFF'}"
+            state = t('general.on') if new_val else t('general.off')
+            self.items[item_index] = f"{t('settings.audio.endless_play')}: {state}"
             return None
 
         return None
@@ -264,7 +266,7 @@ class LibraryCategory(SettingsCategory):
     """Library settings category."""
 
     def __init__(self, settings_manager, library_manager):
-        super().__init__("LIBRARY", settings_manager)
+        super().__init__(t('settings.categories.library'), settings_manager)
         self.lib = library_manager
 
     def build_menu(self) -> List[str]:
@@ -273,11 +275,11 @@ class LibraryCategory(SettingsCategory):
         if self.lib.is_scanning:
             # Show scan progress
             return [
-                f"Scanning: {self.lib.scan_current_file}",
-                f"Tracks: {self.lib.scan_track_count}",
-                f"Albums: {self.lib.scan_album_count}",
-                f"Artists: {self.lib.scan_artist_count}",
-                f"Recents Limit: {recents_limit}"
+                f"{t('settings.library.scanning')}: {self.lib.scan_current_file}",
+                f"{t('settings.library.tracks')}: {self.lib.scan_track_count}",
+                f"{t('settings.library.albums')}: {self.lib.scan_album_count}",
+                f"{t('settings.library.artists')}: {self.lib.scan_artist_count}",
+                f"{t('settings.library.recents_limit')}: {recents_limit}"
             ]
         else:
             # Show library stats
@@ -285,11 +287,11 @@ class LibraryCategory(SettingsCategory):
             albums = len(self.lib.albums)
             artists = len(self.lib.artists)
             return [
-                f"Tracks: {tracks}",
-                f"Albums: {albums}",
-                f"Artists: {artists}",
-                "Rescan Library",
-                f"Recents Limit: {recents_limit}"
+                f"{t('settings.library.tracks')}: {tracks}",
+                f"{t('settings.library.albums')}: {albums}",
+                f"{t('settings.library.artists')}: {artists}",
+                t('settings.library.rescan'),
+                f"{t('settings.library.recents_limit')}: {recents_limit}"
             ]
 
     def get_info_indices(self) -> List[int]:
@@ -301,9 +303,9 @@ class LibraryCategory(SettingsCategory):
     def handle_action(self, item_index: int) -> Optional[str]:
         item_text = self.items[item_index]
 
-        if "Rescan Library" in item_text:
+        if t('settings.library.rescan') in item_text:
             self.lib.scan_async(force=True)
-        elif "Recents Limit" in item_text:
+        elif t('settings.library.recents_limit') in item_text:
             self.settings.cycle('recents_limit')
             self.refresh()
 
@@ -314,60 +316,28 @@ class DisplayCategory(SettingsCategory):
     """Display settings category."""
 
     def __init__(self, settings_manager):
-        super().__init__("DISPLAY", settings_manager)
-
-    def _is_hdmi_enabled(self) -> bool:
-        """Check if HDMI output is enabled."""
-        try:
-            result = subprocess.check_output(
-                ["tvservice", "-s"], text=True, stderr=subprocess.DEVNULL, timeout=2
-            ).strip()
-            # "state 0x120006" means off, other states mean on
-            return "off" not in result.lower() and "0x120006" not in result
-        except (subprocess.SubprocessError, OSError):
-            return True
-
-    def _toggle_hdmi(self):
-        """Toggle HDMI output on/off."""
-        try:
-            if self._is_hdmi_enabled():
-                subprocess.run(["sudo", "tvservice", "-o"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
-            else:
-                subprocess.run(["sudo", "tvservice", "-p"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
-                # Restore framebuffer after turning on
-                subprocess.run(["sudo", "fbset", "-depth", "8"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
-                subprocess.run(["sudo", "fbset", "-depth", "16"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
-        except (subprocess.SubprocessError, OSError):
-            pass
+        super().__init__(t('settings.categories.display'), settings_manager)
 
     def build_menu(self) -> List[str]:
         invert = self.settings.get('invert_colors', False)
-        state = "ON" if invert else "OFF"
+        state = t('general.on') if invert else t('general.off')
         ss_timeout = self.settings.get('screensaver_timeout', 60)
-        hdmi_state = "ON" if self._is_hdmi_enabled() else "OFF"
 
         return [
-            f"Invert Colors: {state}",
-            f"Screensaver: {format_duration(ss_timeout)}",
-            f"HDMI Output: {hdmi_state}"
+            f"{t('settings.display.invert_colors')}: {state}",
+            f"{t('settings.display.screensaver')}: {format_duration(ss_timeout)}"
         ]
 
     def handle_action(self, item_index: int) -> Optional[str]:
         item_text = self.items[item_index]
 
-        if "Invert Colors" in item_text:
+        if t('settings.display.invert_colors') in item_text:
             new_val = self.settings.toggle('invert_colors')
-            self.items[item_index] = f"Invert Colors: {'ON' if new_val else 'OFF'}"
-        elif "Screensaver" in item_text:
+            state = t('general.on') if new_val else t('general.off')
+            self.items[item_index] = f"{t('settings.display.invert_colors')}: {state}"
+        elif t('settings.display.screensaver') in item_text:
             new_val = self.settings.cycle('screensaver_timeout')
-            self.items[item_index] = f"Screensaver: {format_duration(new_val)}"
-        elif "HDMI" in item_text:
-            self._toggle_hdmi()
-            self.refresh()
+            self.items[item_index] = f"{t('settings.display.screensaver')}: {format_duration(new_val)}"
 
         return None
 
@@ -379,7 +349,7 @@ class NetworkCategory(SettingsCategory):
     WIFI_TIMEOUT = 15
 
     def __init__(self, settings_manager):
-        super().__init__("NETWORK", settings_manager)
+        super().__init__(t('settings.categories.network'), settings_manager)
         from core.bluetooth import BluetoothManager
         self.bt = BluetoothManager()
         self.wifi_view_callback = None
@@ -505,7 +475,7 @@ class NetworkCategory(SettingsCategory):
 
     def _get_wifi_info(self) -> str:
         if not self._is_wifi_enabled():
-            return "OFF"
+            return t('general.off')
         try:
             ssid = subprocess.check_output(
                 ["iwgetid", "-r"], text=True, stderr=subprocess.DEVNULL, timeout=2
@@ -515,19 +485,19 @@ class NetworkCategory(SettingsCategory):
             ).split()[0]
             return f"{ssid} ({ip})"
         except (subprocess.SubprocessError, OSError, IndexError):
-            return "Disconnected"
+            return t('settings.network.disconnected')
 
     def _get_bt_status(self) -> str:
         if not self._is_bt_enabled():
-            return "OFF"
+            return t('general.off')
         try:
             paired = self.bt.get_paired_devices()
             for dev in paired:
                 if self.bt.is_connected(dev['mac']):
                     return dev['name'][:16]
-            return "Not Connected"
+            return t('settings.network.not_connected')
         except (subprocess.SubprocessError, OSError, KeyError):
-            return "Unavailable"
+            return t('settings.network.unavailable')
 
     def get_known_wifi_networks(self) -> List[dict]:
         """Get list of known WiFi networks from wpa_supplicant.
@@ -605,16 +575,16 @@ class NetworkCategory(SettingsCategory):
             return False
 
     def build_menu(self) -> List[str]:
-        wifi_state = "ON" if self._is_wifi_enabled() else "OFF"
-        bt_state = "ON" if self._is_bt_enabled() else "OFF"
+        wifi_state = t('general.on') if self._is_wifi_enabled() else t('general.off')
+        bt_state = t('general.on') if self._is_bt_enabled() else t('general.off')
         wifi_info = self._get_wifi_info()
         bt_info = self._get_bt_status()
         return [
-            f"WiFi: {wifi_info}",
-            f"Bluetooth: {bt_info}",
-            f"Toggle WiFi: {wifi_state}",
-            "WiFi Networks",
-            f"Toggle BT: {bt_state}"
+            f"{t('settings.network.wifi')}: {wifi_info}",
+            f"{t('settings.network.bluetooth')}: {bt_info}",
+            f"{t('settings.network.toggle_wifi')}: {wifi_state}",
+            t('settings.network.wifi_networks'),
+            f"{t('settings.network.toggle_bt')}: {bt_state}"
         ]
 
     def get_info_indices(self) -> List[int]:
@@ -623,14 +593,14 @@ class NetworkCategory(SettingsCategory):
     def handle_action(self, item_index: int) -> Optional[str]:
         item_text = self.items[item_index]
 
-        if item_text.startswith("Toggle WiFi"):
+        if item_text.startswith(t('settings.network.toggle_wifi')):
             self._toggle_wifi()
             self.refresh()
-        elif "WiFi Networks" in item_text:
+        elif t('settings.network.wifi_networks') in item_text:
             self.wifi_networks = self.get_known_wifi_networks()
             self.wifi_idx = 0
             return 'WIFI_NETWORKS'
-        elif item_text.startswith("Toggle BT"):
+        elif item_text.startswith(t('settings.network.toggle_bt')):
             self._toggle_bt()
             self.refresh()
         return None
@@ -643,7 +613,7 @@ class SystemCategory(SettingsCategory):
     POWER_SCRIPT = Path(__file__).parent.parent.parent / "scripts" / "power_optimise.sh"
 
     def __init__(self, settings_manager):
-        super().__init__("SYSTEM", settings_manager)
+        super().__init__(t('settings.categories.system'), settings_manager)
         self._screen_clear_callback = None
         self._update_callback = None
         self._reset_callback = None
@@ -677,10 +647,10 @@ class SystemCategory(SettingsCategory):
             if len(lines) >= 2:
                 parts = lines[1].split()
                 if len(parts) >= 4:
-                    return parts[3] + " Free"
-            return "Unknown"
+                    return f"{parts[3]} {t('settings.system.free')}"
+            return t('settings.system.unknown')
         except (subprocess.SubprocessError, OSError, IndexError):
-            return "Unknown"
+            return t('settings.system.unknown')
 
     def _get_cpu_governor(self) -> str:
         """Get current CPU governor."""
@@ -766,19 +736,19 @@ class SystemCategory(SettingsCategory):
     def build_menu(self) -> List[str]:
         long_press = self.settings.get('long_press_duration', 0.5)
         auto_update = self.settings.get('auto_update', False)
-        auto_update_str = "ON" if auto_update else "OFF"
-        power_mode = "Optimised" if self._is_power_optimised() else "Normal"
+        auto_update_str = t('general.on') if auto_update else t('general.off')
+        power_mode = t('settings.system.power_optimised') if self._is_power_optimised() else t('settings.system.power_normal')
         disk = self._get_disk_usage()
         return [
-            f"Disk: {disk}",
-            f"Ver: {version.VERSION} ({version.VERSION_DATE})",
-            f"Power Mode: {power_mode}",
-            f"Long Press: {long_press}s",
-            f"Auto-Update: {auto_update_str}",
-            "Check for Updates",
-            "Restart System",
-            "Reset Data & Reboot",
-            "Clear Screen + Shut Down"
+            f"{t('settings.system.disk')}: {disk}",
+            f"{t('settings.system.version')}: {version.VERSION} ({version.VERSION_DATE})",
+            f"{t('settings.system.power_mode')}: {power_mode}",
+            f"{t('settings.system.long_press')}: {long_press}s",
+            f"{t('settings.system.auto_update')}: {auto_update_str}",
+            t('settings.system.check_updates'),
+            t('settings.system.restart'),
+            t('settings.system.reset_data'),
+            t('settings.system.shutdown')
         ]
 
     def get_info_indices(self) -> List[int]:
@@ -787,25 +757,25 @@ class SystemCategory(SettingsCategory):
     def handle_action(self, item_index: int) -> Optional[str]:
         item_text = self.items[item_index]
 
-        if "Power Mode" in item_text:
+        if t('settings.system.power_mode') in item_text:
             self._toggle_power_mode()
             self.refresh()
-        elif "Auto-Update" in item_text:
+        elif t('settings.system.auto_update') in item_text:
             new_val = self.settings.toggle('auto_update')
-            state = "ON" if new_val else "OFF"
-            self.items[item_index] = f"Auto-Update: {state}"
-        elif "Check for Updates" in item_text:
+            state = t('general.on') if new_val else t('general.off')
+            self.items[item_index] = f"{t('settings.system.auto_update')}: {state}"
+        elif t('settings.system.check_updates') in item_text:
             if self._update_callback:
                 self._update_callback()
-        elif "Restart System" in item_text:
+        elif t('settings.system.restart') in item_text:
             subprocess.run(["sudo", "reboot"], timeout=5)
-        elif "Long Press" in item_text:
+        elif t('settings.system.long_press') in item_text:
             new_val = self.settings.cycle('long_press_duration')
-            self.items[item_index] = f"Long Press: {new_val}s"
-        elif "Reset Data" in item_text:
+            self.items[item_index] = f"{t('settings.system.long_press')}: {new_val}s"
+        elif t('settings.system.reset_data') in item_text:
             if self._reset_callback:
                 self._reset_callback()
-        elif "Clear Screen" in item_text:
+        elif t('settings.system.shutdown') in item_text:
             if self._screen_clear_callback:
                 self._screen_clear_callback()
 

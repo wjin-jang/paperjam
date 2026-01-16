@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 import config as cfg
+from core.i18n import t
 from core.metadata import format_duration
 from ui.image_utils import get_cover
 from core.track_info import extract_track_info
@@ -35,15 +36,15 @@ class BrowseHandler:
         """Get the root menu items."""
         track_count = self.lib.get_total_tracks()
         icons = cfg.MENU_ICONS
-        return "MAIN MENU", [
-            {'name': 'Artists', 'type': 'dir', 'mode': 'ARTISTS_ROOT', 'icon': icons['artist']},
-            {'name': 'Albums', 'type': 'dir', 'mode': 'ALBUMS_ROOT', 'icon': icons['album']},
-            {'name': 'Tracks', 'type': 'dir', 'mode': 'TRACKS_VIEW', 'icon': icons['tracks']},
-            {'name': 'Fav Artists', 'type': 'dir', 'mode': 'FAV_ARTISTS', 'icon': icons['fav']},
-            {'name': 'Fav Albums', 'type': 'dir', 'mode': 'FAV_ALBUMS', 'icon': icons['fav']},
-            {'name': 'Playlists', 'type': 'dir', 'mode': 'PLAYLISTS_ROOT', 'icon': icons['playlist']},
-            {'name': 'Recents', 'type': 'dir', 'mode': 'RECENTS', 'icon': icons['recent']},
-            {'name': 'Files', 'type': 'dir', 'mode': 'FILES', 'path': cfg.MUSIC_PATH, 'icon': icons['dir']}
+        return t('menu.main_menu'), [
+            {'name': t('player.browse.artists'), 'type': 'dir', 'mode': 'ARTISTS_ROOT', 'icon': icons['artist']},
+            {'name': t('player.browse.albums'), 'type': 'dir', 'mode': 'ALBUMS_ROOT', 'icon': icons['album']},
+            {'name': t('player.browse.tracks'), 'type': 'dir', 'mode': 'TRACKS_VIEW', 'icon': icons['tracks']},
+            {'name': t('player.browse.fav_artists'), 'type': 'dir', 'mode': 'FAV_ARTISTS', 'icon': icons['fav']},
+            {'name': t('player.browse.fav_albums'), 'type': 'dir', 'mode': 'FAV_ALBUMS', 'icon': icons['fav']},
+            {'name': t('player.browse.playlists'), 'type': 'dir', 'mode': 'PLAYLISTS_ROOT', 'icon': icons['playlist']},
+            {'name': t('player.browse.recent'), 'type': 'dir', 'mode': 'RECENTS', 'icon': icons['recent']},
+            {'name': t('player.browse.files'), 'type': 'dir', 'mode': 'FILES', 'path': cfg.MUSIC_PATH, 'icon': icons['dir']}
         ]
 
     def _create_alphabetical_list(self, data_dict: dict, item_type: str, item_mode: str) -> List[dict]:
@@ -78,40 +79,40 @@ class BrowseHandler:
         """Get list of all artists, organized alphabetically with headings."""
         if self._artist_list_cache is None:
             self._artist_list_cache = self._create_alphabetical_list(self.lib.artists, 'artist', 'ARTIST_VIEW')
-        return "ARTISTS", self._artist_list_cache
+        return t('player.browse.artists'), self._artist_list_cache
 
     def get_albums_list(self) -> Tuple[str, List[dict]]:
         """Get list of all albums."""
         if self._album_list_cache is None:
             self._album_list_cache = self._create_alphabetical_list(self.lib.albums, 'album', 'ALBUM_VIEW')
-        return "ALBUMS", self._album_list_cache
+        return t('player.browse.albums'), self._album_list_cache
 
     def get_fav_artists_list(self) -> Tuple[str, List[dict]]:
         """Get list of favorite artists."""
         if not self.lib.fav_artists:
-            return "FAV ARTISTS", [{'name': '(No Fav Artists)', 'type': 'info'}]
+            return t('player.browse.fav_artists'), [{'name': t('player.browse.no_fav_artists'), 'type': 'info'}]
         items = [
             {'name': k, 'type': 'artist', 'mode': 'ARTIST_VIEW', 'icon': 'Ⓗ'}
             for k in sorted(self.lib.fav_artists, key=lambda s: s.lower())
         ]
-        return "FAV ARTISTS", items
+        return t('player.browse.fav_artists'), items
 
     def get_fav_albums_list(self) -> Tuple[str, List[dict]]:
         """Get list of favorite albums."""
         if not self.lib.fav_albums:
-            return "FAV ALBUMS", [{'name': '(No Fav Albums)', 'type': 'info'}]
+            return t('player.browse.fav_albums'), [{'name': t('player.browse.no_fav_albums'), 'type': 'info'}]
         items = [
             {'name': k, 'type': 'album', 'mode': 'ALBUM_VIEW', 'icon': 'Ⓗ'}
             for k in sorted(self.lib.fav_albums, key=lambda s: s.lower())
         ]
-        return "FAV ALBUMS", items
+        return t('player.browse.fav_albums'), items
 
     def get_playlists_list(self) -> Tuple[str, List[dict]]:
         """Get list of playlists."""
-        items = [{'name': 'Favourites', 'type': 'playlist', 'mode': 'FAV_TRACKS_VIEW', 'icon': 'Ⓗ'}]
+        items = [{'name': t('player.browse.favourites'), 'type': 'playlist', 'mode': 'FAV_TRACKS_VIEW', 'icon': 'Ⓗ'}]
         for p in self.lib.get_playlists():
             items.append({'name': p.stem, 'type': 'playlist', 'path': p, 'mode': 'PLAYLIST_VIEW'})
-        return "PLAYLISTS", items
+        return t('player.browse.playlists'), items
 
     def get_all_tracks(self, shuffle: bool = False) -> Tuple[str, List[dict], str, str, Optional[object]]:
         """
@@ -125,7 +126,7 @@ class BrowseHandler:
             Tuple of (title, tracks, track_count, duration, cover)
         """
         tracks = self.lib.get_all_tracks(shuffle=shuffle)
-        title = "SHUFFLE ALL" if shuffle else "ALL TRACKS"
+        title = t('player.browse.shuffle_all') if shuffle else t('player.browse.all_tracks')
         return self._process_track_list(title, tracks)
 
     def get_recents_tracks(self) -> Tuple[str, List[dict], str, str, Optional[object]]:
@@ -150,12 +151,12 @@ class BrowseHandler:
                         'path': p, 'title': p.stem, 'artist': None,
                         'year': None, 'album': None, 'duration': 0
                     })
-        return self._process_track_list("RECENTS", tracks)
+        return self._process_track_list(t('player.browse.recent'), tracks)
 
     def get_fav_tracks(self) -> Tuple[str, List[dict], str, str, Optional[object]]:
         """Get favorite tracks."""
         tracks = self.lib.get_fav_tracks_list()
-        return self._process_track_list("FAVOURITES", tracks)
+        return self._process_track_list(t('player.browse.favourites'), tracks)
 
     def get_playlist_tracks(self, playlist_path: Path) -> Tuple[str, List[dict], str, str, Optional[object]]:
         """Get tracks from a playlist."""
@@ -173,15 +174,15 @@ class BrowseHandler:
             # Group tracks by album and insert headings
             tracks_with_headings = []
             current_album = None
-            for t in tracks:
-                album = t.get('album', 'Unknown')
+            for track in tracks:
+                album = track.get('album', t('player.browse.unknown'))
                 if album != current_album:
                     current_album = album
                     tracks_with_headings.append({
                         'type': 'heading',
                         'name': album
                     })
-                tracks_with_headings.append(t)
+                tracks_with_headings.append(track)
             tracks = tracks_with_headings
 
         # Count only actual tracks (not headings)
@@ -212,20 +213,20 @@ class BrowseHandler:
             year = str(tracks[0].get('year', '') or '')
 
             # Check if album has multiple discs
-            discs = set(t.get('disc', 1) for t in tracks)
+            discs = set(track.get('disc', 1) for track in tracks)
             if len(discs) > 1:
                 # Insert disc headings
                 tracks_with_headings = []
                 current_disc = None
-                for t in tracks:
-                    disc = t.get('disc', 1)
+                for track in tracks:
+                    disc = track.get('disc', 1)
                     if disc != current_disc:
                         current_disc = disc
                         tracks_with_headings.append({
                             'type': 'heading',
-                            'name': f'Disc {disc}'
+                            'name': t('player.browse.disc', num=disc)
                         })
-                    tracks_with_headings.append(t)
+                    tracks_with_headings.append(track)
                 tracks = tracks_with_headings
 
         # Add pinned info item at the beginning
@@ -344,7 +345,7 @@ class BrowseHandler:
         # Manual Queue
         manual_items = []
         if playlist.manual_queue:
-            manual_items.append({'name': 'MANUAL QUEUE', 'type': 'heading'})
+            manual_items.append({'name': t('player.browse.manual_queue'), 'type': 'heading'})
             for p_str in playlist.manual_queue:
                 p = Path(p_str)
                 try:
@@ -358,7 +359,7 @@ class BrowseHandler:
         # Auto Queue
         auto_items = []
         if playlist.has_queue:
-            auto_items.append({'name': 'AUTO QUEUE', 'type': 'heading'})
+            auto_items.append({'name': t('player.browse.auto_queue'), 'type': 'heading'})
             start_idx = playlist.queue_idx
             count = 0
             idx = start_idx
@@ -422,7 +423,7 @@ class BrowseHandler:
         
         scrollable_items = []
         if not all_items and not pinned_items:
-            scrollable_items = [{'name': '(Queue Empty)', 'type': 'info'}]
+            scrollable_items = [{'name': t('player.browse.queue_empty'), 'type': 'info'}]
         else:
             scrollable_items = all_items
 
@@ -431,4 +432,4 @@ class BrowseHandler:
             covers = get_cover(Path(playing_path))
             cover = covers[0] if covers else None
 
-        return "QUEUE", pinned_items, scrollable_items, cover
+        return t('player.browse.queue'), pinned_items, scrollable_items, cover

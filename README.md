@@ -54,7 +54,6 @@ E-ink music player for Raspberry Pi Zero 2 W.
 - Recent tracks limit
 - Color inversion
 - Screensaver timeout
-- HDMI output toggle
 - WiFi toggle
 - Bluetooth toggle
 - CPU power mode (normal/powersave)

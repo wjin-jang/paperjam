@@ -13,6 +13,7 @@ from typing import Optional, Callable, List, Dict, Any
 import time
 from PIL import Image, ImageDraw
 import config as cfg
+from core.i18n import t
 from ui.views.core import Panel
 from ui.views.items import TextItem, ColumnItem, Column, VolumeBarItem
 
@@ -450,7 +451,7 @@ class PopupManager:
             The popup for setting callbacks
         """
         if options is None:
-            options = ["No", "Yes"]
+            options = [t('general.no'), t('general.yes')]
 
         config = PopupConfig(
             header=title,
