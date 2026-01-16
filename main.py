@@ -1,3 +1,18 @@
+"""
+PaperJam - E-ink Music Player for Raspberry Pi
+
+Main application entry point. Handles:
+- System initialization (audio, display, inputs)
+- Application lifecycle (music player, settings, welcome)
+- Main event loop with display refresh optimization
+- Global callbacks (volume, shutdown, battery monitoring)
+
+E-paper display considerations:
+- Periodic full refresh prevents ghosting (every 30 partials or 180s)
+- Frame change detection skips redundant refreshes
+- Display sleeps during screensaver to save power
+- Wake on user input with full refresh
+"""
 import time
 import sys
 import traceback
@@ -52,6 +67,11 @@ class MainApp:
         # Display State
         self.first_render = True
         self._last_frame_hash = None  # For change detection
+        self._partial_refresh_count = 0  # Track partial refreshes for periodic full refresh
+        self._last_full_refresh_time = time.time()  # Track time since last full refresh
+        self._full_refresh_interval = 180  # Seconds between full refreshes (Waveshare recommendation)
+        self._max_partial_refreshes = 30  # Max partials before forced full refresh
+        self._display_sleeping = False  # Track display sleep state for screensaver
 
         # Setup Global Callbacks
         self.sys.on_shutdown_request = self._handle_shutdown_request
@@ -152,6 +172,10 @@ class MainApp:
         logger.info("Entering main loop")
         try:
             while True:
+                # Wake display if sleeping and there was input
+                if self._display_sleeping and self.inputs.has_pending_input():
+                    self._wake_display()
+
                 # Check for popup input routing first
                 popup_callbacks = self.renderer.get_popup_callbacks()
                 if popup_callbacks:
@@ -204,6 +228,12 @@ class MainApp:
                     frame = self.renderer.render_with_popups(frame)
                     self._display(frame, force_full)
 
+                    # Sleep display if screensaver is active (saves power)
+                    if (self.current_app == self.music_app and
+                        self.music_app.state.screensaver_image is not None and
+                        not self._display_sleeping):
+                        self._sleep_display()
+
                 # Background updates
                 if self.current_app != self.music_app:
                     self.music_app.update()
@@ -238,6 +268,21 @@ class MainApp:
         self.view = 'HOME'
         self.inputs.set_callbacks(self._get_home_callbacks())
         self.first_render = True
+
+    def _wake_display(self):
+        """Wake display from sleep mode."""
+        if self._display_sleeping:
+            self.sys.wake_display()
+            self._display_sleeping = False
+            self.first_render = True  # Force full refresh on wake
+            logger.debug("Display awakened from sleep")
+
+    def _sleep_display(self):
+        """Put display into sleep mode."""
+        if not self._display_sleeping:
+            self.sys.sleep_display()
+            self._display_sleeping = True
+            logger.debug("Display entering sleep mode")
 
     def _vol_up(self):
         self.settings_app.categories['AUDIO'].set_volume(5)
@@ -316,6 +361,9 @@ class MainApp:
 
     def _perform_shutdown(self):
         """Perform shutdown with random cover art display."""
+        # Save volume before shutdown
+        self.settings_app.categories['AUDIO'].save_volume()
+
         # Get random cover art from library
         cover = self.music_app.lib.get_random_cover()
         frame = self.renderer.render_shutdown(cover)
@@ -328,6 +376,9 @@ class MainApp:
         self.inputs.set_callbacks(self._get_home_callbacks())
 
     def _perform_system_action(self, msg, action):
+        # Save volume before system action (reboot)
+        self.settings_app.categories['AUDIO'].save_volume()
+
         frame = self.renderer.render_menu("SYSTEM", [msg], 0, 0)
         self._display(frame, full_refresh=True)
         time.sleep(2)
@@ -423,16 +474,26 @@ class MainApp:
             return  # No change, skip display update
         self._last_frame_hash = frame_hash
 
+        # Check if periodic full refresh is needed (Waveshare e-paper precaution)
+        now = time.time()
+        needs_periodic_full = (
+            self._partial_refresh_count >= self._max_partial_refreshes or
+            (now - self._last_full_refresh_time) >= self._full_refresh_interval
+        )
+
         epd = self.sys.get_display()
         if epd:
             try:
                 buffer = epd.getbuffer(img.rotate(180))
-                if self.first_render or full_refresh:
+                if self.first_render or full_refresh or needs_periodic_full:
                     epd.init()
                     epd.displayPartBaseImage(buffer)
                     self.first_render = False
+                    self._partial_refresh_count = 0
+                    self._last_full_refresh_time = now
                 else:
                     epd.displayPartial(buffer)
+                    self._partial_refresh_count += 1
             except Exception as e:
                 logger.error(f"Display Error: {e}")
 

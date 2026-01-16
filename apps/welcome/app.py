@@ -11,6 +11,9 @@ from typing import Callable, Optional, Dict
 
 from ui.renderer import UIRenderer
 import config as cfg
+from core.logger import setup_logger
+
+logger = setup_logger()
 
 
 class WelcomeApp:
@@ -29,6 +32,9 @@ class WelcomeApp:
         # Callback for system operations
         self._shutdown_callback: Optional[Callable] = None
         self._display_callback: Optional[Callable] = None
+
+        # Cache for welcome screen covers (loaded once)
+        self._welcome_covers = None
 
     def set_shutdown_callback(self, callback: Callable):
         """Set callback for shutdown action."""
@@ -137,9 +143,12 @@ class WelcomeApp:
 
     def _render_welcome(self):
         """Render tiled album art welcome screen."""
-        covers = self.lib.get_random_covers(count=15, small=True)
+        # Load covers only once to avoid lag
+        if self._welcome_covers is None:
+            self._welcome_covers = self.lib.get_random_covers(count=15, small=True)
+
         return self.renderer.render_welcome_tiled(
-            covers,
+            self._welcome_covers,
             dialog_text="WELCOME TO PAPERJAM",
             button_text="Continue..."
         )
@@ -150,6 +159,15 @@ class WelcomeApp:
         self.view = 'CHOICE'
         self.choice_idx = 0
         self.first_render = True
+        self._welcome_covers = None  # Reset cover cache for fresh load
+
+        # Create music directory if it doesn't exist
+        if not cfg.MUSIC_PATH.exists():
+            try:
+                cfg.MUSIC_PATH.mkdir(parents=True, exist_ok=True)
+                logger.info(f"Created music directory: {cfg.MUSIC_PATH}")
+            except (OSError, PermissionError) as e:
+                logger.error(f"Failed to create music directory: {e}")
 
     def on_exit(self):
         """Called when app exits."""

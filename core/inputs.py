@@ -1,3 +1,14 @@
+"""
+Input device handling using evdev.
+
+Features:
+- Auto-detection of keyboards, IR remotes, Bluetooth media buttons
+- Long-press detection for context menus
+- Debouncing and key repeat handling
+- Hot-plugging support (detects disconnected devices)
+
+Works without X11/Wayland - reads directly from /dev/input.
+"""
 import time
 import evdev
 import select
@@ -70,6 +81,14 @@ class InputHandler:
 
         if not self.devices:
             logger.warning("No valid input devices found")
+
+    def has_pending_input(self):
+        """Check if there's any pending input without processing it."""
+        if not self.devices:
+            return False
+        fds = [dev.fd for dev in self.devices]
+        r, w, x = select.select(fds, [], [], 0.0)
+        return len(r) > 0
 
     def check_inputs(self):
         if not self.devices:

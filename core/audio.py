@@ -1,6 +1,17 @@
+"""
+Audio playback engine using VLC.
+
+Provides simple audio playback with:
+- Automatic output detection (PulseAudio, ALSA, default)
+- Play, pause, stop controls
+- State querying (playing, paused, ended)
+
+VLC was chosen for robust codec support and simple Python bindings.
+"""
 import vlc
 import os
 import subprocess
+
 
 class AudioEngine:
     def __init__(self):

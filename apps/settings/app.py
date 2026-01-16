@@ -77,6 +77,8 @@ class SettingsApp:
             'NETWORK': NetworkCategory(self.settings),
             'SYSTEM': SystemCategory(self.settings)
         }
+        # Link categories that need cross-references
+        self.categories['SYSTEM'].set_network_category(self.categories['NETWORK'])
 
     def get_callbacks(self):
         return {
@@ -216,11 +218,14 @@ class SettingsApp:
                 network = net_cat.wifi_networks[net_cat.wifi_idx]
                 self.wifi_status = "Connecting..."
                 if net_cat.connect_to_wifi(network['id']):
+                    # Wait briefly for connection to establish
+                    time.sleep(2)
                     self.wifi_status = "Connected"
                 else:
                     self.wifi_status = "Failed"
-                # Refresh network list
+                # Refresh network list and parent category
                 net_cat.wifi_networks = net_cat.get_known_wifi_networks()
+                net_cat.refresh()  # Refresh parent menu to show new connection
 
     def nav_back(self):
         if self.view == 'VOLUME':
@@ -235,6 +240,9 @@ class SettingsApp:
         elif self.view == 'WIFI_NETWORKS':
             self.view = 'SUBMENU'
             self.wifi_status = "Select Network"
+            # Refresh network category to show updated connection status
+            self.categories['NETWORK'].refresh()
+            self.current_submenu = self.categories['NETWORK'].items
         elif self.view == 'SUBMENU':
             self.view = 'MAIN'
             self.submenu_idx = 0

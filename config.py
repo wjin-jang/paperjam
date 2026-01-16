@@ -1,3 +1,14 @@
+"""
+Configuration management for PaperJam.
+
+Loads settings from ~/.config/paperjam/config.json with sensible defaults.
+Provides global constants for:
+- Display dimensions and colors
+- Font loading
+- File paths (music, data, cache)
+- UI layout parameters
+- Status and menu icons
+"""
 import json
 import os
 from pathlib import Path
@@ -52,8 +63,11 @@ def save_config(updates):
 
 # --- Exported Constants ---
 MUSIC_PATH = Path(_config["music_path"])
-if not MUSIC_PATH.exists():
-    MUSIC_PATH = Path.cwd()
+# Note: Music directory is created in welcome app if it doesn't exist
+
+# --- Volume Persistence ---
+VOLUME_FILE = DATA_DIR / "volume.json"
+DEFAULT_VOLUME = 30
 
 SCREENSAVER_TIMEOUT = _config["screensaver_timeout"]
 LONG_PRESS_DURATION = _config["long_press_duration"]

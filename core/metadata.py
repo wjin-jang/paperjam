@@ -1,3 +1,13 @@
+"""
+Audio file metadata extraction using Mutagen.
+
+Supports:
+- FLAC: album, artist, title, track/disc numbers, year
+- MP3: ID3 tags (TALB, TPE1/2, TIT2, TRCK, TPOS, TDRC/TYER)
+
+Optional text romanization for Korean/Japanese characters
+using korean_romanizer and pykakasi libraries.
+"""
 import os
 from mutagen import File
 from mutagen.flac import FLAC

@@ -185,15 +185,24 @@ class MusicViewRenderer:
         art_panel.render(self.canvas)
 
         # === Status Bar Panel ===
-        status_panel = Panel(8, 100, art_size, cfg.ROW_HEIGHT)
-        status_menu = status_panel.create_menu()
+        # Draw status bar manually to use FONT_HEADER for icon
+        status_x, status_y = 8, 100
+        status_w, status_h = art_size, cfg.ROW_HEIGHT
+
+        # Draw border and background
+        self.draw.rectangle((status_x, status_y, status_x + status_w, status_y + status_h),
+                           fill=cfg.WHITE, outline=cfg.BLACK)
 
         raw_status = state.get_status_text()
         icon = cfg.STATUS_ICONS.get(raw_status, 'Ⓘ')
-        status_text = f"{icon} {raw_status}"
-        status_menu.items = [TextItem(status_text, selectable=False)]
 
-        status_panel.render(self.canvas)
+        # Draw icon with FONT_HEADER (better icon rendering)
+        icon_x = status_x + 4
+        self.draw.text((icon_x, status_y + 1), icon, font=cfg.FONT_HEADER, fill=cfg.BLACK)
+
+        # Draw status text with FONT_MAIN
+        text_x = status_x + 18
+        self.draw.text((text_x, status_y + 3), raw_status, font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
         # === Main Panel ===
         header_text = "Scanning..." if state.is_scanning else state.album

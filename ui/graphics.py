@@ -1,3 +1,11 @@
+"""
+Graphics utilities and icon assets for the UI.
+
+Provides:
+- Bayer matrix dithering for e-paper display
+- Pre-rendered UI icons (back, shuffle, loop, fav, clear)
+- Image processing helpers
+"""
 import numpy
 from PIL import Image, ImageDraw, ImageOps, ImageEnhance
 from config import SCREEN_WIDTH, SCREEN_HEIGHT, BLACK

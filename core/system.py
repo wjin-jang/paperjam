@@ -1,3 +1,14 @@
+"""
+System hardware management for PaperJam.
+
+Controls:
+- Waveshare e-paper display (2.13" V4)
+- System operations (shutdown, reboot)
+- Battery monitoring integration
+- Display sleep/wake for power saving
+
+Falls back to headless mode if e-paper drivers unavailable.
+"""
 import os
 import time
 import subprocess

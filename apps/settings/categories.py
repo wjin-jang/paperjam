@@ -1,6 +1,7 @@
 """
 Settings category handlers for modular settings management.
 """
+import json
 import re
 import subprocess
 from abc import ABC, abstractmethod
@@ -10,6 +11,9 @@ from typing import List, Optional, Callable
 import config as cfg
 import version
 from core.settings_manager import format_duration
+from core.logger import setup_logger
+
+logger = setup_logger()
 
 
 class SettingsCategory(ABC):
@@ -50,12 +54,59 @@ class AudioCategory(SettingsCategory):
     def __init__(self, settings_manager, audio_engine):
         super().__init__("AUDIO", settings_manager)
         self.audio = audio_engine
-        self.volume_level = 50
+        self.volume_level = cfg.DEFAULT_VOLUME
         self._audio_sinks = []
         self._current_sink_index = 0
         self._mixer_control = self._find_mixer_control()
-        self._init_volume()
+        self._load_volume()
         self._refresh_audio_sinks()
+
+    def _load_volume(self):
+        """Load volume from persistent storage or use default."""
+        try:
+            if cfg.VOLUME_FILE.exists():
+                with open(cfg.VOLUME_FILE, 'r') as f:
+                    data = json.load(f)
+                    self.volume_level = data.get('volume', cfg.DEFAULT_VOLUME)
+                    # Apply the loaded volume to system
+                    self._apply_volume()
+                    logger.info(f"Volume loaded: {self.volume_level}%")
+                    return
+        except (json.JSONDecodeError, OSError, KeyError) as e:
+            logger.warning(f"Failed to load volume: {e}")
+
+        # Use default and apply it
+        self.volume_level = cfg.DEFAULT_VOLUME
+        self._apply_volume()
+
+    def save_volume(self):
+        """Save current volume to persistent storage."""
+        try:
+            with open(cfg.VOLUME_FILE, 'w') as f:
+                json.dump({'volume': self.volume_level}, f)
+            logger.info(f"Volume saved: {self.volume_level}%")
+        except OSError as e:
+            logger.error(f"Failed to save volume: {e}")
+
+    def _apply_volume(self):
+        """Apply volume to all audio outputs (ALSA + PulseAudio)."""
+        try:
+            # Set ALSA mixer
+            subprocess.run(
+                ["amixer", "set", self._mixer_control, f"{self.volume_level}%"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
+            )
+        except (subprocess.SubprocessError, OSError):
+            pass
+
+        try:
+            # Set PulseAudio sink volume
+            subprocess.run(
+                ["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{self.volume_level}%"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
+            )
+        except (subprocess.SubprocessError, OSError):
+            pass
 
     def _find_mixer_control(self) -> str:
         """Find an available mixer control name."""
@@ -81,21 +132,19 @@ class AudioCategory(SettingsCategory):
             pass
         return 'Master'  # Default fallback
 
-    def _init_volume(self):
+    def _read_system_volume(self):
+        """Read current system volume (for display only, not for initialization)."""
         try:
-            # Avoid shell=True to prevent shell injection
             result = subprocess.check_output(
                 ["amixer", "get", self._mixer_control],
                 text=True, stderr=subprocess.DEVNULL, timeout=2
             )
-            # Parse percentage from output
             match = re.search(r'\[(\d+)%\]', result)
             if match:
-                self.volume_level = int(match.group(1))
-            else:
-                self.volume_level = 50
+                return int(match.group(1))
         except (subprocess.SubprocessError, ValueError, OSError):
-            self.volume_level = 50
+            pass
+        return self.volume_level
 
     def _refresh_audio_sinks(self):
         """Get list of available PulseAudio sinks (audio output devices)."""
@@ -175,14 +224,10 @@ class AudioCategory(SettingsCategory):
         return sink['display']
 
     def set_volume(self, change: int):
+        """Change volume by given amount and persist."""
         self.volume_level = max(0, min(100, self.volume_level + change))
-        try:
-            subprocess.run(
-                ["amixer", "set", self._mixer_control, f"{self.volume_level}%"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
-            )
-        except (subprocess.SubprocessError, OSError):
-            pass
+        self._apply_volume()
+        self.save_volume()
 
     def build_menu(self) -> List[str]:
         self._refresh_audio_sinks()
@@ -202,7 +247,6 @@ class AudioCategory(SettingsCategory):
         if "Bluetooth" in item_text:
             return 'BT_SAVED'
         elif "Volume" in item_text:
-            self._init_volume()
             return 'VOLUME'
         elif item_text.startswith("Output:"):
             new_output = self._cycle_audio_output()
@@ -331,6 +375,9 @@ class DisplayCategory(SettingsCategory):
 class NetworkCategory(SettingsCategory):
     """Network information category."""
 
+    # WiFi connection timeout in seconds
+    WIFI_TIMEOUT = 15
+
     def __init__(self, settings_manager):
         super().__init__("NETWORK", settings_manager)
         from core.bluetooth import BluetoothManager
@@ -338,13 +385,14 @@ class NetworkCategory(SettingsCategory):
         self.wifi_view_callback = None
         self.wifi_networks = []
         self.wifi_idx = 0
+        self._wifi_on_demand = True  # Enable WiFi on-demand by default
 
     def set_wifi_view_callback(self, callback):
         """Set callback to enter WiFi view."""
         self.wifi_view_callback = callback
 
     def _is_wifi_enabled(self) -> bool:
-        """Check if WiFi is enabled."""
+        """Check if WiFi is enabled (not blocked)."""
         try:
             result = subprocess.check_output(
                 ["rfkill", "list", "wifi"], text=True, stderr=subprocess.DEVNULL, timeout=2
@@ -353,22 +401,79 @@ class NetworkCategory(SettingsCategory):
         except (subprocess.SubprocessError, OSError):
             return True
 
+    def _is_wifi_connected(self) -> bool:
+        """Check if WiFi is connected with an IP address."""
+        try:
+            result = subprocess.check_output(
+                ["ip", "-4", "addr", "show", "wlan0"],
+                text=True, stderr=subprocess.DEVNULL, timeout=2
+            )
+            return "inet " in result
+        except (subprocess.SubprocessError, OSError):
+            return False
+
+    def enable_wifi(self, timeout: int = None) -> bool:
+        """
+        Enable WiFi and wait for connection.
+
+        Args:
+            timeout: Max seconds to wait for connection (default: WIFI_TIMEOUT)
+
+        Returns:
+            True if connected, False if timeout or error
+        """
+        if timeout is None:
+            timeout = self.WIFI_TIMEOUT
+
+        try:
+            # Unblock WiFi
+            subprocess.run(
+                ["sudo", "rfkill", "unblock", "wifi"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+
+            # Bring interface up
+            subprocess.run(
+                ["sudo", "ip", "link", "set", "wlan0", "up"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+
+            # Wait for connection
+            import time
+            start = time.time()
+            while time.time() - start < timeout:
+                if self._is_wifi_connected():
+                    logger.info("WiFi enabled and connected")
+                    return True
+                time.sleep(1)
+
+            logger.warning(f"WiFi enable timeout after {timeout}s")
+            return False
+        except (subprocess.SubprocessError, OSError) as e:
+            logger.error(f"Failed to enable WiFi: {e}")
+            return False
+
+    def disable_wifi(self):
+        """Disable WiFi to save power."""
+        try:
+            subprocess.run(
+                ["sudo", "ip", "link", "set", "wlan0", "down"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+            subprocess.run(
+                ["sudo", "rfkill", "block", "wifi"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+            logger.info("WiFi disabled")
+        except (subprocess.SubprocessError, OSError) as e:
+            logger.error(f"Failed to disable WiFi: {e}")
+
     def _toggle_wifi(self):
         """Toggle WiFi on/off."""
-        try:
-            if self._is_wifi_enabled():
-                subprocess.run(["sudo", "rfkill", "block", "wifi"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
-            else:
-                subprocess.run(["sudo", "rfkill", "unblock", "wifi"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
-                # Bring interface up and reconnect
-                subprocess.run(["sudo", "ifconfig", "wlan0", "up"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
-                subprocess.run(["sudo", "wpa_cli", "-i", "wlan0", "reconnect"],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
-        except (subprocess.SubprocessError, OSError):
-            pass
+        if self._is_wifi_enabled():
+            self.disable_wifi()
+        else:
+            self.enable_wifi()
 
     def _is_bt_enabled(self) -> bool:
         """Check if Bluetooth is enabled."""
@@ -419,7 +524,16 @@ class NetworkCategory(SettingsCategory):
             return "Unavailable"
 
     def get_known_wifi_networks(self) -> List[dict]:
-        """Get list of known WiFi networks from wpa_supplicant."""
+        """Get list of known WiFi networks from wpa_supplicant.
+
+        Enables WiFi if needed and fails if connection times out.
+        """
+        # Enable WiFi if not enabled
+        if not self._is_wifi_enabled():
+            if not self.enable_wifi():
+                logger.error("Failed to enable WiFi for network list")
+                return []
+
         networks = []
         try:
             # Get list of configured networks from wpa_cli
@@ -431,7 +545,7 @@ class NetworkCategory(SettingsCategory):
             lines = result.strip().split('\n')[1:]
             for line in lines:
                 parts = line.split('\t')
-                if len(parts) >= 4:
+                if len(parts) >= 2:
                     network_id = parts[0]
                     ssid = parts[1]
                     flags = parts[3] if len(parts) > 3 else ""
@@ -441,12 +555,22 @@ class NetworkCategory(SettingsCategory):
                         'ssid': ssid,
                         'current': is_current
                     })
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to get WiFi networks: {e}")
         return networks
 
     def connect_to_wifi(self, network_id: str) -> bool:
-        """Connect to a specific WiFi network by ID."""
+        """Connect to a specific WiFi network by ID.
+
+        Enables WiFi if needed and waits for connection.
+        Returns False if connection fails.
+        """
+        # Enable WiFi if not enabled
+        if not self._is_wifi_enabled():
+            if not self.enable_wifi():
+                logger.error("Failed to enable WiFi for connection")
+                return False
+
         try:
             # Select the network
             subprocess.run(
@@ -458,8 +582,20 @@ class NetworkCategory(SettingsCategory):
                 ["sudo", "wpa_cli", "-i", "wlan0", "reconnect"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
             )
-            return True
-        except Exception:
+
+            # Wait for connection
+            import time
+            start = time.time()
+            while time.time() - start < self.WIFI_TIMEOUT:
+                if self._is_wifi_connected():
+                    logger.info(f"Connected to WiFi network {network_id}")
+                    return True
+                time.sleep(1)
+
+            logger.warning(f"WiFi connection timeout for network {network_id}")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to connect to WiFi: {e}")
             return False
 
     def build_menu(self) -> List[str]:
@@ -497,12 +633,20 @@ class NetworkCategory(SettingsCategory):
 class SystemCategory(SettingsCategory):
     """System settings category."""
 
+    # Path to power optimization script
+    POWER_SCRIPT = Path(__file__).parent.parent.parent / "scripts" / "power_optimise.sh"
+
     def __init__(self, settings_manager):
         super().__init__("SYSTEM", settings_manager)
         self._screen_clear_callback = None
         self._update_callback = None
         self._reset_callback = None
         self._update_status = ""
+        self._network_category = None  # Set by SettingsApp for WiFi control
+
+    def set_network_category(self, network_cat):
+        """Set reference to NetworkCategory for WiFi control."""
+        self._network_category = network_cat
 
     def set_screen_clear_callback(self, callback):
         """Set callback for screen clear shutdown."""
@@ -535,27 +679,58 @@ class SystemCategory(SettingsCategory):
     def _get_cpu_governor(self) -> str:
         """Get current CPU governor."""
         try:
-            # Read file directly instead of using cat subprocess
             governor_path = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
             with open(governor_path, 'r') as f:
                 return f.read().strip()
         except (OSError, IOError):
             return "unknown"
 
-    def _toggle_cpu_powersave(self):
-        """Toggle between performance and powersave CPU governors."""
+    def _is_power_optimised(self) -> bool:
+        """Check if power optimizations are enabled."""
+        return self._get_cpu_governor() == "powersave"
+
+    def _toggle_power_mode(self):
+        """Toggle between optimised and normal power modes."""
         try:
-            current = self._get_cpu_governor()
-            if current == "powersave":
-                new_gov = "ondemand"
+            if self._is_power_optimised():
+                # Disable optimizations
+                if self.POWER_SCRIPT.exists():
+                    subprocess.run(
+                        ["sudo", "bash", str(self.POWER_SCRIPT), "disable"],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10
+                    )
+                else:
+                    # Fallback: just set governor
+                    self._set_cpu_governor("ondemand")
+                logger.info("Power optimizations disabled")
             else:
-                new_gov = "powersave"
-            # Set governor for all CPUs using sudo tee
-            # Shell is needed here for glob pattern, but new_gov is controlled
-            subprocess.run(
-                ["sudo", "tee"] + list(Path("/sys/devices/system/cpu/").glob("cpu*/cpufreq/scaling_governor")),
-                input=new_gov, text=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
-            )
+                # Enable optimizations
+                if self.POWER_SCRIPT.exists():
+                    subprocess.run(
+                        ["sudo", "bash", str(self.POWER_SCRIPT), "enable"],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10
+                    )
+                else:
+                    # Fallback: just set governor
+                    self._set_cpu_governor("powersave")
+
+                # Disable WiFi as part of power optimization
+                if self._network_category:
+                    self._network_category.disable_wifi()
+
+                logger.info("Power optimizations enabled")
+        except (subprocess.SubprocessError, OSError) as e:
+            logger.error(f"Failed to toggle power mode: {e}")
+
+    def _set_cpu_governor(self, governor: str):
+        """Set CPU governor for all CPUs."""
+        try:
+            for cpu_path in Path("/sys/devices/system/cpu/").glob("cpu*/cpufreq/scaling_governor"):
+                subprocess.run(
+                    ["sudo", "tee", str(cpu_path)],
+                    input=governor, text=True,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+                )
         except (subprocess.SubprocessError, OSError):
             pass
 
@@ -563,13 +738,12 @@ class SystemCategory(SettingsCategory):
         long_press = self.settings.get('long_press_duration', 0.5)
         auto_update = self.settings.get('auto_update', False)
         auto_update_str = "ON" if auto_update else "OFF"
-        cpu_gov = self._get_cpu_governor()
-        cpu_mode = "Powersave" if cpu_gov == "powersave" else "Normal"
+        power_mode = "Optimised" if self._is_power_optimised() else "Normal"
         disk = self._get_disk_usage()
         return [
             f"Disk: {disk}",
             f"Ver: {version.VERSION} ({version.VERSION_DATE})",
-            f"CPU Mode: {cpu_mode}",
+            f"Power Mode: {power_mode}",
             f"Long Press: {long_press}s",
             f"Auto-Update: {auto_update_str}",
             "Check for Updates",
@@ -584,8 +758,8 @@ class SystemCategory(SettingsCategory):
     def handle_action(self, item_index: int) -> Optional[str]:
         item_text = self.items[item_index]
 
-        if "CPU Mode" in item_text:
-            self._toggle_cpu_powersave()
+        if "Power Mode" in item_text:
+            self._toggle_power_mode()
             self.refresh()
         elif "Auto-Update" in item_text:
             new_val = self.settings.toggle('auto_update')

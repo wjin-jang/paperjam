@@ -1,6 +1,14 @@
+"""
+Screen overlay rendering for status indicators.
+
+Renders on top of the main frame:
+- Status icons (headphones, WiFi, Bluetooth) in top-left
+- Battery indicator (percentage or icon) in top-right
+"""
 from PIL import ImageDraw
 import config as cfg
 from core.battery import get_battery_monitor
+
 
 class OverlayRenderer:
     def __init__(self):
@@ -19,7 +27,7 @@ class OverlayRenderer:
         if icons:
             draw = ImageDraw.Draw(img)
             draw.text((8, 0), icons, font=cfg.FONT_ICONS, fill=cfg.BLACK)
-        
+
         return img
 
     def draw_battery(self, img):

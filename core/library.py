@@ -1,3 +1,17 @@
+"""
+Music library management and caching.
+
+Features:
+- Background library scanning with progress tracking
+- Artist/Album/Track organization with case normalization
+- Favorites management (tracks, albums, artists)
+- Playlist creation and management
+- Recent plays history
+- Library cache persistence (JSON)
+
+The library scanner runs in a background thread and notifies
+listeners when complete via callback.
+"""
 import json
 import threading
 import random

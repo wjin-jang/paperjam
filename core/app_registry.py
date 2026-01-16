@@ -1,3 +1,11 @@
+"""
+Application registry for managing multiple apps.
+
+Provides a central registry for app instances, allowing
+the main loop to launch apps by ID and track their order.
+"""
+
+
 class AppRegistry:
     def __init__(self):
         self._apps = {}

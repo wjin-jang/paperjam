@@ -1,3 +1,9 @@
+"""
+Logging configuration for PaperJam.
+
+Logs to both file (~/.cache/paperjam/paperjam.log) and stdout.
+File logs are limited to 1MB with 3 backup rotations.
+"""
 import logging
 import sys
 from pathlib import Path

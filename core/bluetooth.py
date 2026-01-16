@@ -1,3 +1,15 @@
+"""
+Bluetooth device management via bluetoothctl.
+
+Features:
+- Device scanning and discovery
+- Pairing, connecting, disconnecting
+- Saved device management
+- Audio output routing to Bluetooth devices
+
+Uses subprocess to interact with bluetoothctl for compatibility
+with systems that don't have DBus Python bindings installed.
+"""
 import subprocess
 import time
 import threading
@@ -304,6 +316,12 @@ class BluetoothManager:
 
         if not success:
             logger.warning(f"Bluetooth connection to {safe_mac} failed: {msg}")
+        else:
+            # Set audio output to the connected device after a brief delay
+            # to allow PulseAudio to register the new sink
+            time.sleep(1.5)
+            if self._is_audio_device(mac):
+                self.set_audio_output(mac)
 
         callback(success, msg)
 
@@ -316,3 +334,63 @@ class BluetoothManager:
         if not self._is_valid_mac(mac):
             return
         self._run_cmd(['bluetoothctl', 'disconnect', mac])
+
+    def set_audio_output(self, mac):
+        """Set audio output to the connected Bluetooth device.
+
+        Args:
+            mac: MAC address of the Bluetooth device
+        """
+        if not self._is_valid_mac(mac):
+            return False
+
+        try:
+            # Get PulseAudio sinks
+            result = subprocess.check_output(
+                ["pactl", "list", "sinks", "short"],
+                text=True, stderr=subprocess.DEVNULL, timeout=2
+            )
+
+            # Find sink matching the Bluetooth device (bluez_sink format)
+            # MAC address in sink name uses underscores instead of colons
+            mac_underscore = mac.replace(':', '_')
+            for line in result.split('\n'):
+                if mac_underscore.lower() in line.lower() or 'bluez' in line.lower():
+                    parts = line.split('\t')
+                    if len(parts) >= 2:
+                        sink_name = parts[1]
+                        # Set as default sink
+                        subprocess.run(
+                            ["pactl", "set-default-sink", sink_name],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
+                        )
+                        # Move existing streams to new sink
+                        self._move_streams_to_sink(sink_name)
+                        logger.info(f"Audio output set to Bluetooth device: {sink_name}")
+                        return True
+
+            logger.warning(f"No audio sink found for Bluetooth device {mac}")
+            return False
+        except (subprocess.SubprocessError, OSError) as e:
+            logger.error(f"Failed to set Bluetooth audio output: {e}")
+            return False
+
+    def _move_streams_to_sink(self, sink_name):
+        """Move all playing streams to the specified sink."""
+        try:
+            # Get list of sink inputs
+            result = subprocess.check_output(
+                ["pactl", "list", "short", "sink-inputs"],
+                text=True, stderr=subprocess.DEVNULL, timeout=2
+            )
+            for line in result.strip().split('\n'):
+                if line:
+                    parts = line.split('\t')
+                    if parts:
+                        input_id = parts[0]
+                        subprocess.run(
+                            ["pactl", "move-sink-input", input_id, sink_name],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
+                        )
+        except (subprocess.SubprocessError, OSError):
+            pass

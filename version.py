@@ -1,3 +1,9 @@
+"""
+Version information for PaperJam.
+
+Provides VERSION constant and helper to get version date from git history.
+Used by settings app to display current version info.
+"""
 import subprocess
 import os
 

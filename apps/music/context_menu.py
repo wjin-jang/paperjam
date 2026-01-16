@@ -69,7 +69,13 @@ class ContextMenuHandler:
         elif item.get('type') == 'album':
             return ["Add to Queue", "Favourite Album", "Cancel"]
         elif item.get('type') == 'heading':
-            # Headings are typically album names in artist view
+            # Check if this is an alphabetical heading (single char like A, B, #)
+            # vs album/disc heading (longer name like "Album Name" or "Disc 1")
+            name = item.get('name', '')
+            if len(name) <= 1 or name.startswith('Disc '):
+                # Alphabetical or disc heading - no context menu options
+                return ["Cancel"]
+            # Album heading in artist view
             return ["Go to Album", "Add to Queue", "Favourite Album", "Cancel"]
         elif item.get('type') == 'file':
             opts = ["Add to Queue", "Favourite Song", "Add to Playlist"]
