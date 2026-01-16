@@ -14,7 +14,7 @@ import time
 from PIL import Image, ImageDraw
 import config as cfg
 from ui.views.core import Panel
-from ui.views.items import TextItem, ColumnItem, Column
+from ui.views.items import TextItem, ColumnItem, Column, VolumeBarItem
 
 
 class PopupTermination(Enum):
@@ -283,6 +283,7 @@ class PopupManager:
     def __init__(self):
         """Create a popup manager."""
         self._stack: List[PopupPanel] = []
+        self._needs_refresh = False  # Set when popup expires to trigger display refresh
 
     def push(self, popup: PopupPanel) -> PopupPanel:
         """Push a popup onto the stack.
@@ -357,7 +358,21 @@ class PopupManager:
 
     def _cleanup_expired(self):
         """Remove expired popups from stack."""
+        old_count = len(self._stack)
         self._stack = [p for p in self._stack if p.is_active()]
+        if len(self._stack) < old_count:
+            self._needs_refresh = True
+
+    def consume_refresh_flag(self) -> bool:
+        """Check and clear the refresh flag.
+
+        Returns:
+            True if a refresh is needed due to popup expiry
+        """
+        if self._needs_refresh:
+            self._needs_refresh = False
+            return True
+        return False
 
     # Factory methods for common popup types
 
@@ -391,7 +406,7 @@ class PopupManager:
         Returns:
             The popup for updating level
         """
-        def render_volume(canvas: Image.Image, state: PopupState) -> Image.Image:
+        def render_volume_panel(canvas: Image.Image, state: PopupState) -> Image.Image:
             vol = state.extra.get('level', 0)
             title_text = state.extra.get('title', 'VOLUME')
 
@@ -400,33 +415,15 @@ class PopupManager:
             x = (cfg.SCREEN_WIDTH - panel_w) // 2
             y = (cfg.SCREEN_HEIGHT - panel_h) // 2
 
-            # Create panel with header
-            panel = Panel(x, y, panel_w, panel_h, header=f"{title_text} {int(vol)}%")
+            # Create panel with volume header
+            header_text = f"{title_text} {int(vol)}%"
+            panel = Panel(x, y, panel_w, panel_h, header=header_text)
             menu = panel.create_menu()
 
-            # Create volume bar as ColumnItem
-            bar_w = panel_w - (cfg.ROW_HEIGHT * 2)
-            menu.items = [
-                ColumnItem([
-                    Column(content="-", width=cfg.ROW_HEIGHT, align='center'),
-                    Column(content="", width=bar_w, align='left'),
-                    Column(content="+", width=cfg.ROW_HEIGHT, align='center'),
-                ], selectable=False)
-            ]
+            # Add volume bar item
+            menu.items = [VolumeBarItem(level=vol)]
 
             panel.render(canvas)
-
-            # Draw volume bar fill on top
-            draw = ImageDraw.Draw(canvas)
-            content_y = y + cfg.ROW_HEIGHT
-            bar_x = x + cfg.ROW_HEIGHT
-            fill_w = int(bar_w * (vol / 100.0))
-            if fill_w > 0:
-                draw.rectangle(
-                    (bar_x, content_y, bar_x + fill_w, content_y + cfg.ROW_HEIGHT),
-                    fill=cfg.BLACK
-                )
-
             return canvas
 
         config = PopupConfig(
@@ -434,7 +431,7 @@ class PopupManager:
             termination=PopupTermination.TIMER,
             timeout=1.5,
             width=160,
-            custom_render=render_volume
+            custom_render=render_volume_panel
         )
         popup = PopupPanel(config)
         popup.show([], extra={'title': title, 'level': level})

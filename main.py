@@ -19,6 +19,7 @@ import traceback
 from PIL import Image
 
 import config as cfg
+import version
 from core.audio import AudioEngine
 from core.inputs import InputHandler
 from core.system import SystemManager
@@ -99,6 +100,8 @@ class MainApp:
         else:
             # Check for auto-update on startup (only if not first run)
             self._check_auto_update()
+            # Check if version requires library rescan
+            self._check_needs_rescan()
 
     def _run_first_startup(self):
         """Handle first run using WelcomeApp."""
@@ -138,6 +141,20 @@ class MainApp:
         self._display(frame, full_refresh=True)
         time.sleep(2)
         self.sys.shutdown()
+
+    def _check_needs_rescan(self):
+        """Check if version requires library rescan."""
+        if not version.NEEDS_RESCAN:
+            return
+
+        logger.info("Version requires library rescan")
+
+        # Show rescan message
+        frame = self.renderer.render_menu("UPDATE", ["Rescanning library..."], -1, 0)
+        self._display(frame, full_refresh=True)
+
+        # Trigger async rescan
+        self.music_app.lib.scan_async(force=True)
 
     def _check_auto_update(self):
         """Check for updates on startup if auto-update is enabled."""
@@ -226,6 +243,9 @@ class MainApp:
                 if frame:
                     # Render popups on top of frame
                     frame = self.renderer.render_with_popups(frame)
+                    # Force refresh if a popup just expired
+                    if self.renderer.popup_needs_refresh():
+                        force_full = True
                     self._display(frame, force_full)
 
                     # Sleep display if screensaver is active (saves power)

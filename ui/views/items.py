@@ -19,15 +19,20 @@ class Item(ABC):
     Items are rendered within a Menu and support cursor selection.
     """
 
-    def __init__(self, selectable: bool = True, pinned: bool = False):
+    def __init__(self, selectable: bool = True, pinned: bool = False,
+                 font=None, padding: tuple = None):
         """Create an item.
 
         Args:
             selectable: Whether this item can be selected
             pinned: Whether item stays at top (doesn't scroll)
+            font: Optional font override (default: FONT_MAIN)
+            padding: Optional (x, y) padding tuple (default: (5, 3))
         """
         self.selectable = selectable
         self.pinned = pinned
+        self.font = font
+        self.padding = padding
 
     def get_height(self) -> int:
         """Get item height in pixels."""
@@ -56,7 +61,7 @@ class Item(ABC):
     def _draw_text_box(self, draw: ImageDraw.Draw, canvas: Image.Image,
                        text: str, x: int, y: int, w: int, h: int,
                        invert: bool = False, center: bool = False,
-                       font=None):
+                       font=None, padding: tuple = None):
         """Draw a text box with optional inversion.
 
         Args:
@@ -67,12 +72,17 @@ class Item(ABC):
             invert: Whether to invert colors
             center: Whether to center text
             font: Optional font override
+            padding: Optional (x, y) padding tuple
         """
         if h < 1 or w < 1:
             return
 
+        # Use item's font/padding if set, otherwise use defaults/args
         if font is None:
-            font = cfg.FONT_MAIN
+            font = self.font if self.font else cfg.FONT_MAIN
+        if padding is None:
+            padding = self.padding if self.padding else (5, 3)
+        padding_x, padding_y = padding
 
         bg = cfg.BLACK if invert else cfg.WHITE
         fg = cfg.WHITE if invert else cfg.BLACK
@@ -81,7 +91,6 @@ class Item(ABC):
         text_draw = ImageDraw.Draw(text_layer)
         text_draw.rectangle((0, 0, w, h), outline=cfg.BLACK)
 
-        padding_x, padding_y = 5, 3
         if center:
             bbox = text_draw.textbbox((0, 0), text, font=font)
             text_w = bbox[2] - bbox[0]
@@ -324,11 +333,142 @@ class HeadingItem(Item):
             draw.rectangle((x + 1, y + 1, x + w - 1, y + h - 1), outline=cfg.WHITE)
 
 
+class MultilineItem(Item):
+    """Item that wraps text across multiple lines based on available width."""
+
+    def __init__(self, text: str, selectable: bool = False, pinned: bool = False,
+                 font=None, padding: tuple = None):
+        """Create a multiline item.
+
+        Args:
+            text: Text to wrap across lines
+            selectable: Whether item can be selected
+            pinned: Whether item stays at top
+            font: Optional font override
+            padding: Optional (x, y) padding tuple
+        """
+        super().__init__(selectable, pinned, font, padding)
+        self.text = text
+        self._wrapped_lines: List[str] = []
+        self._last_width: int = 0
+
+    def _wrap_text(self, width: int) -> List[str]:
+        """Wrap text to fit within given width."""
+        if width == self._last_width and self._wrapped_lines:
+            return self._wrapped_lines
+
+        font = self.font if self.font else cfg.FONT_MAIN
+        padding_x = self.padding[0] if self.padding else 5
+        max_text_width = width - (padding_x * 2)
+
+        words = self.text.split()
+        lines = []
+        current_line = []
+
+        # Estimate char width (approximate)
+        from PIL import Image, ImageDraw
+        temp = Image.new('1', (1, 1))
+        temp_draw = ImageDraw.Draw(temp)
+
+        for word in words:
+            test_line = ' '.join(current_line + [word])
+            bbox = temp_draw.textbbox((0, 0), test_line, font=font)
+            text_width = bbox[2] - bbox[0]
+
+            if text_width <= max_text_width:
+                current_line.append(word)
+            else:
+                if current_line:
+                    lines.append(' '.join(current_line))
+                current_line = [word]
+
+        if current_line:
+            lines.append(' '.join(current_line))
+
+        self._wrapped_lines = lines if lines else [self.text]
+        self._last_width = width
+        return self._wrapped_lines
+
+    def get_height(self) -> int:
+        """Get item height based on wrapped line count."""
+        # Use a default estimate if not yet wrapped
+        if not self._wrapped_lines:
+            # Estimate based on text length
+            estimated_lines = max(1, len(self.text) // 20)
+            return estimated_lines * cfg.ROW_HEIGHT
+        return len(self._wrapped_lines) * cfg.ROW_HEIGHT
+
+    def render(self, draw: ImageDraw.Draw, canvas: Image.Image,
+               x: int, y: int, w: int, h: int,
+               selected: bool = False, selected_col: int = -1):
+        """Render multiline item."""
+        lines = self._wrap_text(w)
+        font = self.font if self.font else cfg.FONT_MAIN
+        padding = self.padding if self.padding else (5, 3)
+        padding_x, padding_y = padding
+
+        invert = selected and self.selectable
+        bg = cfg.BLACK if invert else cfg.WHITE
+        fg = cfg.WHITE if invert else cfg.BLACK
+
+        total_h = len(lines) * cfg.ROW_HEIGHT
+        layer = Image.new('1', (w + 1, total_h + 1), bg)
+        layer_draw = ImageDraw.Draw(layer)
+        layer_draw.rectangle((0, 0, w, total_h), outline=cfg.BLACK)
+
+        for i, line in enumerate(lines):
+            line_y = i * cfg.ROW_HEIGHT + padding_y
+            layer_draw.text((padding_x, line_y), sanitize_text(line), font=font, fill=fg)
+
+        canvas.paste(layer, (x, y))
+
+
+class VolumeBarItem(Item):
+    """Volume bar item with -/+ buttons and progress bar."""
+
+    def __init__(self, level: int = 0, selectable: bool = False, pinned: bool = False):
+        """Create a volume bar item.
+
+        Args:
+            level: Volume level 0-100
+            selectable: Whether item can be selected
+            pinned: Whether item stays at top
+        """
+        super().__init__(selectable, pinned)
+        self.level = level
+
+    def render(self, draw: ImageDraw.Draw, canvas: Image.Image,
+               x: int, y: int, w: int, h: int,
+               selected: bool = False, selected_col: int = -1):
+        """Render volume bar with -/+ buttons."""
+        btn_w = cfg.ROW_HEIGHT
+        bar_w = w - (btn_w * 2)
+        bar_x = x + btn_w
+
+        # Draw - button
+        draw.rectangle((x, y, x + btn_w, y + h), outline=cfg.BLACK)
+        draw.text((x + 3, y - 2), "-", font=cfg.FONT_HEADER, fill=cfg.BLACK)
+
+        # Draw + button
+        end_x = x + w - btn_w
+        draw.rectangle((end_x, y, x + w, y + h), outline=cfg.BLACK)
+        draw.text((end_x + 2, y - 2), "+", font=cfg.FONT_HEADER, fill=cfg.BLACK)
+
+        # Draw volume bar background
+        draw.rectangle((bar_x, y, bar_x + bar_w, y + h), outline=cfg.BLACK)
+
+        # Draw volume bar fill
+        fill_w = int(bar_w * (self.level / 100.0))
+        if fill_w > 0:
+            draw.rectangle((bar_x, y, bar_x + fill_w, y + h), fill=cfg.BLACK)
+
+
 class InfoItem(Item):
     """Non-selectable info item with optional columns."""
 
     def __init__(self, columns: List[str] = None, lines: List = None,
-                 text: str = None, pinned: bool = False):
+                 text: str = None, pinned: bool = False,
+                 font=None, padding: tuple = None):
         """Create an info item.
 
         Args:
@@ -336,8 +476,10 @@ class InfoItem(Item):
             lines: Multiple rows, each a string or list of column strings
             text: Simple text (if no columns/lines)
             pinned: Whether item stays at top
+            font: Optional font override
+            padding: Optional (x, y) padding tuple
         """
-        super().__init__(selectable=False, pinned=pinned)
+        super().__init__(selectable=False, pinned=pinned, font=font, padding=padding)
         self.columns = columns
         self.lines = lines
         self.text = text

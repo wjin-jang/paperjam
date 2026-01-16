@@ -3,11 +3,15 @@ Version information for PaperJam.
 
 Provides VERSION constant and helper to get version date from git history.
 Used by settings app to display current version info.
+
+NEEDS_RESCAN: Set to True when an update requires library rescan
+(e.g., metadata parsing changes). Reset to False after release.
 """
 import subprocess
 import os
 
 VERSION = "1.0"
+NEEDS_RESCAN = False  # Set True when update requires library rescan
 
 def _get_version_date():
     try:

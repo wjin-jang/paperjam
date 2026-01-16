@@ -16,12 +16,9 @@ from mutagen.mp3 import MP3
 from ui.graphics import dither_image
 
 
-def extract_cover_art(file_path: Path) -> Tuple[Optional[Image.Image], Optional[Image.Image]]:
+def get_cover(file_path: Path) -> Tuple[Optional[Image.Image], Optional[Image.Image]]:
     """
     Extract and process cover art from an audio file.
-
-    This function was moved from core/metadata.py to fix the circular
-    dependency where core modules were importing from ui modules.
 
     Args:
         file_path: Path to the audio file
@@ -61,7 +58,3 @@ def extract_cover_art(file_path: Path) -> Tuple[Optional[Image.Image], Optional[
             pass
 
     return (final_small, final_large)
-
-
-# Alias for backward compatibility
-get_cover = extract_cover_art

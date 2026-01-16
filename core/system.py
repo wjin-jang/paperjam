@@ -32,15 +32,19 @@ class SystemManager:
     - E-Paper Display initialization
     - Battery monitoring
     - Shutdown/Reboot
+    - HDMI control
     """
     def __init__(self):
         self.epd = self._init_display()
         self.battery = get_battery_monitor()
         self._last_battery_check = 0
         self._low_battery_threshold = 12  # Shutdown at 12%
-        
+
         # Shutdown callback
         self.on_shutdown_request = None
+
+        # Disable HDMI by default to save power
+        self.disable_hdmi()
 
     def _init_display(self):
         if HAS_EPAPER:
@@ -67,11 +71,9 @@ class SystemManager:
         pct = self.battery.percentage
         
         if 0 <= pct <= self._low_battery_threshold and not self.battery.charging:
-            logger.warning(f"Low battery ({pct}%) - initiating safe shutdown")
+            logger.warning(f"Low battery ({pct}%)")
             if self.on_shutdown_request:
                 self.on_shutdown_request(reason="LOW BATTERY")
-            else:
-                self.shutdown()
 
     def sleep_display(self):
         if self.epd:
@@ -94,6 +96,55 @@ class SystemManager:
                 self.epd.Clear(0xFF)
             except Exception:
                 pass
+
+    def is_hdmi_enabled(self) -> bool:
+        """Check if HDMI output is enabled."""
+        try:
+            result = subprocess.check_output(
+                ["tvservice", "-s"], text=True, stderr=subprocess.DEVNULL, timeout=2
+            ).strip()
+            # "state 0x120006" means off, other states mean on
+            return "off" not in result.lower() and "0x120006" not in result
+        except (subprocess.SubprocessError, OSError):
+            return True  # Assume on if we can't check
+
+    def disable_hdmi(self):
+        """Disable HDMI output to save power."""
+        try:
+            subprocess.run(
+                ["sudo", "tvservice", "-o"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+            logger.debug("HDMI disabled")
+        except (subprocess.SubprocessError, OSError):
+            pass  # tvservice may not be available on all systems
+
+    def enable_hdmi(self):
+        """Enable HDMI output."""
+        try:
+            subprocess.run(
+                ["sudo", "tvservice", "-p"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+            # Restore framebuffer after turning on
+            subprocess.run(
+                ["sudo", "fbset", "-depth", "8"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+            subprocess.run(
+                ["sudo", "fbset", "-depth", "16"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+            logger.debug("HDMI enabled")
+        except (subprocess.SubprocessError, OSError):
+            pass
+
+    def toggle_hdmi(self):
+        """Toggle HDMI output on/off."""
+        if self.is_hdmi_enabled():
+            self.disable_hdmi()
+        else:
+            self.enable_hdmi()
 
     def shutdown(self):
         logger.info("System shutting down")
@@ -123,13 +174,22 @@ class SystemManager:
         """
         try:
             # Fetch from remote
-            subprocess.run(
+            result = subprocess.run(
                 ["git", "fetch"],
                 cwd=Path(__file__).parent.parent,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
                 timeout=30
             )
+
+            # Check for network errors
+            if result.returncode != 0:
+                error_msg = result.stderr.lower() if result.stderr else ""
+                if "could not resolve" in error_msg or "unable to access" in error_msg:
+                    return False, "No internet"
+                if "connection refused" in error_msg or "connection timed out" in error_msg:
+                    return False, "Connection failed"
+                return False, "Fetch failed"
 
             # Check if we're behind origin/main
             result = subprocess.run(
@@ -146,6 +206,8 @@ class SystemManager:
                 return False, "Up to date"
             else:
                 return False, "Unknown status"
+        except subprocess.TimeoutExpired:
+            return False, "Connection timeout"
         except (subprocess.SubprocessError, OSError) as e:
             return False, f"Error: {str(e)[:20]}"
 

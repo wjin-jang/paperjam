@@ -242,7 +242,11 @@ class MusicPlayerApp:
         item = self.state.items[self.state.selection_index]
         # Allow context menu for artists, albums, and headings (album headings in artist view)
         if item['type'] in ['file', 'playlist', 'artist', 'album', 'heading']:
-            self.context_menu.open(item)
+            # Pass queue context for queue view items
+            in_queue = self.state.browse_mode == 'QUEUE_VIEW'
+            # Queue index is selection_index minus 1 (for controls item)
+            queue_idx = self.state.selection_index - 1 if in_queue else None
+            self.context_menu.open(item, in_queue_view=in_queue, queue_index=queue_idx)
             self._sync_context_state()
 
     def _play_media(self, path, play=True):
@@ -568,6 +572,13 @@ class MusicPlayerApp:
         if self.state.shuffle_active:
             random.shuffle(self.playlist.queue)
         self.playlist.queue_idx = 0
+
+        # Wake screensaver to show new album
+        if self.state.screensaver_image is not None:
+            self.state.screensaver_image = None
+            self.state.screensaver_album = None
+            self.state.needs_refresh = True
+            self.last_input_time = time.time()  # Reset timer to keep display on
 
         # Load and play first track
         self._load_track(self.playlist.queue[0])

@@ -331,15 +331,15 @@ class DisplayCategory(SettingsCategory):
         """Toggle HDMI output on/off."""
         try:
             if self._is_hdmi_enabled():
-                subprocess.run(["tvservice", "-o"],
+                subprocess.run(["sudo", "tvservice", "-o"],
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
             else:
-                subprocess.run(["tvservice", "-p"],
+                subprocess.run(["sudo", "tvservice", "-p"],
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
                 # Restore framebuffer after turning on
-                subprocess.run(["fbset", "-depth", "8"],
+                subprocess.run(["sudo", "fbset", "-depth", "8"],
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
-                subprocess.run(["fbset", "-depth", "16"],
+                subprocess.run(["sudo", "fbset", "-depth", "16"],
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
         except (subprocess.SubprocessError, OSError):
             pass
@@ -435,6 +435,12 @@ class NetworkCategory(SettingsCategory):
             # Bring interface up
             subprocess.run(
                 ["sudo", "ip", "link", "set", "wlan0", "up"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+
+            # Tell wpa_supplicant to reconnect
+            subprocess.run(
+                ["sudo", "wpa_cli", "-i", "wlan0", "reconnect"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
             )
 
@@ -723,14 +729,37 @@ class SystemCategory(SettingsCategory):
             logger.error(f"Failed to toggle power mode: {e}")
 
     def _set_cpu_governor(self, governor: str):
-        """Set CPU governor for all CPUs."""
+        """Set CPU governor for all CPUs.
+
+        For 'normal' mode, tries governors in order: ondemand, schedutil, performance.
+        For 'powersave' mode, uses powersave directly.
+        """
         try:
             for cpu_path in Path("/sys/devices/system/cpu/").glob("cpu*/cpufreq/scaling_governor"):
-                subprocess.run(
-                    ["sudo", "tee", str(cpu_path)],
-                    input=governor, text=True,
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
-                )
+                avail_path = cpu_path.parent / "scaling_available_governors"
+
+                # For normal mode, try multiple governors
+                if governor == "ondemand":
+                    governors_to_try = ["ondemand", "schedutil", "performance"]
+                else:
+                    governors_to_try = [governor]
+
+                for gov in governors_to_try:
+                    # Check if governor is available
+                    try:
+                        avail = avail_path.read_text()
+                        if gov not in avail:
+                            continue
+                    except OSError:
+                        pass  # Try anyway
+
+                    result = subprocess.run(
+                        ["sudo", "tee", str(cpu_path)],
+                        input=gov, text=True,
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+                    )
+                    if result.returncode == 0:
+                        break  # Success, move to next CPU
         except (subprocess.SubprocessError, OSError):
             pass
 

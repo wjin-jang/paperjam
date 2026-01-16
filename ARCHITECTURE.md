@@ -26,8 +26,9 @@ paperjam/
 │   ├── inputs.py        # Input device handling (evdev)
 │   ├── library.py       # Music library scanner/manager
 │   ├── metadata.py      # Audio file metadata extraction
-│   ├── system.py        # System operations (shutdown, display)
-│   └── battery.py       # I2C battery monitor
+│   ├── system.py        # System operations (shutdown, display, HDMI)
+│   ├── battery.py       # I2C battery monitor
+│   └── i18n.py          # Internationalization (translations)
 ├── ui/                  # UI rendering
 │   ├── renderer.py      # Main renderer facade
 │   ├── overlays.py      # Status bar, battery indicator
@@ -39,6 +40,8 @@ paperjam/
 │       ├── menu_view.py     # Generic menu view
 │       ├── popup.py         # Popup system
 │       └── screensaver_view.py # Screensaver/shutdown
+├── locales/             # Translation files (YAML)
+│   └── en.yaml          # English translations
 └── assets/              # Fonts and static resources
 ```
 
@@ -67,16 +70,32 @@ paperjam/
 ### UI Architecture
 
 **Panel → Menu → Item** hierarchy:
-- `Panel`: Container with optional header, draws borders
-- `Menu`: Manages items, cursor, scrolling
-- `Item`: Renderable elements (TextItem, ColumnItem, HeadingItem, etc.)
+- `Panel`: Container with optional header, draws borders and shadow
+- `Menu`: Manages items, cursor position, scrolling
+- `Item`: Renderable elements with consistent interface
+
+**Item Types** (`ui/views/items.py`):
+- `TextItem`: Simple text with optional icon prefix
+- `HeadingItem`: Section heading (always inverted)
+- `InfoItem`: Non-selectable info with columns/lines
+- `ColumnItem`: Multiple columns for horizontal navigation
+- `ImageItem`: Album art display with placeholder
+- `MultilineItem`: Text that wraps across multiple lines
+- `VolumeBarItem`: Volume control with -/+ buttons and progress bar
+
+**Popup System** (`ui/views/popup.py`):
+- `PopupPanel`: Overlay panel with configurable dismissal
+- `PopupManager`: Manages popup stack and input routing
+- Dismissal modes: INPUT (user), PROGRAMMATIC, TIMER
+- Factory methods: `show_volume()`, `show_confirm()`, `show_loading()`, etc.
 
 **Rendering Flow**:
 1. App calls `renderer.render_*()` method
 2. View renderer creates Panel/Menu/Items
 3. Items render to PIL Image
 4. Main loop applies overlays (status bar, battery)
-5. Image sent to e-paper display
+5. PopupManager renders active popups
+6. Image sent to e-paper display
 
 ### E-Paper Display Handling
 
@@ -157,6 +176,20 @@ User Input → InputHandler → Callbacks → App State
 - `volume.json`: Persisted volume level
 - `playlists/`: User playlists
 
+### Internationalization
+
+**i18n Module** (`core/i18n.py`):
+- YAML-based translation files in `locales/` directory
+- Dot notation for nested keys: `t('player.status.playing')`
+- Falls back to English if translation missing
+- Supports string interpolation: `t('track.count', count=5)`
+
+**Usage**:
+```python
+from core.i18n import t
+label = t('player.status.playing')  # Returns "PLAYING"
+```
+
 ## Key Design Decisions
 
 1. **PIL for rendering**: Cross-platform, easy image manipulation
@@ -165,3 +198,4 @@ User Input → InputHandler → Callbacks → App State
 4. **JSON for data**: Human-readable, easy debugging
 5. **Modular apps**: Clean separation, easy to add new apps
 6. **View hierarchy**: Reusable UI components
+7. **Panel → Menu → Item**: Consistent UI rendering pattern

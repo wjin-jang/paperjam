@@ -114,7 +114,6 @@ def load_fonts():
     return main, header, icons
 
 FONT_MAIN, FONT_HEADER, FONT_ICONS = load_fonts()
-NEEDS_RESCAN = False
 
 # --- Status Icons ---
 STATUS_ICONS = {

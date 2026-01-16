@@ -42,15 +42,23 @@ case "$ACTION" in
         # Enable HDMI output
         if command -v tvservice &> /dev/null; then
             tvservice -p 2>/dev/null || true
+            # Restore framebuffer
+            fbset -depth 8 2>/dev/null || true
+            fbset -depth 16 2>/dev/null || true
         fi
 
         # Restore LED defaults
         echo mmc0 | sudo tee /sys/class/leds/led0/trigger 2>/dev/null || true
         echo input | sudo tee /sys/class/leds/led1/trigger 2>/dev/null || true
 
-        # Set CPU governor to ondemand (balanced)
+        # Set CPU governor to performance mode (try multiple options)
         for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-            echo ondemand | sudo tee "$cpu" 2>/dev/null || true
+            # Try governors in order of preference
+            for gov in ondemand schedutil performance; do
+                if grep -q "$gov" "${cpu%/*}/scaling_available_governors" 2>/dev/null; then
+                    echo "$gov" | sudo tee "$cpu" 2>/dev/null && break
+                fi
+            done
         done
 
         echo "Power optimizations disabled"

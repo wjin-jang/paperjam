@@ -79,6 +79,23 @@ class PlaylistManager:
         with self._lock:
             self.manual_queue.clear()
 
+    def remove_from_queue(self, index: int):
+        """Remove a track from the manual queue by index (thread-safe)."""
+        with self._lock:
+            if 0 <= index < len(self.manual_queue):
+                del self.manual_queue[index]
+
+    def move_in_queue(self, from_index: int, to_index: int):
+        """Move a track in the manual queue from one position to another (thread-safe)."""
+        with self._lock:
+            if 0 <= from_index < len(self.manual_queue):
+                # Clamp to_index to valid range
+                to_index = max(0, min(to_index, len(self.manual_queue) - 1))
+                if from_index != to_index:
+                    item = self.manual_queue[from_index]
+                    del self.manual_queue[from_index]
+                    self.manual_queue.insert(to_index, item)
+
     def next_track(self, auto_advance=False) -> Optional[str]:
         """
         Move to next track and return its path.

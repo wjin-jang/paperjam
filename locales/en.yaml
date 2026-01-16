@@ -1,0 +1,144 @@
+# English translations for PaperJam
+# This is the default/fallback language
+
+# Main menu
+menu:
+  home: "HOME MENU"
+  music: "Music"
+  settings: "Settings"
+
+# Music player
+player:
+  status:
+    playing: "PLAYING"
+    paused: "PAUSED"
+    idle: "IDLE"
+    next: "NEXT"
+    previous: "PREVIOUS"
+    shuffle_on: "SHUFFLE ON"
+    shuffle_off: "SHUFFLE OFF"
+    loop_all: "LOOP ALL"
+    loop_one: "LOOP ONE"
+    loop_off: "LOOP OFF"
+    endless: "ENDLESS"
+
+  browse:
+    library: "Library"
+    artists: "Artists"
+    albums: "Albums"
+    tracks: "All Tracks"
+    playlists: "Playlists"
+    favourites: "Favourites"
+    fav_albums: "Fav Albums"
+    fav_artists: "Fav Artists"
+    fav_tracks: "Fav Tracks"
+    recent: "Recently Played"
+    files: "Files"
+    queue: "QUEUE"
+    queue_empty: "(Queue Empty)"
+    no_tracks: "(No Tracks)"
+    unknown_album: "Unknown Album"
+    unknown_artist: "Unknown Artist"
+
+  context:
+    options: "OPTIONS"
+    add_to_queue: "Add to Queue"
+    favourite_song: "Favourite Song"
+    favourite_album: "Favourite Album"
+    favourite_artist: "Favourite Artist"
+    add_to_playlist: "Add to Playlist"
+    new_playlist: "New Playlist"
+    delete_playlist: "Delete Playlist"
+    go_to_artist: "Go to Artist"
+    go_to_album: "Go to Album"
+    remove_from_queue: "Remove from Queue"
+    send_to_top: "Send to Top"
+    move_up: "Move Up"
+    move_down: "Move Down"
+    cancel: "Cancel"
+
+# Settings
+settings:
+  categories:
+    audio: "Audio"
+    library: "Library"
+    network: "Network"
+    system: "System"
+    display: "Display"
+
+  audio:
+    volume: "Volume"
+    output: "Output"
+    bluetooth: "Bluetooth"
+    endless_play: "Endless Play"
+
+  library:
+    scan: "Scan Library"
+    scanning: "Scanning..."
+    clear_recents: "Clear Recents"
+    clear_favs: "Clear Favourites"
+
+  network:
+    wifi: "WiFi"
+    wifi_network: "WiFi Network"
+    select_network: "Select Network"
+    connecting: "Connecting..."
+    connected: "Connected"
+    failed: "Failed"
+    saved_networks: "Saved Networks"
+
+  display:
+    invert_colors: "Invert Colors"
+    screensaver: "Screensaver"
+    hdmi_output: "HDMI Output"
+
+  system:
+    disk: "Disk"
+    version: "Ver"
+    power_mode: "Power Mode"
+    power_optimised: "Optimised"
+    power_normal: "Normal"
+    long_press: "Long Press"
+    auto_update: "Auto-Update"
+    check_updates: "Check for Updates"
+    restart: "Restart System"
+    reset_data: "Reset Data & Reboot"
+    shutdown: "Clear Screen + Shut Down"
+
+  bluetooth:
+    scan: "Scan"
+    scanning: "Scanning..."
+    connect: "Connect"
+    disconnect: "Disconnect"
+    forget: "Forget Device"
+    pairing: "Pairing..."
+    paired: "Paired"
+    no_devices: "No devices found"
+
+# Welcome screen
+welcome:
+  title: "WELCOME TO PAPERJAM"
+  continue: "Continue..."
+  scanning: "Scanning library..."
+
+# General
+general:
+  on: "ON"
+  off: "OFF"
+  yes: "Yes"
+  no: "No"
+  ok: "OK"
+  loading: "Loading..."
+  error: "Error"
+  power_off: "POWER OFF"
+
+# Update messages
+updates:
+  checking: "Checking..."
+  available: "Updates available"
+  up_to_date: "Up to date"
+  no_internet: "No internet"
+  connection_failed: "Connection failed"
+  timeout: "Connection timeout"
+  updating: "Updating..."
+  restart: "Restarting..."

@@ -137,7 +137,7 @@ class ScreensaverRenderer:
 
         # Draw dialog box as a Panel
         dialog_w = 140
-        dialog_h = cfg.ROW_HEIGHT * 2 + 4
+        dialog_h = cfg.ROW_HEIGHT * 2
         dialog_x = (cfg.SCREEN_WIDTH - dialog_w) // 2
         dialog_y = (cfg.SCREEN_HEIGHT - dialog_h) // 2
 

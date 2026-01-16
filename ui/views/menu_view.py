@@ -4,7 +4,7 @@ Menu view rendering using Panel → Menu → Item hierarchy.
 from PIL import Image, ImageDraw
 import config as cfg
 from ui.views.core import Panel
-from ui.views.items import TextItem, InfoItem, ColumnItem, Column
+from ui.views.items import TextItem, InfoItem, ColumnItem, Column, VolumeBarItem
 
 
 class MenuViewRenderer:
@@ -120,7 +120,7 @@ class MenuViewRenderer:
         return self.canvas
 
     def render_volume(self, title, volume_level):
-        """Render volume control view.
+        """Render volume control view using Panel → Menu → Item structure.
 
         Args:
             title: Title text (e.g., "VOLUME")
@@ -136,31 +136,14 @@ class MenuViewRenderer:
         x = (cfg.SCREEN_WIDTH - panel_w) // 2
         y = (cfg.SCREEN_HEIGHT - panel_h) // 2
 
-        # Create panel with header
-        panel = Panel(x, y, panel_w, panel_h, header=f"{title} {int(volume_level)}%")
+        # Create panel with volume header
+        header_text = f"{title} {int(volume_level)}%"
+        panel = Panel(x, y, panel_w, panel_h, header=header_text)
         menu = panel.create_menu()
 
-        # Create volume bar as ColumnItem with 3 columns: [-] [bar] [+]
-        bar_w = panel_w - (cfg.ROW_HEIGHT * 2)
-        menu.items = [
-            ColumnItem([
-                Column(content="-", width=cfg.ROW_HEIGHT, align='center'),
-                Column(content="", width=bar_w, align='left'),  # Bar placeholder
-                Column(content="+", width=cfg.ROW_HEIGHT, align='center'),
-            ], selectable=False)
-        ]
+        # Add volume bar item
+        menu.items = [VolumeBarItem(level=volume_level)]
 
-        # Render panel
         panel.render(self.canvas)
-
-        # Draw the volume bar fill on top (special case - progress bar)
-        content_y = y + cfg.ROW_HEIGHT
-        bar_x = x + cfg.ROW_HEIGHT
-        fill_w = int(bar_w * (volume_level / 100.0))
-        if fill_w > 0:
-            self.draw.rectangle(
-                (bar_x, content_y, bar_x + fill_w, content_y + cfg.ROW_HEIGHT),
-                fill=cfg.BLACK
-            )
 
         return self.canvas

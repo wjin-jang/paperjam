@@ -208,31 +208,40 @@ class Menu:
         When scrolling past the first visible item, load the previous page.
         """
         if not self.items or self.cursor.row < 0:
+            self.scroll_offset = 0
             return
 
+        # Ensure cursor is in bounds
+        if self.cursor.row >= len(self.items):
+            self.cursor.row = len(self.items) - 1
+
         # Calculate cursor item position in pixels
-        y = 0
+        row_top = 0
+        row_bottom = 0
         for i, item in enumerate(self.items):
             h = item.get_height()
             if i == self.cursor.row:
-                row_top = y
-                row_bottom = y + h
+                row_bottom = row_top + h
                 break
-            y += h
-        else:
+            row_top += h
+
+        total_height = self.get_total_height()
+        max_scroll = max(0, total_height - self.height)
+
+        # If content fits in viewport, no scrolling needed
+        if total_height <= self.height:
+            self.scroll_offset = 0
             return
 
         # Page-based scrolling
         if row_top < self.scroll_offset:
             # Scrolling up - show previous page with cursor at bottom
-            # Calculate page offset that puts cursor item at bottom of viewport
             self.scroll_offset = max(0, row_bottom - self.height)
         elif row_bottom > self.scroll_offset + self.height:
             # Scrolling down - show next page with cursor at top
             self.scroll_offset = row_top
 
         # Clamp to valid range
-        max_scroll = max(0, self.get_total_height() - self.height)
         self.scroll_offset = max(0, min(self.scroll_offset, max_scroll))
 
     def render(self) -> Image.Image:

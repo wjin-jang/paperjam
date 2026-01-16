@@ -75,7 +75,10 @@ def get_metadata(file_path):
             title = audio.get("title", [None])[0]
 
             track_num = parse_num(audio.get("tracknumber", [0])[0])
-            disc_num = parse_num(audio.get("discnumber", [1])[0])
+            # Try multiple disc number tag variations (different taggers use different names)
+            disc_val = (audio.get("discnumber") or audio.get("disc") or
+                       audio.get("disknumber") or audio.get("part") or [1])
+            disc_num = parse_num(disc_val[0])
 
             date_str = audio.get("date", [None])[0]
             if date_str: year = date_str.split('-')[0]
@@ -121,5 +124,3 @@ def format_duration(seconds: int) -> str:
     if hours > 0:
         return f"{hours}:{minutes:02d}:{secs:02d}"
     return f"{minutes}:{secs:02d}"
-
-# get_cover is in ui.image_utils - import directly from there

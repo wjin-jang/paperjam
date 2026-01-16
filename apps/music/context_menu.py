@@ -27,19 +27,25 @@ class ContextMenuHandler:
         self.options: List[str] = []
         self.index = 0
         self.target_item: Optional[dict] = None
+        self.target_queue_index: Optional[int] = None  # Index in queue for queue items
         self.layer = 0
+        self._in_queue_view = False
 
-    def open(self, item: dict):
+    def open(self, item: dict, in_queue_view: bool = False, queue_index: int = None):
         """
         Open context menu for an item.
 
         Args:
             item: Item dict to show context menu for
+            in_queue_view: Whether the item is in queue view
+            queue_index: Index of the item in the queue (for queue management)
         """
         self.active = True
         self.index = 0
         self.target_item = item
+        self.target_queue_index = queue_index
         self.layer = 0
+        self._in_queue_view = in_queue_view
         self.options = self._get_options_for_item(item)
 
     def close(self):
@@ -48,7 +54,9 @@ class ContextMenuHandler:
         self.options = []
         self.index = 0
         self.target_item = None
+        self.target_queue_index = None
         self.layer = 0
+        self._in_queue_view = False
 
     def go_back(self):
         """Handle back action in context menu."""
@@ -62,6 +70,16 @@ class ContextMenuHandler:
 
     def _get_options_for_item(self, item: dict) -> List[str]:
         """Get context menu options based on item type."""
+        # Queue view has special options for queue management
+        if self._in_queue_view and item.get('type') == 'file':
+            opts = ["Remove from Queue", "Send to Top", "Move Up", "Move Down"]
+            if item.get('artist'):
+                opts.append("Go to Artist")
+            if item.get('album'):
+                opts.append("Go to Album")
+            opts.append("Cancel")
+            return opts
+
         if item.get('type') == 'playlist':
             return ["Add to Queue", "Delete Playlist", "Cancel"]
         elif item.get('type') == 'artist':
@@ -117,6 +135,35 @@ class ContextMenuHandler:
         if self.layer == 0:
             if opt == "Cancel":
                 self.close()
+                return None
+
+            # Queue management options (for QUEUE_VIEW)
+            elif opt == "Remove from Queue":
+                if self.target_queue_index is not None:
+                    self.playlist.remove_from_queue(self.target_queue_index)
+                self.close()
+                on_refresh()
+                return None
+
+            elif opt == "Send to Top":
+                if self.target_queue_index is not None:
+                    self.playlist.move_in_queue(self.target_queue_index, 0)
+                self.close()
+                on_refresh()
+                return None
+
+            elif opt == "Move Up":
+                if self.target_queue_index is not None and self.target_queue_index > 0:
+                    self.playlist.move_in_queue(self.target_queue_index, self.target_queue_index - 1)
+                self.close()
+                on_refresh()
+                return None
+
+            elif opt == "Move Down":
+                if self.target_queue_index is not None:
+                    self.playlist.move_in_queue(self.target_queue_index, self.target_queue_index + 1)
+                self.close()
+                on_refresh()
                 return None
 
             elif opt == "Add to Queue":

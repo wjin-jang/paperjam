@@ -80,3 +80,11 @@ class UIRenderer:
             True if popup is active
         """
         return self.popups.has_active_popup()
+
+    def popup_needs_refresh(self) -> bool:
+        """Check if a popup expired and needs a display refresh.
+
+        Returns:
+            True if refresh needed (consumes the flag)
+        """
+        return self.popups.consume_refresh_flag()
