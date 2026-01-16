@@ -235,10 +235,10 @@ class Menu:
         # Page-based scrolling
         if row_top < self.scroll_offset:
             # Scrolling up - ensure top is visible
-            self.scroll_offset = max(0, row_top - self.height)
+            self.scroll_offset = row_top
         elif row_bottom > self.scroll_offset + self.height:
             # Scrolling down - ensure bottom is visible
-            self.scroll_offset = row_bottom + self.height
+            self.scroll_offset = row_bottom - self.height
 
         # Clamp to valid range
         self.scroll_offset = max(0, min(self.scroll_offset, max_scroll))
