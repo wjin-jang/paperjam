@@ -106,7 +106,7 @@ cd paperjam
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
-pip install pillow mutagen python-vlc smbus2 evdev numpy spidev RPi.GPIO gpiozero pykakasi korean_romanizer
+pip install pillow mutagen python-vlc smbus2 evdev numpy spidev RPi.GPIO gpiozero pykakasi korean_romanizer pyyaml
 
 # Symlink system lgpio into venv (can't be pip installed)
 # Get the exact Python version for the correct site-packages path
@@ -129,6 +129,7 @@ Dependencies:
 - **lgpio** - GPIO backend for gpiozero (system package, symlinked)
 - **pykakasi** - Japanese text romanization (optional, for Japanese metadata)
 - **korean_romanizer** - Korean text romanization (optional, for Korean metadata)
+- **pyyaml** - YAML parsing for localization files
 
 ### 8. Waveshare e-Paper Driver
 
