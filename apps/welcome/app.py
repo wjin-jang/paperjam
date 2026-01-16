@@ -99,7 +99,7 @@ class WelcomeApp:
             return self._render_scanning()
         elif self.view == 'WELCOME':
             return self._render_welcome()
-        return self.renderer.render_menu("WELCOME", [t('general.loading')], 0, 0)
+        return self.renderer.render_menu(t('welcome.welcome'), [t('general.loading')], 0, 0)
 
     def _render_choice(self):
         """Render choice screen with multi-line info."""
@@ -109,7 +109,7 @@ class WelcomeApp:
             music_path = music_path[:22]
 
         items = [
-            {"type": "info", "text": t('welcome.music_found', path=music_path)},
+            t('welcome.music_found', path=music_path),
             t('welcome.scan_now'),
             t('welcome.shutdown_add_music')
         ]
@@ -118,7 +118,7 @@ class WelcomeApp:
         sel_idx = self.choice_idx + 1
 
         return self.renderer.render_menu(
-            "WELCOME", items, sel_idx, 0,
+            t('welcome.welcome'), items, sel_idx, 0,
             info_indices=[0]
         )
 
@@ -132,10 +132,10 @@ class WelcomeApp:
 
         if self.lib.scan_current_file:
             current = self.lib.scan_current_file[:22]
-            items.append(f"File: {current}")
+            items.append(f"{t('welcome.file')}: {current}")
 
         return self.renderer.render_menu(
-            t('settings.library.scanning').upper(), items, -1, 0,
+            t('welcome.scanning'), items, -1, 0,
             info_indices=[0, 1, 2, 3]
         )
 

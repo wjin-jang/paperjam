@@ -9,7 +9,9 @@
       "WebSearch",
       "WebFetch(domain:github.com)",
       "Bash(find:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(findstr:*)",
+      "Bash(findstr /R \"t\\(''\")"
     ]
   }
 }

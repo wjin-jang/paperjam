@@ -135,13 +135,16 @@ settings:
 
 # Welcome screen
 welcome:
+  welcome: "WELCOME"
   title: "WELCOME TO PAPERJAM"
   continue: "Continue..."
-  scanning: "Scanning library..."
+  scanning: "SCANNING"
+  scanning_library: "Scanning library..."
   music_found: "Your music was found at {path}"
   scan_now: "Scan Library Now"
   shutdown_add_music: "Shutdown (Add Music)"
   scanning_tracks: "Scanning: {count} tracks"
+  file: "File"
 
 # General
 general:
