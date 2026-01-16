@@ -202,9 +202,9 @@ class Menu:
         self.cursor.col = 0
 
     def _ensure_visible(self):
-        """Ensure cursor row is visible in the viewport.
+        """Ensure cursor row is visible in the viewport using page-based scrolling.
 
-        Adjusts scroll offset to keep the selected item visible.
+        Scrolls by a full page (screen height) when the cursor moves out of bounds.
         """
         if not self.items or self.cursor.row < 0:
             self.scroll_offset = 0
@@ -216,32 +216,29 @@ class Menu:
 
         # Calculate cursor item position in pixels
         row_top = 0
-        row_bottom = 0
         for i, item in enumerate(self.items):
             h = item.get_height()
             if i == self.cursor.row:
-                row_bottom = row_top + h
                 break
             row_top += h
 
         total_height = self.get_total_height()
+        
+        # Calculate page height
+        rows_per_page = self.height // cfg.ROW_HEIGHT
+        page_height = rows_per_page * cfg.ROW_HEIGHT
+
+        # Avoid division by zero if window is extremely small
+        if page_height <= 0:
+            page_height = self.height
+
+        # Calculate which page the cursor is on
+        current_page_index = row_top // page_height
+        target_scroll = current_page_index * page_height
+
+        # Clamp to valid range (Standard bounds checking)
         max_scroll = max(0, total_height - self.height)
-
-        # If content fits in viewport, no scrolling needed
-        if total_height <= self.height:
-            self.scroll_offset = 0
-            return
-
-        # Page-based scrolling
-        if row_top < self.scroll_offset:
-            # Scrolling up - ensure top is visible
-            self.scroll_offset = row_top
-        elif row_bottom > self.scroll_offset + self.height:
-            # Scrolling down - ensure bottom is visible
-            self.scroll_offset = row_bottom + self.height
-
-        # Clamp to valid range
-        self.scroll_offset = max(0, min(self.scroll_offset, max_scroll))
+        self.scroll_offset = max(0, min(target_scroll, max_scroll))
 
     def render(self) -> Image.Image:
         """Render menu items to a frame buffer.
