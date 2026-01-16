@@ -115,6 +115,41 @@ class SystemManager:
         except (subprocess.SubprocessError, OSError) as e:
             logger.error(f"Reboot failed: {e}")
 
+    def check_audio_device(self):
+        """Check if a valid audio sink is available."""
+        try:
+            r = subprocess.check_output(
+                ["pactl", "get-default-sink"],
+                text=True, stderr=subprocess.DEVNULL, timeout=2
+            ).strip()
+            if any(x in r.lower() for x in ['bluez', 'usb', 'headphone']):
+                return True
+        except (subprocess.SubprocessError, OSError):
+            pass
+        return False
+
+    def check_wifi(self):
+        """Check if connected to WiFi."""
+        try:
+            r = subprocess.check_output(
+                ["iwgetid", "-r"],
+                text=True, stderr=subprocess.DEVNULL, timeout=2
+            ).strip()
+            return len(r) > 0
+        except (subprocess.SubprocessError, OSError):
+            return False
+
+    def check_bluetooth(self):
+        """Check if Bluetooth is powered on/unblocked."""
+        try:
+            r = subprocess.check_output(
+                ["rfkill", "list", "bluetooth"],
+                text=True, stderr=subprocess.DEVNULL, timeout=2
+            )
+            return "Soft blocked: no" in r
+        except (subprocess.SubprocessError, OSError):
+            return False
+
     def check_for_updates(self):
         """Check if updates are available from git.
 

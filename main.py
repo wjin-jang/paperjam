@@ -14,9 +14,7 @@ E-paper display considerations:
 - Wake on user input with full refresh
 """
 import time
-import sys
 import traceback
-from PIL import Image
 
 import config as cfg
 import version
@@ -475,9 +473,9 @@ class MainApp:
         if not skip_status:
             img = self.renderer.overlays.draw_status_icons(
                 img,
-                self._check_audio_device(),
-                self._check_wifi(),
-                self._check_bluetooth()
+                self.sys.check_audio_device(),
+                self.sys.check_wifi(),
+                self.sys.check_bluetooth()
             )
         if not skip_battery:
             img = self.renderer.overlays.draw_battery(img)
@@ -510,43 +508,7 @@ class MainApp:
             except Exception as e:
                 logger.error(f"Display Error: {e}")
 
-    # --- System Checks (Helpers) ---
-    def _check_audio_device(self):
-        # This could be moved to SystemManager too
-        import subprocess
-        try:
-            r = subprocess.check_output(
-                ["pactl", "get-default-sink"],
-                text=True, stderr=subprocess.DEVNULL, timeout=2
-            ).strip()
-            if any(x in r.lower() for x in ['bluez', 'usb', 'headphone']):
-                return True
-        except (subprocess.SubprocessError, OSError):
-            pass
-        return False
-
-    def _check_wifi(self):
-        import subprocess
-        try:
-            r = subprocess.check_output(
-                ["iwgetid", "-r"],
-                text=True, stderr=subprocess.DEVNULL, timeout=2
-            ).strip()
-            return len(r) > 0
-        except (subprocess.SubprocessError, OSError):
-            return False
-
-    def _check_bluetooth(self):
-        import subprocess
-        try:
-            r = subprocess.check_output(
-                ["rfkill", "list", "bluetooth"],
-                text=True, stderr=subprocess.DEVNULL, timeout=2
-            )
-            return "Soft blocked: no" in r
-        except (subprocess.SubprocessError, OSError):
-            return False
-
 if __name__ == "__main__":
     app = MainApp()
     app.run()
+            

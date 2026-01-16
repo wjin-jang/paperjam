@@ -6,7 +6,7 @@ from typing import Dict, Optional
 
 from ui.renderer import UIRenderer
 from core.bluetooth import BluetoothManager
-from core.navigation import nav_index_up, nav_index_down
+from core.navigation import nav_index_up, nav_index_down, nav_skip_info_up, nav_skip_info_down
 from core.settings_manager import get_settings_manager
 import config as cfg
 
@@ -14,12 +14,14 @@ from apps.settings.categories import (
     AudioCategory, LibraryCategory, DisplayCategory,
     NetworkCategory, SystemCategory
 )
+from apps.base import AppBase
 
 
-class SettingsApp:
+class SettingsApp(AppBase):
     """Main settings application."""
 
     def __init__(self, library_manager, audio_engine, input_handler):
+        super().__init__(name="System Settings")
         self.renderer = UIRenderer()
         self.lib = library_manager
         self.audio = audio_engine
@@ -110,30 +112,15 @@ class SettingsApp:
 
     def _nav_submenu(self, direction: int):
         """Navigate submenu, skipping info-only items."""
-        info_indices = self._get_info_indices()
-        total = len(self.current_submenu)
-        if total == 0:
+        if not self.current_submenu:
+            self.submenu_idx = -1
             return
 
-        # Check if all items are info-only
-        selectable = [i for i in range(total) if i not in info_indices]
-        if not selectable:
-            self.submenu_idx = -1  # No selection possible
-            return
-
-        # Handle case where we start with no selection
-        if self.submenu_idx < 0:
-            self.submenu_idx = selectable[0] if direction > 0 else selectable[-1]
-            return
-
-        # Find next valid index
-        for _ in range(total):
-            if direction > 0:
-                self.submenu_idx = (self.submenu_idx + 1) % total
-            else:
-                self.submenu_idx = (self.submenu_idx - 1) % total
-            if self.submenu_idx not in info_indices:
-                return
+        # Use shared navigation logic to skip info items
+        if direction > 0:
+            self.submenu_idx = nav_skip_info_down(self.submenu_idx, self.current_submenu)
+        else:
+            self.submenu_idx = nav_skip_info_up(self.submenu_idx, self.current_submenu)
 
     # --- Navigation ---
     def nav_up(self):

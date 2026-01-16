@@ -97,8 +97,8 @@ class AudioCategory(SettingsCategory):
                 ["amixer", "set", self._mixer_control, f"{self.volume_level}%"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
             )
-        except (subprocess.SubprocessError, OSError):
-            pass
+        except (subprocess.SubprocessError, OSError) as e:
+            logger.warning(f"Failed to set ALSA volume: {e}")
 
         try:
             # Set PulseAudio sink volume
@@ -106,8 +106,8 @@ class AudioCategory(SettingsCategory):
                 ["pactl", "set-sink-volume", "@DEFAULT_SINK@", f"{self.volume_level}%"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
             )
-        except (subprocess.SubprocessError, OSError):
-            pass
+        except (subprocess.SubprocessError, OSError) as e:
+            logger.warning(f"Failed to set PulseAudio volume: {e}")
 
     def _find_mixer_control(self) -> str:
         """Find an available mixer control name."""
@@ -129,8 +129,8 @@ class AudioCategory(SettingsCategory):
                 match = re.search(r"'([^']+)'", result)
                 if match:
                     return match.group(1)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to find mixer control: {e}")
         return 'Master'  # Default fallback
 
     def _read_system_volume(self):
@@ -143,8 +143,8 @@ class AudioCategory(SettingsCategory):
             match = re.search(r'\[(\d+)%\]', result)
             if match:
                 return int(match.group(1))
-        except (subprocess.SubprocessError, ValueError, OSError):
-            pass
+        except (subprocess.SubprocessError, ValueError, OSError) as e:
+            logger.debug(f"Failed to read system volume: {e}")
         return self.volume_level
 
     def _refresh_audio_sinks(self):
@@ -184,7 +184,8 @@ class AudioCategory(SettingsCategory):
                 if sink['name'] == default:
                     self._current_sink_index = i
                     break
-        except Exception:
+        except Exception as e:
+            logger.warning(f"PulseAudio sinks not available: {e}")
             # PulseAudio not available, add a default entry
             self._audio_sinks = [{'id': '0', 'name': 'default', 'display': t('general.default')}]
             self._current_sink_index = 0
@@ -219,8 +220,8 @@ class AudioCategory(SettingsCategory):
                     f"pactl list short sink-inputs | cut -f1 | xargs -I{{}} pactl move-sink-input {{}} {sink['name']}",
                     shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to set default sink: {e}")
 
         return sink['display']
 
@@ -649,7 +650,8 @@ class SystemCategory(SettingsCategory):
                 if len(parts) >= 4:
                     return f"{parts[3]} {t('settings.system.free')}"
             return t('settings.system.unknown')
-        except (subprocess.SubprocessError, OSError, IndexError):
+        except (subprocess.SubprocessError, OSError, IndexError) as e:
+            logger.warning(f"Failed to get disk usage: {e}")
             return t('settings.system.unknown')
 
     def _get_cpu_governor(self) -> str:

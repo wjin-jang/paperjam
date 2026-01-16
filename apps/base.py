@@ -15,8 +15,25 @@ class AppBase(ABC):
     with different apps (Music Player, Settings, etc.).
     """
 
-    def __init__(self):
+    def __init__(self, name: str = "App"):
         self.running = True
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        """Return the display name of the app."""
+        return self._name
+
+    @name.setter
+    def name(self, value: str):
+        self._name = value
+
+    def refresh_list(self):
+        """
+        Refresh the internal list or state.
+        Optional to implement.
+        """
+        pass
 
     @abstractmethod
     def get_callbacks(self) -> Dict[str, Callable]:

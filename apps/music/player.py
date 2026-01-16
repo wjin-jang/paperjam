@@ -18,12 +18,14 @@ from apps.music.state import PlayerState
 from apps.music.playlist import PlaylistManager
 from apps.music.context_menu import ContextMenuHandler
 from apps.music.browse import BrowseHandler
+from apps.base import AppBase
 
 
-class MusicPlayerApp:
+class MusicPlayerApp(AppBase):
     """Main music player application."""
 
     def __init__(self, audio, input_handler):
+        super().__init__(name="Music Player")
         self.audio = audio
         self.input = input_handler
         self.lib = LibraryManager()

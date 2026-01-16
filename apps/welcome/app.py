@@ -13,14 +13,16 @@ from ui.renderer import UIRenderer
 import config as cfg
 from core.i18n import t
 from core.logger import setup_logger
+from apps.base import AppBase
 
 logger = setup_logger()
 
 
-class WelcomeApp:
+class WelcomeApp(AppBase):
     """First-run welcome and setup application."""
 
     def __init__(self, library_manager, input_handler):
+        super().__init__(name="Welcome")
         self.lib = library_manager
         self.inputs = input_handler
         self.renderer = UIRenderer()
