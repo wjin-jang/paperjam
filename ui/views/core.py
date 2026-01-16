@@ -202,10 +202,9 @@ class Menu:
         self.cursor.col = 0
 
     def _ensure_visible(self):
-        """Ensure cursor row is visible in the viewport using page-based scrolling.
+        """Ensure cursor row is visible in the viewport.
 
-        When scrolling past the last fully visible item, load the next page.
-        When scrolling past the first visible item, load the previous page.
+        Adjusts scroll offset to keep the selected item visible.
         """
         if not self.items or self.cursor.row < 0:
             self.scroll_offset = 0
@@ -235,11 +234,11 @@ class Menu:
 
         # Page-based scrolling
         if row_top < self.scroll_offset:
-            # Scrolling up - show previous page with cursor at bottom
-            self.scroll_offset = max(0, row_bottom - self.height)
+            # Scrolling up - ensure top is visible
+            self.scroll_offset = max(0, row_top - self.height)
         elif row_bottom > self.scroll_offset + self.height:
-            # Scrolling down - show next page with cursor at top
-            self.scroll_offset = row_top
+            # Scrolling down - ensure bottom is visible
+            self.scroll_offset = row_bottom + self.height
 
         # Clamp to valid range
         self.scroll_offset = max(0, min(self.scroll_offset, max_scroll))
@@ -392,7 +391,7 @@ class Panel:
 
         sb_x = self.x + self.width - 8
         sb_y = self.y + self.content_y - 1
-        sb_h = self.content_height
+        sb_h = self.content_height + 2
         sb_w = 8
 
         # Dithered background
