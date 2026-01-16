@@ -71,9 +71,11 @@ class SystemManager:
         pct = self.battery.percentage
         
         if 0 <= pct <= self._low_battery_threshold and not self.battery.charging:
-            logger.warning(f"Low battery ({pct}%)")
+            logger.warning(f"Low battery ({pct}%) - initiating safe shutdown")
             if self.on_shutdown_request:
                 self.on_shutdown_request(reason="LOW BATTERY")
+            else:
+                self.shutdown()
 
     def sleep_display(self):
         if self.epd:
