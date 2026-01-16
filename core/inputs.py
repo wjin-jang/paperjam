@@ -133,7 +133,8 @@ class InputHandler:
         # Keys that support long press
         long_press_keys = [
             ecodes.KEY_ENTER, ecodes.KEY_KPENTER, ecodes.KEY_KP5, ecodes.KEY_BACKSPACE,
-            ecodes.KEY_PLAYPAUSE, ecodes.KEY_P, ecodes.KEY_KP0, ecodes.KEY_PLAYCD, ecodes.KEY_PAUSECD
+            ecodes.KEY_PLAYPAUSE, ecodes.KEY_P, ecodes.KEY_KP0, ecodes.KEY_PLAYCD, ecodes.KEY_PAUSECD,
+            ecodes.KEY_PLAY
         ]
 
         # 1. KEY DOWN: Start Timer
@@ -187,7 +188,7 @@ class InputHandler:
 
         # Play/pause keys
         elif code in (ecodes.KEY_KP5, ecodes.KEY_P, ecodes.KEY_PLAYPAUSE,
-                      ecodes.KEY_PLAYCD, ecodes.KEY_PAUSECD):
+                      ecodes.KEY_PLAYCD, ecodes.KEY_PAUSECD, ecodes.KEY_PLAY):
             action = 'play_pause_long' if is_long else 'play_pause'
 
         # Next track keys
