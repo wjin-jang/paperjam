@@ -16,7 +16,7 @@ from PIL import ImageFont
 
 # --- Defaults ---
 DEFAULT_CONFIG = {
-    "music_path": str(Path.home() / "music"),
+    "music_path": str(Path.home() / "Music"),
     "screensaver_timeout": 60,
     "long_press_duration": 0.5,
     "recents_limit": 50,
