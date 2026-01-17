@@ -60,7 +60,7 @@ class ScreensaverRenderer:
 
         # Draw "POWER OFF" text
         text = "POWER OFF"
-        w, h = 32, cfg.ROW_HEIGHT
+        w, h = 80, cfg.ROW_HEIGHT
         x = (cfg.SCREEN_WIDTH - w) - 8
         
         # If image provided, put text at bottom, image above
@@ -68,11 +68,10 @@ class ScreensaverRenderer:
             y_text = cfg.SCREEN_HEIGHT - h - 8
             # Image panel
             img_w, img_h = image.size
-            img_size = min(img_w, 80)
             img_x = (cfg.SCREEN_WIDTH - img_size - 2) // 2
             img_y = 10
             
-            panel_img = Panel(img_x, img_y, img_size + 2, img_size + 2)
+            panel_img = Panel(img_x, img_y, img_w + 2, img_h + 2)
             menu_img = panel_img.create_menu()
             art_item = Item(show_image=True, image=image)
             art_item.set_height(img_size)

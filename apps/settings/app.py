@@ -115,15 +115,8 @@ class SettingsApp(AppBase):
         """Convert category items to dict items for MenuController."""
         items = []
         for i, item_data in enumerate(category.items):
-            if isinstance(item_data, Item):
-                # We can pass the Item object directly to MenuController now
-                items.append(item_data)
-                # We still need to map the index for handle_action if needed, 
-                # but MenuController stores the list as is.
-            else:
-                # Fallback for any legacy items
-                items.append({'name': str(item_data), 'type': 'text', 'original_index': i})
-        
+            items.append(item_data)
+
         # Don't reset index if we are just refreshing the same list
         self.submenu_controller.set_items(items, reset_index=False)
 

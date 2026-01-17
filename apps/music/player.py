@@ -442,7 +442,7 @@ class MusicPlayerApp(AppBase):
             shuffle = self.state.shuffle_active
             album, tracks, track_count, duration, cover = self.browse.get_all_tracks(shuffle=shuffle)
             self.state.album = album
-            items = tracks if tracks else [{'name': '(No Tracks)', 'type': 'info'}]
+            items = tracks if tracks else [Item(text='(No Tracks)', selectable=False)]
             if tracks:
                 self.state.browsing_cover_s = cover
             self.state.artist = track_count
@@ -452,7 +452,7 @@ class MusicPlayerApp(AppBase):
         elif self.mode == 'FAV_TRACKS_VIEW':
             album, tracks, track_count, duration, cover = self.browse.get_fav_tracks()
             self.state.album = album
-            items = tracks if tracks else [{'name': '(No Fav Songs)', 'type': 'info'}]
+            items = tracks if tracks else [Item(text='(No Favourites)', selectable=False)]
             if tracks:
                 self.state.browsing_cover_s = cover
             self.state.artist = track_count

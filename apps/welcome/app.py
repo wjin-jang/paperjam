@@ -119,9 +119,9 @@ class WelcomeApp(AppBase):
         if not self.choice_menu.items:
             # Build menu items
             items = [
-                Item(text=t('welcome.music_found', path=music_path), type='info', wrap_text=True, selectable=False),
-                Item(text=t('welcome.scan_now'), type='text', id='SCAN'),
-                Item(text=t('welcome.shutdown_add_music'), type='text', id='SHUTDOWN')
+                Item(text=t('welcome.music_found', path=music_path), wrap_text=True, selectable=False),
+                Item(text=t('welcome.scan_now'), id='SCAN'),
+                Item(text=t('welcome.shutdown_add_music'), id='SHUTDOWN')
             ]
             self.choice_menu.set_items(items)
 
@@ -134,15 +134,15 @@ class WelcomeApp(AppBase):
         from ui.views.items import Item
         # Use columns for stats
         items = [
-            Item(type='info', columns=[t('settings.library.tracks'), str(self.lib.scan_track_count)], selectable=False),
-            Item(type='info', columns=[t('settings.library.albums'), str(self.lib.scan_album_count)], selectable=False),
-            Item(type='info', columns=[t('settings.library.artists'), str(self.lib.scan_artist_count)], selectable=False)
+            Item(columns=[t('settings.library.tracks'), str(self.lib.scan_track_count)], selectable=False),
+            Item(columns=[t('settings.library.albums'), str(self.lib.scan_album_count)], selectable=False),
+            Item(columns=[t('settings.library.artists'), str(self.lib.scan_artist_count)], selectable=False)
         ]
 
         if self.lib.scan_current_file:
             current = self.lib.scan_current_file
             # File path should wrap if long
-            items.append(Item(text=f"{t('welcome.file')} | {current}", type='info', wrap_text=True, selectable=False))
+            items.append(Item(text=f"{t('welcome.file')} | {current}", wrap_text=True, selectable=False))
 
         return self.renderer.render_menu(
             t('welcome.scanning'), items, -1, self.scroll_offset
