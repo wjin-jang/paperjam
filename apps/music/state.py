@@ -105,7 +105,7 @@ class PlayerState:
         """Get the current status text, considering temporary messages."""
         # Check if temporary message is still active
         if self.status_message and (time.time() - self.status_message_time) < self.status_message_duration:
-            return self.status_message
+            return t(self.status_message)
 
         # Clear expired message
         self.status_message = None
