@@ -21,7 +21,7 @@ class SettingsApp(AppBase):
     """Main settings application."""
 
     def __init__(self, library_manager, audio_engine, input_handler):
-        super().__init__(name="System Settings")
+        super().__init__(name=t('menu.settings'))
         self.renderer = UIRenderer()
         self.lib = library_manager
         self.audio = audio_engine
@@ -35,11 +35,11 @@ class SettingsApp(AppBase):
         # Main Menu
         from ui.views.items import Item
         self.main_menu = MenuController([
-            Item(text="Audio", type='text', id="AUDIO"),
-            Item(text="Library", type='text', id="LIBRARY"),
-            Item(text="Network", type='text', id="NETWORK"),
-            Item(text="System", type='text', id="SYSTEM"),
-            Item(text="Display", type='text', id="DISPLAY")
+            Item(text=t('settings.categories.audio'), type='text', id="AUDIO"),
+            Item(text=t('settings.categories.library'), type='text', id="LIBRARY"),
+            Item(text=t('settings.categories.network'), type='text', id="NETWORK"),
+            Item(text=t('settings.categories.system'), type='text', id="SYSTEM"),
+            Item(text=t('settings.categories.display'), type='text', id="DISPLAY")
         ])
 
         # Submenus
@@ -58,12 +58,12 @@ class SettingsApp(AppBase):
         # Bluetooth state
         self.bt_menu = MenuController([])
         self.bt_device_menu = MenuController([])
-        self.bt_status = "Idle"
+        self.bt_status = t('settings.bluetooth.idle')
         self.bt_selected_device = None
 
         # WiFi state
         self.wifi_menu = MenuController([])
-        self.wifi_status = "Select Network"
+        self.wifi_status = t('settings.network.select_network')
 
         # Popup state
         self.popup_msg = ""
@@ -187,9 +187,9 @@ class SettingsApp(AppBase):
             
             if item.id == 'SCAN_NEW':
                 self.view = 'BT_SCAN'
-                self.bt_status = "Scanning..."
+                self.bt_status = t('settings.bluetooth.scanning')
                 from ui.views.items import Item
-                self.bt_menu.set_items([Item(text="(Scanning...)", type='info', selectable=False)])
+                self.bt_menu.set_items([Item(text=t('settings.bluetooth.scanning'), type='info', selectable=False)])
                 self.bt.start_scan(self._bt_scan_callback)
             else:
                 self._enter_bt_device_menu(item.id) # id stores device dict
@@ -199,7 +199,7 @@ class SettingsApp(AppBase):
             if item and item.id: # id stores device dict
                 dev = item.id
                 self.bt.stop_scan()
-                self.bt_status = f"Pairing {dev['name']}..."
+                self.bt_status = t('settings.bluetooth.pairing')
                 self.bt.connect_async(dev['mac'], self._bt_connect_callback)
                 
         elif self.view == 'BT_DEVICE_MENU':
@@ -209,15 +209,15 @@ class SettingsApp(AppBase):
             item = self.wifi_menu.get_selected_item()
             if item and item.id: # id stores network dict
                 network = item.id
-                self.wifi_status = "Connecting..."
+                self.wifi_status = t('settings.network.connecting')
                 net_cat = self.categories['NETWORK']
                 
                 if net_cat.connect_to_wifi(network['id']):
                     # Wait briefly for connection to establish
                     time.sleep(2)
-                    self.wifi_status = "Connected"
+                    self.wifi_status = t('settings.network.connected')
                 else:
-                    self.wifi_status = "Failed"
+                    self.wifi_status = t('settings.network.failed')
                     
                 # Refresh network list and parent category
                 net_cat.wifi_networks = net_cat.get_known_wifi_networks()
@@ -235,7 +235,7 @@ class SettingsApp(AppBase):
             self.view = 'SUBMENU'
         elif self.view == 'WIFI_NETWORKS':
             self.view = 'SUBMENU'
-            self.wifi_status = "Select Network"
+            self.wifi_status = t('settings.network.select_network')
             # Refresh network category to show updated connection status
             self.categories['NETWORK'].refresh()
             self._update_submenu_items(self.categories['NETWORK'])
@@ -288,14 +288,14 @@ class SettingsApp(AppBase):
         
     def _enter_wifi_networks(self):
         self.view = 'WIFI_NETWORKS'
-        self.wifi_status = "Select Network"
+        self.wifi_status = t('settings.network.select_network')
         
         net_cat = self.categories['NETWORK']
         from ui.views.items import Item
         
         display_items = []
         if not net_cat.wifi_networks:
-             display_items.append(Item(text="(No networks)", type='info', selectable=False))
+             display_items.append(Item(text=t('settings.network.no_networks'), type='info', selectable=False))
         else:
             for net in net_cat.wifi_networks:
                 prefix = "C" if net['current'] else " "
@@ -308,7 +308,7 @@ class SettingsApp(AppBase):
 
     def _enter_bt_saved_view(self):
         self.view = 'BT_SAVED'
-        self.bt_status = "Select Device"
+        self.bt_status = t('settings.bluetooth.select_device')
         
         from ui.views.items import Item
         devices = self.bt.get_paired_devices()
@@ -322,7 +322,7 @@ class SettingsApp(AppBase):
                 id=d
             ))
         
-        items.append(Item(text="[ Scan New Device ]", type='text', id='SCAN_NEW'))
+        items.append(Item(text=t('settings.bluetooth.scan_new'), type='text', id='SCAN_NEW'))
         self.bt_menu.set_items(items)
 
     def _enter_bt_device_menu(self, device):
@@ -333,9 +333,17 @@ class SettingsApp(AppBase):
 
         options = []
         if is_connected:
-            options = ["Disconnect", "Forget", "Cancel"]
+            options = [
+                t('settings.bluetooth.disconnect'),
+                t('settings.bluetooth.forget_short'),
+                t('general.cancel')
+            ]
         else:
-            options = ["Connect", "Forget", "Cancel"]
+            options = [
+                t('settings.bluetooth.connect'),
+                t('settings.bluetooth.forget_short'),
+                t('general.cancel')
+            ]
             
         items = [Item(text=opt, type='text', id=opt) for opt in options]
         self.bt_device_menu.set_items(items)
@@ -354,33 +362,29 @@ class SettingsApp(AppBase):
         dev = self.bt_selected_device
         mac = dev['mac']
 
-        if action == "Connect":
-            self.bt_status = "Connecting..."
+        if action == t('settings.bluetooth.connect'):
+            self.bt_status = t('settings.bluetooth.connecting')
             self.bt.connect_async(mac, self._bt_connect_callback)
-        elif action == "Disconnect":
-            self.bt_status = "Disconnecting..."
+        elif action == t('settings.bluetooth.disconnect'):
+            self.bt_status = t('settings.bluetooth.disconnecting')
             self.bt.disconnect_device(mac)
-            self.bt_status = "Disconnected"
+            self.bt_status = t('settings.bluetooth.idle') # Or disconnected?
             self._enter_bt_saved_view()
-        elif action == "Forget":
-            self.bt_status = "Removing..."
+        elif action == t('settings.bluetooth.forget_short'):
+            self.bt_status = t('settings.bluetooth.forgetting')
             self.bt.forget_device(mac)
-            self.bt_status = "Removed"
+            self.bt_status = t('settings.bluetooth.removed')
             self._enter_bt_saved_view()
-        elif action == "Cancel":
+        elif action == t('general.cancel'):
             self._enter_bt_saved_view()
 
-    def _show_popup(self, msg: str):
-        self.popup_msg = msg
-        self.prev_view = self.view
-        self.view = 'POPUP'
-        self.popup_start = time.time()
+...
 
     def _bt_scan_callback(self, devices):
         from ui.views.items import Item
         items = []
         if not devices:
-            items = [Item(text="(Scanning...)", type='info', selectable=False)]
+            items = [Item(text=t('settings.bluetooth.scanning'), type='info', selectable=False)]
         else:
             for d in devices:
                 icon = "P" if d.get('paired') else " "
@@ -403,18 +407,18 @@ class SettingsApp(AppBase):
 
     def get_frame(self):
         if self.view == 'VOLUME':
-            return self.renderer.render_volume("VOLUME", self._audio_category.volume_level)
+            return self.renderer.render_volume(t('general.volume_popup'), self._audio_category.volume_level)
 
         if self.view == 'POPUP':
             is_busy = self.lib.is_scanning or (time.time() - self.popup_start < 1.5)
             if not is_busy:
                 self.view = self.prev_view
             else:
-                frame, _ = self.renderer.render_menu("PLEASE WAIT", [Item(text=self.popup_msg, type='info')], 0, 0)
+                frame, _ = self.renderer.render_menu(t('general.please_wait'), [Item(text=self.popup_msg, type='info')], 0, 0)
                 return frame
 
         if self.view == 'MAIN':
-            frame, scroll = self.renderer.render_menu("SETTINGS", **self.main_menu.get_render_args())
+            frame, scroll = self.renderer.render_menu(t('settings.title'), **self.main_menu.get_render_args())
             self.main_menu.scroll_offset = scroll
             return frame
 
@@ -424,24 +428,24 @@ class SettingsApp(AppBase):
             return frame
 
         elif self.view == 'BT_SAVED':
-            frame, scroll = self.renderer.render_menu(f"BT: {self.bt_status}", **self.bt_menu.get_render_args())
+            frame, scroll = self.renderer.render_menu(t('settings.bluetooth.title', status=self.bt_status), **self.bt_menu.get_render_args())
             self.bt_menu.scroll_offset = scroll
             return frame
 
         elif self.view == 'BT_SCAN':
-            frame, scroll = self.renderer.render_menu(f"BT: {self.bt_status}", **self.bt_menu.get_render_args())
+            frame, scroll = self.renderer.render_menu(t('settings.bluetooth.title', status=self.bt_status), **self.bt_menu.get_render_args())
             self.bt_menu.scroll_offset = scroll
             return frame
 
         elif self.view == 'BT_DEVICE_MENU':
-            frame, scroll = self.renderer.render_menu(f"BT: {self.bt_status}", **self.bt_device_menu.get_render_args())
+            frame, scroll = self.renderer.render_menu(t('settings.bluetooth.title', status=self.bt_status), **self.bt_device_menu.get_render_args())
             self.bt_device_menu.scroll_offset = scroll
             return frame
 
         elif self.view == 'WIFI_NETWORKS':
-            frame, scroll = self.renderer.render_menu(f"WiFi: {self.wifi_status}", **self.wifi_menu.get_render_args())
+            frame, scroll = self.renderer.render_menu(t('settings.network.title', status=self.wifi_status), **self.wifi_menu.get_render_args())
             self.wifi_menu.scroll_offset = scroll
             return frame
             
-        frame, _ = self.renderer.render_menu("ERROR", [Item(text="Unknown View", type='info')], 0, 0)
+        frame, _ = self.renderer.render_menu(t('general.error'), [Item(text=t('general.unknown_view'), type='info')], 0, 0)
         return frame

@@ -204,7 +204,7 @@ class MusicViewRenderer:
         status_panel.render(self.canvas)
 
         # === Main Panel ===
-        header_text = "Scanning..." if state.is_scanning else state.album
+        header_text = t('settings.library.scanning') if state.is_scanning else state.album
         main_panel = Panel(cfg.PANEL_X, cfg.PANEL_Y, cfg.PANEL_W, cfg.PANEL_H,
                           header=header_text)
         main_menu = main_panel.create_menu()
@@ -266,7 +266,7 @@ class MusicViewRenderer:
         x = (cfg.SCREEN_WIDTH - w) // 2
         y = (cfg.SCREEN_HEIGHT - menu_h) // 2
 
-        panel = Panel(x, y, w, menu_h, header="OPTIONS")
+        panel = Panel(x, y, w, menu_h, header=t('player.context.options'))
         menu = panel.create_menu()
 
         # Convert options to TextItems

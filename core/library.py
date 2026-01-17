@@ -22,6 +22,7 @@ import config as cfg
 from ui.image_utils import get_cover
 from core.track_info import extract_track_info
 from core.logger import setup_logger
+from core.i18n import t
 
 logger = setup_logger()
 
@@ -211,7 +212,7 @@ class LibraryManager:
     def create_playlist(self):
         i = 1
         while True:
-            name = f"Playlist {i}"
+            name = f"{t('player.browse.playlist')} {i}"
             p = cfg.PLAYLIST_DIR / f"{name}.json"
             if not p.exists():
                 with open(p, 'w') as f: json.dump([], f)

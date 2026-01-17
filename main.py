@@ -2,6 +2,7 @@ from core.app_registry import AppRegistry
 from core.i18n import t
 from ui.renderer import UIRenderer
 from ui.menu import MenuController
+from ui.views.items import Item
 
 import config as cfg
 import version
@@ -38,8 +39,8 @@ class MainApp:
         self.music_app.set_settings(self.settings_app.settings)
         
         # Register Apps
-        self.music_app.name = "Music Player"
-        self.settings_app.name = "System Settings"
+        self.music_app.name = t('menu.music')
+        self.settings_app.name = t('menu.settings')
         self.registry.register("music", self.music_app)
         self.registry.register("settings", self.settings_app)
 
@@ -151,7 +152,7 @@ class MainApp:
         logger.info("Version requires library rescan")
 
         # Show rescan message
-        frame, _ = self.renderer.render_menu("UPDATE", [Item(text=t('welcome.scanning_library'), type='info', selectable=False)], -1, 0)
+        frame, _ = self.renderer.render_menu(t('settings.system.check_updates'), [Item(text=t('welcome.scanning_library'), type='info', selectable=False)], -1, 0)
         self._display(frame, full_refresh=True)
 
         # Trigger async rescan
@@ -165,7 +166,7 @@ class MainApp:
         logger.info("Auto-update enabled, checking for updates...")
 
         # Show checking status
-        frame, _ = self.renderer.render_menu("AUTO-UPDATE", [Item(text=t('updates.checking'), type='info', selectable=False)], -1, 0)
+        frame, _ = self.renderer.render_menu(t('settings.system.auto_update'), [Item(text=t('updates.checking'), type='info', selectable=False)], -1, 0)
         self._display(frame, full_refresh=True)
 
         # Check for updates
@@ -173,13 +174,13 @@ class MainApp:
 
         if has_updates:
             logger.info("Updates available, installing...")
-            frame, _ = self.renderer.render_menu("AUTO-UPDATE", [Item(text=t('updates.installing'), type='info', selectable=False)], -1, 0)
+            frame, _ = self.renderer.render_menu(t('settings.system.auto_update'), [Item(text=t('updates.installing'), type='info', selectable=False)], -1, 0)
             self._display(frame, full_refresh=True)
 
             success, result_msg = self.sys.perform_update()
             if not success:
                 logger.error(f"Auto-update failed: {result_msg}")
-                frame, _ = self.renderer.render_menu("AUTO-UPDATE", [Item(text=t('updates.failed', msg=result_msg[:18]), type='info', selectable=False)], -1, 0)
+                frame, _ = self.renderer.render_menu(t('settings.system.auto_update'), [Item(text=t('updates.failed', msg=result_msg[:18]), type='info', selectable=False)], -1, 0)
                 self._display(frame, full_refresh=True)
                 time.sleep(2)
             # If successful, perform_update will restart the app
@@ -360,9 +361,10 @@ class MainApp:
         self.confirm_target = target
         
         # Build confirm menu
+        from ui.views.items import Item
         items = [
-            {'name': t('general.no'), 'type': 'file', 'value': False},
-            {'name': t('general.yes'), 'type': 'file', 'value': True}
+            Item(text=t('general.no'), type='text', value=False, id=False),
+            Item(text=t('general.yes'), type='text', value=True, id=True)
         ]
         self.confirm_menu.set_items(items)
         self.inputs.set_callbacks(self._get_confirm_callbacks())
@@ -390,7 +392,7 @@ class MainApp:
 
     def _handle_confirm(self):
         item = self.confirm_menu.get_selected_item()
-        if item and item.get('value') is True:
+        if item and item.id is True:
             if self.confirm_target == "REBOOT":
                 self._perform_system_action(t('system_messages.rebooting'), self.sys.reboot)
             elif self.confirm_target == "SHUTDOWN":
@@ -443,23 +445,23 @@ class MainApp:
         logger.info("Checking for updates")
 
         # Show checking status
-        frame, _ = self.renderer.render_menu("UPDATE", [Item(text=t('updates.checking'), type='info', selectable=False)], -1, 0)
+        frame, _ = self.renderer.render_menu(t('settings.system.check_updates'), [Item(text=t('updates.checking'), type='info', selectable=False)], -1, 0)
         self._display(frame, full_refresh=True)
 
         # Check for updates
         has_updates, msg = self.sys.check_for_updates()
 
         if has_updates:
-            frame, _ = self.renderer.render_menu("UPDATE", [Item(text=t('updates.updating'), type='info', selectable=False)], -1, 0)
+            frame, _ = self.renderer.render_menu(t('settings.system.check_updates'), [Item(text=t('updates.updating'), type='info', selectable=False)], -1, 0)
             self._display(frame, full_refresh=True)
 
             success, result_msg = self.sys.perform_update()
             if not success:
-                frame, _ = self.renderer.render_menu("UPDATE", [Item(text=t('general.error_prefix', msg=result_msg), type='info', selectable=False)], -1, 0)
+                frame, _ = self.renderer.render_menu(t('settings.system.check_updates'), [Item(text=t('general.error_prefix', msg=result_msg), type='info', selectable=False)], -1, 0)
                 self._display(frame, full_refresh=True)
                 time.sleep(2)
         else:
-            frame, _ = self.renderer.render_menu("UPDATE", [Item(text=msg, type='info', selectable=False)], -1, 0)
+            frame, _ = self.renderer.render_menu(t('settings.system.check_updates'), [Item(text=msg, type='info', selectable=False)], -1, 0)
             self._display(frame, full_refresh=True)
             time.sleep(1.5)
 

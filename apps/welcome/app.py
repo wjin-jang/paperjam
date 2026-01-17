@@ -31,6 +31,7 @@ class WelcomeApp(AppBase):
         self.running = True
         self.view = 'CHOICE'  # CHOICE, SCANNING, WELCOME
         self.first_render = True
+        self.scroll_offset = 0 # Track scroll position for scanning view etc
         
         # Menu Controllers
         self.choice_menu = MenuController([])
@@ -96,12 +97,19 @@ class WelcomeApp(AppBase):
     def get_frame(self):
         """Render current view."""
         if self.view == 'CHOICE':
-            return self._render_choice()
+            frame, scroll = self._render_choice()
+            self.choice_menu.scroll_offset = scroll
+            return frame
         elif self.view == 'SCANNING':
-            return self._render_scanning()
+            frame, scroll = self._render_scanning()
+            self.scroll_offset = scroll
+            return frame
         elif self.view == 'WELCOME':
             return self._render_welcome()
-        return self.renderer.render_menu(t('welcome.welcome'), [t('general.loading')], 0, 0)
+        
+        from ui.views.items import Item
+        frame, _ = self.renderer.render_menu(t('welcome.welcome'), [Item(text=t('general.loading'), type='info', selectable=False)], 0, 0)
+        return frame
 
     def _render_choice(self):
         """Render choice screen with multi-line info."""
@@ -126,7 +134,7 @@ class WelcomeApp(AppBase):
         from ui.views.items import Item
         # Use columns for stats
         items = [
-            Item(type='info', columns=["Tracks", str(self.lib.scan_track_count)], selectable=False),
+            Item(type='info', columns=[t('settings.library.tracks'), str(self.lib.scan_track_count)], selectable=False),
             Item(type='info', columns=[t('settings.library.albums'), str(self.lib.scan_album_count)], selectable=False),
             Item(type='info', columns=[t('settings.library.artists'), str(self.lib.scan_artist_count)], selectable=False)
         ]
@@ -137,7 +145,7 @@ class WelcomeApp(AppBase):
             items.append(Item(text=f"{t('welcome.file')} | {current}", type='info', wrap_text=True, selectable=False))
 
         return self.renderer.render_menu(
-            t('welcome.scanning'), items, -1, 0
+            t('welcome.scanning'), items, -1, self.scroll_offset
         )
 
     def _render_welcome(self):

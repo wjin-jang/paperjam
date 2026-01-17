@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, Callable, Optional, List, Any
 from PIL import Image
+from core.i18n import t
 
 
 class PopupPanel(Panel):
@@ -172,8 +173,8 @@ class PopupManager:
         menu = panel.create_menu()
         
         menu.items = [
-            Item(text="No", type='text', selectable=True),
-            Item(text="Yes", type='text', selectable=True)
+            Item(text=t('general.no'), type='text', selectable=True),
+            Item(text=t('general.yes'), type='text', selectable=True)
         ]
         menu.cursor.row = 0
         
@@ -200,14 +201,14 @@ class PopupManager:
         
         self.push(panel, callbacks)
 
-    def show_loading(self, title="Loading..."):
+    def show_loading(self, title=None):
         """Show a loading spinner/text (programmatic dismiss)."""
         w = 140
         h = 50
         x = (cfg.SCREEN_WIDTH - w) // 2
         y = (cfg.SCREEN_HEIGHT - h) // 2
         
-        panel = PopupPanel(x, y, w, h, title=title, dismiss_mode='PROGRAMMATIC')
+        panel = PopupPanel(x, y, w, h, title=title or t('general.loading'), dismiss_mode='PROGRAMMATIC')
         # No menu items needed really, or just static text
         self.push(panel)
         return panel # Return handle to close

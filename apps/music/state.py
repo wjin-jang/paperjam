@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Set, Any
 
 from ui.views.core import Cursor
+from core.i18n import t
 
 
 @dataclass
@@ -16,7 +17,7 @@ class PlayerState:
     scrollable_items: List[dict] = field(default_factory=list)
     cursor: Cursor = field(default_factory=Cursor)
     scroll_offset: int = 0
-    album: str = "Library"
+    album: str = field(default_factory=lambda: t('player.browse.library'))
     artist: str = ""
     year: str = ""
     is_playing: bool = False

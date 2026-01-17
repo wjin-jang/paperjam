@@ -13,6 +13,7 @@ from core.track_info import extract_track_info
 from core.navigation import find_next_heading
 from ui.renderer import UIRenderer
 from ui.menu import MenuController
+from ui.views.items import Item
 import config as cfg
 
 from apps.music.state import PlayerState
@@ -26,7 +27,7 @@ class MusicPlayerApp(AppBase):
     """Main music player application."""
 
     def __init__(self, audio, input_handler):
-        super().__init__(name="Music Player")
+        super().__init__(name=t('menu.music'))
         self.audio = audio
         self.input = input_handler
         self.lib = LibraryManager()
@@ -220,20 +221,21 @@ class MusicPlayerApp(AppBase):
         if item_type == 'info':
             return
 
-        if item['type'] in ['playlist', 'dir', 'artist', 'album']:
+        if itype in ['playlist', 'dir', 'artist', 'album']:
             self.history.append((self.mode, self.current_path, self.menu.selected_index))
-            new_mode = item['mode']
+            new_mode = item.id.get('mode') if isinstance(item, Item) and isinstance(item.id, dict) else item.get('mode')
 
             # Show loading for potentially large lists
             if new_mode in ['PLAYLIST_VIEW', 'RECENTS', 'ARTIST_VIEW', 'ALBUM_VIEW', 'FAV_TRACKS_VIEW', 'TRACKS_VIEW', 'ARTISTS_ROOT', 'ALBUMS_ROOT']:
-                self._show_loading("Loading...")
+                self._show_loading(t('general.loading'))
 
             self.mode = new_mode
-            self.current_path = item.get('path', item.get('name'))
+            self.current_path = (item.id.get('path') or item.text) if isinstance(item, Item) and isinstance(item.id, dict) else (item.get('path', item.get('name')))
             self.refresh_list(reset_selection=True)
             self._hide_loading()
-        elif item['type'] == 'file':
-            self._play_from_list(item['path'])
+        elif itype == 'file':
+            tpath = item.id.get('path') if isinstance(item, Item) and isinstance(item.id, dict) else (item.id if isinstance(item, Item) else item.get('path'))
+            self._play_from_list(tpath)
 
     def nav_back(self):
         if self._wake_from_screensaver():

@@ -73,6 +73,7 @@ player:
 
 # Settings
 settings:
+  title: "SETTINGS"
   categories:
     audio: "AUDIO"
     library: "LIBRARY"
@@ -95,6 +96,7 @@ settings:
     recents_limit: "Recents Limit"
 
   network:
+    title: "WiFi: {status}"
     wifi: "WiFi"
     bluetooth: "Bluetooth"
     toggle_wifi: "Toggle WiFi"
@@ -103,6 +105,11 @@ settings:
     disconnected: "Disconnected"
     not_connected: "Not Connected"
     unavailable: "Unavailable"
+    select_network: "Select Network"
+    no_networks: "(No networks)"
+    connecting: "Connecting..."
+    connected: "Connected"
+    failed: "Failed"
 
   display:
     invert_colors: "Invert Colors"
@@ -124,17 +131,26 @@ settings:
     shutdown: "Clear Screen + Shut Down"
 
   bluetooth:
+    title: "BT: {status}"
     manager: "Bluetooth Manager"
     scan: "Scan"
+    scan_new: "[ Scan New Device ]"
     scanning: "Scanning..."
     connect: "Connect"
     disconnect: "Disconnect"
     forget: "Forget Device"
+    forget_short: "Forget"
     pairing: "Pairing..."
     paired: "Paired"
     no_devices: "No devices found"
     default: "Default"
     none: "None"
+    select_device: "Select Device"
+    connecting: "Connecting..."
+    disconnecting: "Disconnecting..."
+    forgetting: "Removing..."
+    removed: "Removed"
+    idle: "Idle"
 
 # Welcome screen
 welcome:
@@ -158,8 +174,11 @@ general:
   yes: "Yes"
   no: "No"
   ok: "OK"
+  cancel: "Cancel"
   loading: "Loading..."
-  error: "Error"
+  please_wait: "PLEASE WAIT"
+  error: "ERROR"
+  unknown_view: "Unknown View"
   power_off: "POWER OFF"
   default: "Default"
   volume_popup: "VOLUME"

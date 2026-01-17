@@ -2,6 +2,7 @@ from ui.views.core import Panel
 from ui.views.items import Item
 from PIL import Image, ImageDraw
 import config as cfg
+from core.i18n import t
 
 
 class MenuViewRenderer:
@@ -91,7 +92,7 @@ class MenuViewRenderer:
         y = (cfg.SCREEN_HEIGHT - panel_h) // 2
 
         # Create panel with volume header
-        header_text = f"{title} {int(volume_level)}%"
+        header_text = f"{title or t('general.volume_popup')} {int(volume_level)}%"
         panel = Panel(x, y, panel_w, panel_h, header=header_text)
         menu = panel.create_menu()
 

@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw, ImageOps
 
 import config as cfg
 from core.metadata import sanitize_text
+from core.i18n import t
 
 
 @dataclass
@@ -32,7 +33,7 @@ class Item:
                  columns: List[Union[str, Column]] = None,
                  lines: List = None,
                  image: Image.Image = None,
-                 placeholder: str = "NO IMAGE",
+                 placeholder: str = None,
                  value: int = 0,
                  selectable: bool = True,
                  pinned: bool = False,
@@ -46,7 +47,7 @@ class Item:
         self.columns = columns
         self.lines = lines
         self.image = image
-        self.placeholder = placeholder
+        self.placeholder = placeholder or t('player.browse.no_image')
         self.value = value
         self.selectable = selectable
         self.pinned = pinned
