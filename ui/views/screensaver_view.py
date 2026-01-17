@@ -69,7 +69,7 @@ class ScreensaverRenderer:
             # Image panel
             img_w, img_h = image.size
             img_x = (cfg.SCREEN_WIDTH - img_w - 2) // 2
-            img_y = (cfg.SCREEN_WIDTH - img_h - 2) // 2
+            img_y = (cfg.SCREEN_HEIGHT - img_h - 2) // 2
             
             panel_img = Panel(img_x, img_y, img_w + 2, img_h + 2)
             menu_img = panel_img.create_menu()
