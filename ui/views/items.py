@@ -62,7 +62,7 @@ class Item:
     def set_height(self, h: int):
         self._height = h
 
-    def get_height(self) -> int:
+    def get_height(self, width: Optional[int] = None) -> int:
         if self._height is not None:
             return self._height
             
@@ -70,11 +70,11 @@ class Item:
             if self.lines:
                 return len(self.lines) * cfg.ROW_HEIGHT
             if self.text and not self.columns:
-                if self.wrap_text and self._wrapped_lines:
-                    return len(self._wrapped_lines) * cfg.ROW_HEIGHT
                 if self.wrap_text:
                     # Eagerly compute wrapped lines if width is provided
                     if width and width != self._last_width:
+                        self._wrapped_lines = self._wrap_text(sanitize_text(self.text), width)
+                        self._last_width = width
                     
                     if self._wrapped_lines:
                         return len(self._wrapped_lines) * cfg.ROW_HEIGHT
