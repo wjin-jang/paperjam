@@ -112,8 +112,8 @@ class PlayerState:
 
         # Return default status
         if self.is_playing:
-            return "PLAYING"
+            return 'player.status.playing'
         elif self.playing_path:
-            return "PAUSED"
+            return 'player.status.paused'
         else:
-            return "IDLE"
+            return 'player.status.idle'
