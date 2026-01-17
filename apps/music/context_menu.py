@@ -34,7 +34,7 @@ class ContextMenuHandler:
         # Menu controller
         self.menu = MenuController([])
 
-    def open(self, item: Any, in_queue_view: bool = False, queue_index: int = None):
+    def open(self, item: any, in_queue_view: bool = False, queue_index: int = None):
         """
         Open context menu for an item.
 
@@ -78,7 +78,7 @@ class ContextMenuHandler:
         items = [Item(text=opt, type='text', id=opt) for opt in options]
         self.menu.set_items(items)
 
-    def _get_options_for_item(self, item: Any) -> List[str]:
+    def _get_options_for_item(self, item: any) -> List[str]:
         """Get context menu options based on item type."""
         from ui.views.items import Item
         itype = item.type if isinstance(item, Item) else item.get('type')
