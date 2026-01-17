@@ -378,7 +378,11 @@ class SettingsApp(AppBase):
         elif action == t('general.cancel'):
             self._enter_bt_saved_view()
 
-...
+    def _show_popup(self, msg: str):
+        self.popup_msg = msg
+        self.prev_view = self.view
+        self.view = 'POPUP'
+        self.popup_start = time.time()
 
     def _bt_scan_callback(self, devices):
         from ui.views.items import Item
