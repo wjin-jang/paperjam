@@ -395,7 +395,7 @@ class Panel:
 
         sb_x = self.x + self.width - 8
         sb_y = self.y + self.content_y
-        sb_h = self.content_height + 2
+        sb_h = self.content_height
         sb_w = 8
 
         # Dithered background

@@ -420,9 +420,6 @@ class BrowseHandler:
             playing_item['pinned'] = True
             pinned_items.append(playing_item)
 
-        controls_item = {'column_nav': True, 'pinned': True}
-        pinned_items.append(controls_item)
-
         scrollable_items = []
         if not all_items and not pinned_items:
             scrollable_items = [{'name': t('player.browse.queue_empty'), 'selectable': False}]
