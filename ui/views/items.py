@@ -36,6 +36,7 @@ class Item:
                  value: int = 0,
                  selectable: bool = True,
                  pinned: bool = False,
+                 wrap_text: bool = False,
                  font=None,
                  padding: tuple = None):
         self.text = text
@@ -48,6 +49,7 @@ class Item:
         self.value = value
         self.selectable = selectable
         self.pinned = pinned
+        self.wrap_text = wrap_text
         self.font = font
         self.padding = padding
         
@@ -67,7 +69,7 @@ class Item:
             if self.lines:
                 return len(self.lines) * cfg.ROW_HEIGHT
             if self.text and not self.columns:
-                if self._wrapped_lines:
+                if self.wrap_text and self._wrapped_lines:
                     return len(self._wrapped_lines) * cfg.ROW_HEIGHT
         
         return cfg.ROW_HEIGHT
@@ -111,18 +113,21 @@ class Item:
             if self.columns:
                 self._render_info_columns(draw, canvas, x, y, w)
                 return
-            # If text, fall through to text rendering (wrapped)
+            # If text, fall through to text rendering (wrapped if flagged)
             if self.text:
-                self._render_wrapped_text(draw, canvas, x, y, w)
+                if self.wrap_text:
+                    self._render_wrapped_text(draw, canvas, x, y, w)
+                else:
+                    # Render as single line info box
+                    self._draw_text_box(draw, canvas, sanitize_text(self.text), x, y, w, cfg.ROW_HEIGHT, font=self.font, padding=self.padding)
                 return
 
         # Handle 'text' and 'heading' types (and 'info' text fallback)
         # Setup specific attributes
         is_heading = (self.type == 'heading')
         invert = is_heading or (selected and self.selectable)
-        bg_color = cfg.BLACK if is_heading else None # Only Heading forces black bg outside selection
         
-        # Draw background if needed (Heading always black, Text only if selected handled by _draw_text_box internally mostly, but let's be explicit if needed)
+        # Draw background if needed
         if is_heading:
              draw.rectangle((x, y, x + w, y + h), fill=cfg.BLACK)
         
@@ -367,11 +372,3 @@ class Item:
                 current_line = [word]
         if current_line: lines.append(' '.join(current_line))
         return lines
-
-# For backward compatibility during transition (optional)
-TextItem = lambda text, **kwargs: Item(text, type='text', **kwargs)
-HeadingItem = lambda text, **kwargs: Item(text, type='heading', **kwargs)
-InfoItem = lambda text=None, columns=None, lines=None, **kwargs: Item(text=text, type='info', columns=columns, lines=lines, **kwargs)
-ColumnItem = lambda columns, **kwargs: Item(type='column', columns=columns, **kwargs)
-ImageItem = lambda image=None, **kwargs: Item(type='image', image=image, **kwargs)
-VolumeBarItem = lambda level, **kwargs: Item(type='volume', value=level, **kwargs)

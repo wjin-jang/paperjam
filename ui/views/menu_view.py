@@ -1,10 +1,7 @@
-"""
-Menu view rendering using Panel → Menu → Item hierarchy.
-"""
+from ui.views.core import Panel
+from ui.views.items import Item
 from PIL import Image, ImageDraw
 import config as cfg
-from ui.views.core import Panel
-from ui.views.items import Item, Column, VolumeBarItem
 
 
 class MenuViewRenderer:
@@ -52,9 +49,16 @@ class MenuViewRenderer:
         # Dict with 'name' field
         if isinstance(item, dict):
             name = item.get('name', str(item))
-            if is_info:
-                return Item(text=name, type='info')
-            return Item(text=name, type='text')
+            wrap_text = item.get('wrap_text', False)
+            itype = item.get('type', 'text')
+            
+            if itype == 'heading':
+                return Item(text=name, type='heading', wrap_text=wrap_text)
+            
+            if is_info or itype == 'info':
+                return Item(text=name, type='info', wrap_text=wrap_text)
+                
+            return Item(text=name, type='text', wrap_text=wrap_text)
 
         return Item(text=str(item), type='text')
 

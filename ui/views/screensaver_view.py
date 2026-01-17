@@ -128,7 +128,7 @@ class ScreensaverRenderer:
         # Add text and button
         # Using multiple items
         menu.items = [
-            Item(text=dialog_text, type='info', padding=(5, 10)),
+            Item(text=dialog_text, type='info', padding=(5, 10), wrap_text=True),
             Item(text=button_text, type='text', selectable=True)
         ]
         

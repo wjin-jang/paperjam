@@ -105,15 +105,12 @@ class WelcomeApp(AppBase):
 
     def _render_choice(self):
         """Render choice screen with multi-line info."""
-        # Truncate path if too long
         music_path = str(cfg.MUSIC_PATH)
-        if len(music_path) > 22:
-            music_path = music_path[:22]
 
         if not self.choice_menu.items:
             # Build menu items
             items = [
-                {'name': t('welcome.music_found', path=music_path), 'type': 'info', 'lines': [t('welcome.music_found', path=music_path)]},
+                {'name': t('welcome.music_found', path=music_path), 'type': 'info', 'wrap_text': True},
                 {'name': t('welcome.scan_now'), 'type': 'file', 'action': 'SCAN'},
                 {'name': t('welcome.shutdown_add_music'), 'type': 'file', 'action': 'SHUTDOWN'}
             ]
@@ -125,18 +122,21 @@ class WelcomeApp(AppBase):
 
     def _render_scanning(self):
         """Render scanning progress."""
+        # Use columns for stats
         items = [
-            {'name': t('welcome.scanning_tracks', count=self.lib.scan_track_count), 'type': 'info'},
-            {'name': f"{t('settings.library.albums')}: {self.lib.scan_album_count}", 'type': 'info'},
-            {'name': f"{t('settings.library.artists')}: {self.lib.scan_artist_count}", 'type': 'info'}
+            {'type': 'info', 'columns': ["Tracks", str(self.lib.scan_track_count)]},
+            {'type': 'info', 'columns': [t('settings.library.albums'), str(self.lib.scan_album_count)]},
+            {'type': 'info', 'columns': [t('settings.library.artists'), str(self.lib.scan_artist_count)]}
         ]
 
         if self.lib.scan_current_file:
-            current = self.lib.scan_current_file[:22]
-            items.append({'name': f"{t('welcome.file')}: {current}", 'type': 'info'})
+            current = self.lib.scan_current_file
+            # File path should wrap if long
+            items.append({'name': f"{t('welcome.file')}: {current}", 'type': 'info', 'wrap_text': True})
 
         return self.renderer.render_menu(
-            t('welcome.scanning'), items, -1, 0, info_indices=[0, 1, 2, 3] # Still passed manually for pure info screen
+            t('welcome.scanning'), items, -1, 0,
+            info_indices=[0, 1, 2, 3]
         )
 
     def _render_welcome(self):
