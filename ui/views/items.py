@@ -103,17 +103,19 @@ class Item:
             return
 
         if self.type == 'info':
+            invert = (selected and self.selectable)
             if self.lines:
-                self._render_multi_line(draw, canvas, x, y, w)
+                self._render_multi_line(draw, canvas, x, y, w, invert=invert)
                 return
             if self.columns:
-                self._render_info_columns(draw, canvas, x, y, w)
+                self._render_info_columns(draw, canvas, x, y, w, invert=invert)
                 return
             if self.text:
                 if self.wrap_text:
-                    self._render_wrapped_text(draw, canvas, x, y, w)
+                    self._render_wrapped_text(draw, canvas, x, y, w, invert=invert)
                 else:
-                    self._draw_text_box(draw, canvas, sanitize_text(self.text), x, y, w, cfg.ROW_HEIGHT, font=self.font, padding=self.padding)
+                    self._draw_text_box(draw, canvas, sanitize_text(self.text), x, y, w, cfg.ROW_HEIGHT, 
+                                       invert=invert, font=self.font, padding=self.padding)
                 return
 
         is_heading = (self.type == 'heading')
@@ -200,17 +202,18 @@ class Item:
         iy = y + (h - icon.height) // 2
         canvas.paste(icon, (ix, iy + 1), mask=icon if not invert else None)
 
-    def _render_multi_line(self, draw, canvas, x, y, w):
+    def _render_multi_line(self, draw, canvas, x, y, w, invert=False):
         total_h = len(self.lines) * cfg.ROW_HEIGHT
-        self._draw_container(draw, x, y, w, total_h)
+        self._draw_container(draw, x, y, w, total_h, invert=invert)
+        fg = cfg.WHITE if invert else cfg.BLACK
         for i, line in enumerate(self.lines):
             line_y = y + (i * cfg.ROW_HEIGHT)
-            if isinstance(line, list): self._render_plain_columns(draw, line, x, line_y, w)
-            else: draw.text((x + 5, line_y + 3), sanitize_text(str(line)), font=cfg.FONT_MAIN, fill=cfg.BLACK)
+            if isinstance(line, list): self._render_plain_columns(draw, line, x, line_y, w, fg=fg)
+            else: draw.text((x + 5, line_y + 3), sanitize_text(str(line)), font=cfg.FONT_MAIN, fill=fg)
 
-    def _render_plain_columns(self, draw, columns, x, y, w):
+    def _render_plain_columns(self, draw, columns, x, y, w, fg=cfg.BLACK):
         if not columns: return
-        draw.text((x + 5, y + 3), sanitize_text(str(columns[0])), font=cfg.FONT_MAIN, fill=cfg.BLACK)
+        draw.text((x + 5, y + 3), sanitize_text(str(columns[0])), font=cfg.FONT_MAIN, fill=fg)
         if len(columns) > 1:
             right_widths = [max(20, len(sanitize_text(str(c))) * 6 + 8) for c in columns[1:]]
             total_right = sum(right_widths)
@@ -220,10 +223,10 @@ class Item:
             col_x = x + max(20, w - sum(right_widths))
             for i, col in enumerate(columns[1:]):
                 col_w = right_widths[i]
-                self._draw_aligned_text(draw, str(col), col_x, y, col_w, cfg.ROW_HEIGHT, 'center', cfg.BLACK)
+                self._draw_aligned_text(draw, str(col), col_x, y, col_w, cfg.ROW_HEIGHT, 'center', fg)
                 col_x += col_w
 
-    def _render_info_columns(self, draw, canvas, x, y, w):
+    def _render_info_columns(self, draw, canvas, x, y, w, invert=False):
         if not self.columns: return
         right_widths = [max(20, len(sanitize_text(str(c))) * 6 + 8) for c in self.columns[1:]]
         total_right = sum(right_widths)
@@ -232,30 +235,32 @@ class Item:
             scale = (w - 20) / total_right if total_right > 0 else 1
             right_widths = [max(10, int(cw * scale)) for cw in right_widths]
             left_w = max(20, w - sum(right_widths))
-        self._draw_text_box(draw, canvas, sanitize_text(str(self.columns[0])), x, y, left_w, cfg.ROW_HEIGHT)
+        self._draw_text_box(draw, canvas, sanitize_text(str(self.columns[0])), x, y, left_w, cfg.ROW_HEIGHT, invert=invert)
         col_x = x + left_w
         for i, col in enumerate(self.columns[1:]):
             col_w = right_widths[i]
-            self._draw_text_box(draw, canvas, sanitize_text(str(col)), col_x, y, col_w, cfg.ROW_HEIGHT, center=True)
+            self._draw_text_box(draw, canvas, sanitize_text(str(col)), col_x, y, col_w, cfg.ROW_HEIGHT, center=True, invert=invert)
             col_x += col_w
 
-    def _render_wrapped_text(self, draw, canvas, x, y, w):
+    def _render_wrapped_text(self, draw, canvas, x, y, w, invert=False):
         if w != self._last_width:
             self._wrapped_lines = self._wrap_text(sanitize_text(self.text), w)
             self._last_width = w
         lines = self._wrapped_lines
         if len(lines) == 1:
-            self._draw_text_box(draw, canvas, lines[0], x, y, w, cfg.ROW_HEIGHT)
+            self._draw_text_box(draw, canvas, lines[0], x, y, w, cfg.ROW_HEIGHT, invert=invert)
         else:
             total_h = len(lines) * cfg.ROW_HEIGHT
-            self._draw_container(draw, x, y, w, total_h)
+            self._draw_container(draw, x, y, w, total_h, invert=invert)
             padding_x = self.padding[0] if self.padding else 5
             padding_y = self.padding[1] if self.padding else 3
+            fg = cfg.WHITE if invert else cfg.BLACK
             for i, line in enumerate(lines):
-                draw.text((x + padding_x, y + (i * cfg.ROW_HEIGHT) + padding_y), line, font=self.font or cfg.FONT_MAIN, fill=cfg.BLACK)
+                draw.text((x + padding_x, y + (i * cfg.ROW_HEIGHT) + padding_y), line, font=self.font or cfg.FONT_MAIN, fill=fg)
 
-    def _draw_container(self, draw, x, y, w, h):
-        draw.rectangle((x, y, x + w , y + h ), fill=cfg.WHITE, outline=cfg.BLACK)
+    def _draw_container(self, draw, x, y, w, h, invert=False):
+        bg = cfg.BLACK if invert else cfg.WHITE
+        draw.rectangle((x, y, x + w , y + h ), fill=bg, outline=cfg.BLACK)
 
     def _draw_text_box(self, draw, canvas, text, x, y, w, h, invert=False, center=False, font=None, padding=None):
         if h < 1 or w < 1: return
