@@ -34,7 +34,7 @@ class UIRenderer:
         """Render screensaver view."""
         return self._screensaver_view.render_screensaver(state)
 
-    def render_music_view(self, state, view_items) -> Image.Image:
+    def render_music_view(self, state, view_items) -> tuple[Image.Image, int]:
         """Render music player view."""
         return self._music_view.render(state, view_items)
 

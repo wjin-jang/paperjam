@@ -159,7 +159,7 @@ class MusicViewRenderer:
 
         return item.get('icon', '')
 
-    def render(self, state, view_items):
+    def render(self, state, view_items) -> tuple[Image.Image, int]:
         """Render the full music view.
 
         Args:
@@ -167,7 +167,7 @@ class MusicViewRenderer:
             view_items: List of items to display (legacy format)
 
         Returns:
-            Rendered canvas image
+            Tuple of (Rendered canvas image, updated scroll offset)
         """
         self.clear()
 
@@ -208,6 +208,7 @@ class MusicViewRenderer:
         main_panel = Panel(cfg.PANEL_X, cfg.PANEL_Y, cfg.PANEL_W, cfg.PANEL_H,
                           header=header_text)
         main_menu = main_panel.create_menu()
+        main_menu.scroll_offset = state.scroll_offset
 
         # Separate pinned and scrollable items
         pinned_legacy = [item for item in view_items if item.get('pinned')]
@@ -246,7 +247,7 @@ class MusicViewRenderer:
         elif state.context_menu_active:
             self.render_context_menu(state)
 
-        return self.canvas
+        return self.canvas, main_menu.scroll_offset
 
     def render_context_menu(self, state):
         """Render context menu overlay.

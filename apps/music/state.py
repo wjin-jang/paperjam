@@ -15,6 +15,7 @@ class PlayerState:
     pinned_items: List[dict] = field(default_factory=list)
     scrollable_items: List[dict] = field(default_factory=list)
     cursor: Cursor = field(default_factory=Cursor)
+    scroll_offset: int = 0
     album: str = "Library"
     artist: str = ""
     year: str = ""
@@ -70,6 +71,7 @@ class PlayerState:
         self.scrollable_items = []
         self.artist = ""
         self.year = ""
+        self.scroll_offset = 0
         if reset_controls:
             self.cursor.col = 0
         self.browsing_cover_s = None

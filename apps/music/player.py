@@ -676,4 +676,6 @@ class MusicPlayerApp(AppBase):
 
         # Pass all items - the Menu system handles scrolling based on cursor
         view_items = self.state.pinned_items + self.state.scrollable_items
-        return self.renderer.render_music_view(self.state, view_items)
+        frame, scroll = self.renderer.render_music_view(self.state, view_items)
+        self.state.scroll_offset = scroll
+        return frame

@@ -74,7 +74,7 @@ class Menu:
 
     def get_total_height(self) -> int:
         """Get total height of all items."""
-        return sum(item.get_height() for item in self.items)
+        return sum(item.get_height(self.width) for item in self.items)
 
     def needs_scrollbar(self) -> bool:
         """Check if menu needs a scrollbar."""
@@ -95,7 +95,7 @@ class Menu:
         for i, item in enumerate(self.items):
             if i >= row_idx:
                 break
-            y += item.get_height()
+            y += item.get_height(self.width)
 
         # Clamp to max scrollable area
         max_scroll = max(0, self.get_total_height() - self.height)
@@ -207,37 +207,38 @@ class Menu:
             return
 
         # Ensure cursor is in bounds
-        if self.cursor.row >= len(self.items):
-            self.cursor.row = len(self.items) - 1
+        idx = max(0, min(self.cursor.row, len(self.items) - 1))
+        self.cursor.row = idx
 
-        # Calculate cursor item position in pixels
+        # Calculate target row boundaries
         row_top = 0
-        for i, item in enumerate(self.items):
-            h = item.get_height()
-            if i == self.cursor.row:
-                break
-            row_top += h
-        
-        row_height = self.items[self.cursor.row].get_height()
+        for i in range(idx):
+            row_top += self.items[i].get_height(self.width)
+        row_height = self.items[idx].get_height(self.width)
         row_bottom = row_top + row_height
         
-        # Current viewport
-        view_top = self.scroll_offset
-        view_bottom = self.scroll_offset + self.height
-        
-        # If item is taller than viewport, align top
-        if row_height >= self.height:
-            self.scroll_offset = row_top
-        # If above viewport, align top
-        elif row_top < view_top:
-            self.scroll_offset = row_top
-        # If below viewport, align bottom
-        elif row_bottom > view_bottom:
-            self.scroll_offset = row_bottom - self.height
-        # Otherwise, the item is already visible, so do nothing.
-
-        # Clamp to valid range
+        # Max possible scroll offset
         max_scroll = max(0, self.get_total_height() - self.height)
+        
+        # Clamp existing scroll_offset first to ensure comparison is fair
+        self.scroll_offset = max(0, min(self.scroll_offset, max_scroll))
+        
+        view_top = self.scroll_offset
+        view_bottom = view_top + self.height
+        
+        # Decision logic
+        if row_top < view_top:
+            # Above viewport -> scroll UP to show top of item
+            self.scroll_offset = row_top
+        elif row_bottom > view_bottom:
+            # Below viewport -> scroll DOWN to show bottom of item
+            self.scroll_offset = row_bottom - self.height
+            
+        # Preference: Always show the top of an item if it's taller than the viewport
+        if row_height > self.height:
+            self.scroll_offset = row_top
+
+        # Final safety clamp
         self.scroll_offset = max(0, min(self.scroll_offset, max_scroll))
 
     def render(self) -> Image.Image:
@@ -249,13 +250,14 @@ class Menu:
         frame = Image.new('1', (self.width, self.height), cfg.WHITE)
         draw = ImageDraw.Draw(frame)
 
-        draw.rectangle((0,0,self.width,self.height))
+        # Explicitly fill background
+        draw.rectangle((0, 0, self.width - 1, self.height - 1), fill=cfg.WHITE)
 
         # scroll_offset is in pixels
         render_y = -self.scroll_offset
 
         for i, item in enumerate(self.items):
-            h = item.get_height()
+            h = item.get_height(self.width)
 
             # Check if item is visible
             if render_y + h > 0 and render_y < self.height:

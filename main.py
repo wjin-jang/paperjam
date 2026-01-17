@@ -130,14 +130,15 @@ class MainApp:
     def _welcome_shutdown(self):
         """Handle shutdown request from welcome app."""
         logger.info("User chose to shutdown for library setup")
-        frame = self.renderer.render_menu("SETUP", [
-            {"type": "info", "lines": [
+        from ui.views.items import Item
+        frame, _ = self.renderer.render_menu("SETUP", [
+            Item(type="info", lines=[
                 t('welcome.shutdown_loading'),
                 "",
                 t('welcome.add_music_prompt'),
                 f"{str(cfg.MUSIC_PATH)[:22]}"
-            ]}
-        ], -1, 0, info_indices=[0])
+            ], selectable=False)
+        ], -1, 0)
         self._display(frame, full_refresh=True)
         time.sleep(2)
         self.sys.shutdown()
@@ -417,7 +418,8 @@ class MainApp:
         # Save volume before system action (reboot)
         self.settings_app.categories['AUDIO'].save_volume()
 
-        frame = self.renderer.render_menu(t('settings.categories.system'), [msg], 0, 0)
+        from ui.views.items import Item
+        frame, _ = self.renderer.render_menu(t('settings.categories.system'), [Item(text=msg, type='info', selectable=False)], 0, 0)
         self._display(frame, full_refresh=True)
         time.sleep(2)
         action()
@@ -425,7 +427,8 @@ class MainApp:
     def _handle_shutdown_request(self, reason="User Request"):
         logger.info(f"Shutdown requested: {reason}")
         if reason == "LOW BATTERY":
-            frame = self.renderer.render_menu(t('system_messages.low_battery'), [t('system_messages.shutting_down')], 0, 0)
+            from ui.views.items import Item
+            frame, _ = self.renderer.render_menu(t('system_messages.low_battery'), [Item(text=t('system_messages.shutting_down'), type='info', selectable=False)], 0, 0)
             self._display(frame, full_refresh=True, skip_battery=False)
             time.sleep(2)
         self._perform_shutdown()
