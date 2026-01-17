@@ -151,7 +151,7 @@ class MainApp:
         logger.info("Version requires library rescan")
 
         # Show rescan message
-        frame = self.renderer.render_menu("UPDATE", [t('welcome.scanning_library')], -1, 0)
+        frame, _ = self.renderer.render_menu("UPDATE", [Item(text=t('welcome.scanning_library'), type='info', selectable=False)], -1, 0)
         self._display(frame, full_refresh=True)
 
         # Trigger async rescan
@@ -165,7 +165,7 @@ class MainApp:
         logger.info("Auto-update enabled, checking for updates...")
 
         # Show checking status
-        frame = self.renderer.render_menu("AUTO-UPDATE", [t('updates.checking')], -1, 0)
+        frame, _ = self.renderer.render_menu("AUTO-UPDATE", [Item(text=t('updates.checking'), type='info', selectable=False)], -1, 0)
         self._display(frame, full_refresh=True)
 
         # Check for updates
@@ -173,13 +173,13 @@ class MainApp:
 
         if has_updates:
             logger.info("Updates available, installing...")
-            frame = self.renderer.render_menu("AUTO-UPDATE", [t('updates.installing')], -1, 0)
+            frame, _ = self.renderer.render_menu("AUTO-UPDATE", [Item(text=t('updates.installing'), type='info', selectable=False)], -1, 0)
             self._display(frame, full_refresh=True)
 
             success, result_msg = self.sys.perform_update()
             if not success:
                 logger.error(f"Auto-update failed: {result_msg}")
-                frame = self.renderer.render_menu("AUTO-UPDATE", [t('updates.failed', msg=result_msg[:18])], -1, 0)
+                frame, _ = self.renderer.render_menu("AUTO-UPDATE", [Item(text=t('updates.failed', msg=result_msg[:18]), type='info', selectable=False)], -1, 0)
                 self._display(frame, full_refresh=True)
                 time.sleep(2)
             # If successful, perform_update will restart the app
@@ -443,23 +443,23 @@ class MainApp:
         logger.info("Checking for updates")
 
         # Show checking status
-        frame = self.renderer.render_menu("UPDATE", [t('updates.checking')], -1, 0)
+        frame, _ = self.renderer.render_menu("UPDATE", [Item(text=t('updates.checking'), type='info', selectable=False)], -1, 0)
         self._display(frame, full_refresh=True)
 
         # Check for updates
         has_updates, msg = self.sys.check_for_updates()
 
         if has_updates:
-            frame = self.renderer.render_menu("UPDATE", [t('updates.updating')], -1, 0)
+            frame, _ = self.renderer.render_menu("UPDATE", [Item(text=t('updates.updating'), type='info', selectable=False)], -1, 0)
             self._display(frame, full_refresh=True)
 
             success, result_msg = self.sys.perform_update()
             if not success:
-                frame = self.renderer.render_menu("UPDATE", [t('general.error_prefix', msg=result_msg)], -1, 0)
+                frame, _ = self.renderer.render_menu("UPDATE", [Item(text=t('general.error_prefix', msg=result_msg), type='info', selectable=False)], -1, 0)
                 self._display(frame, full_refresh=True)
                 time.sleep(2)
         else:
-            frame = self.renderer.render_menu("UPDATE", [msg], -1, 0)
+            frame, _ = self.renderer.render_menu("UPDATE", [Item(text=msg, type='info', selectable=False)], -1, 0)
             self._display(frame, full_refresh=True)
             time.sleep(1.5)
 
@@ -468,7 +468,7 @@ class MainApp:
         logger.info("Resetting data and rebooting")
 
         # Show resetting status
-        frame = self.renderer.render_menu(t('system_messages.reset'), [t('system_messages.resetting')], -1, 0)
+        frame, _ = self.renderer.render_menu(t('system_messages.reset'), [Item(text=t('system_messages.resetting'), type='info', selectable=False)], -1, 0)
         self._display(frame, full_refresh=True)
 
         # Delete data files
