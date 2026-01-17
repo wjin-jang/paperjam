@@ -22,9 +22,7 @@ class PopupPanel(Panel):
         self.state = None # Optional state object
 
     def create_menu(self):
-        self.menu = Menu(self.x + 1, self.y + 1 + (cfg.ROW_HEIGHT if self.header else 0),
-                         self.w - 2, self.h - 2 - (cfg.ROW_HEIGHT if self.header else 0))
-        return self.menu
+        return super().create_menu()
 
     def update(self, items=None, extra=None):
         """Update popup content."""
