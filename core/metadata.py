@@ -77,7 +77,8 @@ def get_metadata(file_path):
             track_num = parse_num(audio.get("tracknumber", [0])[0])
             # Try multiple disc number tag variations (different taggers use different names)
             disc_val = (audio.get("discnumber") or audio.get("disc") or
-                       audio.get("disknumber") or audio.get("part") or [1])
+                       audio.get("disknumber") or audio.get("part") or [1]
+                       or audio.get("disc #"))
             disc_num = parse_num(disc_val[0])
 
             date_str = audio.get("date", [None])[0]

@@ -202,12 +202,8 @@ class Menu:
         self.cursor.col = 0
 
     def _ensure_visible(self):
-        """Ensure cursor row is visible in the viewport using page-based scrolling.
-
-        Scrolls by a full page (screen height) when the cursor moves out of bounds.
-        """
+        """Ensure cursor row is visible in the viewport using smart scrolling."""
         if not self.items or self.cursor.row < 0:
-            self.scroll_offset = 0
             return
 
         # Ensure cursor is in bounds
@@ -221,24 +217,27 @@ class Menu:
             if i == self.cursor.row:
                 break
             row_top += h
-
-        total_height = self.get_total_height()
         
-        # Calculate page height
-        rows_per_page = self.height // cfg.ROW_HEIGHT
-        page_height = rows_per_page * cfg.ROW_HEIGHT
+        row_height = self.items[self.cursor.row].get_height()
+        row_bottom = row_top + row_height
+        
+        # Current viewport
+        view_top = self.scroll_offset
+        view_bottom = self.scroll_offset + self.height
+        
+        # If item is taller than viewport, align top
+        if row_height > self.height:
+            self.scroll_offset = row_top
+        # If above viewport, align top
+        elif row_top < view_top:
+            self.scroll_offset = row_top
+        # If below viewport, align bottom
+        elif row_bottom > view_bottom:
+            self.scroll_offset = row_bottom - self.height
 
-        # Avoid division by zero if window is extremely small
-        if page_height <= 0:
-            page_height = self.height
-
-        # Calculate which page the cursor is on
-        current_page_index = row_top // page_height
-        target_scroll = current_page_index * page_height
-
-        # Clamp to valid range (Standard bounds checking)
-        max_scroll = max(0, total_height - self.height)
-        self.scroll_offset = max(0, min(target_scroll, max_scroll))
+        # Clamp to valid range
+        max_scroll = max(0, self.get_total_height() - self.height)
+        self.scroll_offset = max(0, min(self.scroll_offset, max_scroll))
 
     def render(self) -> Image.Image:
         """Render menu items to a frame buffer.
@@ -248,8 +247,6 @@ class Menu:
         """
         frame = Image.new('1', (self.width, self.height), cfg.WHITE)
         draw = ImageDraw.Draw(frame)
-
-        draw.rectangle((0,0,self.width,self.height), outline=cfg.BLACK)
 
         # scroll_offset is in pixels
         render_y = -self.scroll_offset
@@ -319,7 +316,8 @@ class Panel:
     @property
     def content_width(self) -> int:
         """Width of content area (accounting for scrollbar if needed)."""
-        if self.menu and self.menu.needs_scrollbar():
+        # Only reserve scrollbar space if it's actually needed and panel is large enough
+        if self.menu and self.menu.needs_scrollbar() and self.width > 20:
             return self.width - 8  # Scrollbar width
         return self.width
 
@@ -329,7 +327,9 @@ class Panel:
 
     def create_menu(self) -> Menu:
         """Create and set a menu sized for this panel's content area."""
-        menu = Menu(self.content_width, self.content_height)
+        # Initial guess - assumes no scrollbar first to maximize width
+        # Width will be updated in render if scrollbar is needed
+        menu = Menu(self.width, self.content_height)
         self.menu = menu
         return menu
 
@@ -369,16 +369,23 @@ class Panel:
         # Render menu content
         if self.menu:
             # Update menu dimensions based on scrollbar need
-            self.menu.width = self.content_width
+            # We must set dimensions before rendering so wrapped text calculates correctly
             self.menu.height = self.content_height
-
+            
+            # First pass: check if scrollbar needed with full width
+            self.menu.width = self.width 
+            
+            if self.menu.needs_scrollbar() and self.width > 20:
+                # Needs scrollbar -> reduce width
+                self.menu.width = self.content_width
+                
             frame = self.menu.render()
             content_x = self.x
             content_y = self.y + self.content_y
             canvas.paste(frame, (content_x, content_y))
 
             # Render scrollbar if needed
-            if self.menu.needs_scrollbar():
+            if self.menu.needs_scrollbar() and self.width > 20:
                 self._render_scrollbar(canvas, draw)
 
     def _render_scrollbar(self, canvas: Image.Image, draw: ImageDraw.Draw):
@@ -387,13 +394,16 @@ class Panel:
             return
 
         sb_x = self.x + self.width - 8
-        sb_y = self.y + self.content_y - 1
-        sb_h = self.content_height + 2
+        sb_y = self.y + self.content_y
+        sb_h = self.content_height
         sb_w = 8
 
+        # Border around scrollbar track
+        draw.rectangle((sb_x, sb_y, sb_x + sb_w, sb_y + sb_h), outline=cfg.BLACK, fill=cfg.WHITE)
+
         # Dithered background
-        strip = create_dithered_strip(sb_w + 1, sb_h)
-        canvas.paste(strip, (sb_x, sb_y))
+        strip = create_dithered_strip(sb_w - 1, sb_h - 1)
+        canvas.paste(strip, (sb_x + 1, sb_y + 1))
 
         # Calculate handle size and position
         total_h = self.menu.get_total_height()
@@ -411,6 +421,6 @@ class Panel:
         handle_y = sb_y + int((sb_h - handle_h) * scroll_ratio)
 
         draw.rectangle(
-            (sb_x, handle_y, sb_x + sb_w, handle_y + handle_h - 1),
+            (sb_x + 1, handle_y, sb_x + sb_w - 1, handle_y + handle_h - 1),
             fill=cfg.WHITE, outline=cfg.BLACK
         )
