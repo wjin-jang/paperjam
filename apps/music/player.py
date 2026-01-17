@@ -202,12 +202,18 @@ class MusicPlayerApp(AppBase):
             return
 
         # Clicking a heading jumps to the next heading
-        # MenuController usually skips headings, but if one was selected somehow (programmatically)
-        # we can still handle it, though it's less likely now.
         if item_type == 'heading':
-            # Logic to find next heading - implemented manually or via helper
-            # But with MenuController, user can't select headings usually.
-            # So this might be dead code now, which is fine.
+            # Find next heading index
+            current_idx = self.menu.selected_index
+            total = len(self.menu.items)
+            for i in range(1, total):
+                idx = (current_idx + i) % total
+                target = self.menu.items[idx]
+                target_type = target.type if isinstance(target, Item) else target.get('type')
+                if target_type == 'heading':
+                    self.menu.selected_index = idx
+                    self._sync_state_selection()
+                    return
             return
 
         # Info items are non-interactive (skipped by MenuController)
@@ -256,20 +262,12 @@ class MusicPlayerApp(AppBase):
         item = self.menu.get_selected_item()
         if not item: return
         
+        itype = item.type if isinstance(item, Item) else item.get('type')
+        
         # Allow context menu for artists, albums, and headings (album headings in artist view)
-        if item['type'] in ['file', 'playlist', 'artist', 'album', 'heading']:
+        if itype in ['file', 'playlist', 'artist', 'album', 'heading']:
             # Pass queue context for queue view items
             in_queue = self.state.browse_mode == 'QUEUE_VIEW'
-            # Queue index is selection_index minus 1 (for controls item)
-            # CAUTION: If we pinned multiple items, this offset logic might be fragile.
-            # Ideally we pass the object itself or ID.
-            # For now, let's look at how _load_tracks constructs the list.
-            # It puts pinned items first, then controls.
-            # In QUEUE_VIEW, pinned items are [playing_item, controls].
-            # So index 0 is playing, index 1 is controls. Queue starts at 2.
-            # This offset logic is definitely fragile. 
-            # ContextMenuHandler needs updating or we need to pass better context.
-            # But let's stick to existing logic for now, updated for MenuController.
             
             # Count pinned items
             pinned_count = len(self.state.pinned_items)

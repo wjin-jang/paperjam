@@ -15,70 +15,6 @@ class MenuViewRenderer:
         """Clear the canvas."""
         self.draw.rectangle((0, 0, cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), fill=cfg.WHITE)
 
-    def _convert_legacy_item(self, item, is_info: bool):
-        """Convert legacy item format to new Item classes.
-
-        Args:
-            item: String, dict, or Item instance
-            is_info: Whether item should be non-selectable info
-
-        Returns:
-            Item instance
-        """
-        # Already an Item instance
-        if isinstance(item, Item):
-            return item
-
-        # Dictionary item
-        if isinstance(item, dict):
-            itype = item.get('type', 'text')
-            name = item.get('name', '')
-            wrap_text = item.get('wrap_text', False)
-            
-            if itype == 'heading':
-                return Item(text=name, type='heading', wrap_text=wrap_text)
-            
-            if is_info or itype == 'info':
-                lines = item.get('lines')
-                columns = item.get('columns')
-                if lines:
-                    return Item(type='info', lines=lines)
-                if columns:
-                    return Item(type='info', columns=columns)
-                return Item(text=name if name else str(item), type='info', wrap_text=wrap_text)
-                
-            return Item(text=name if name else str(item), type='text', wrap_text=wrap_text)
-
-        # String item
-        if isinstance(item, str):
-            # Info item with separator notation -> columns
-            separator = '|' if '|' in item else (':' if ':' in item else None)
-            if is_info and separator:
-                parts = item.split(separator, 1)
-                label = parts[0].strip()
-                right_text = parts[1].strip() if len(parts) > 1 else ''
-                if ',' in right_text:
-                    right_cols = [c.strip() for c in right_text.split(',')]
-                else:
-                    right_cols = [right_text] if right_text else []
-                return Item(type='info', columns=[label] + right_cols)
-            # Regular text
-            if is_info:
-                return Item(text=item, type='info')
-            return Item(text=item, type='text')
-
-        return Item(text=str(item), type='text')
-
-    def _get_item_row_count(self, item) -> int:
-        """Get the number of rows an item should span (legacy support)."""
-        if isinstance(item, dict) and item.get('type') == 'info' and item.get('lines'):
-            return len(item['lines'])
-        return 1
-
-    def _get_total_rows(self, items) -> int:
-        """Get total row count including multi-line items."""
-        return sum(self._get_item_row_count(item) for item in items)
-
     def render_menu(self, title, items, sel_idx, scroll_idx=0):
         """Render a menu with title and items.
 
@@ -112,7 +48,12 @@ class MenuViewRenderer:
             if isinstance(item, Item):
                 new_items.append(item)
             elif isinstance(item, dict):
-                new_items.append(Item(text=item.get('name', ''), type=item.get('type', 'text')))
+                new_items.append(Item(
+                    text=item.get('name', ''),
+                    type=item.get('type', 'text'),
+                    id=item.get('id'),
+                    selectable=(item.get('type') != 'info')
+                ))
             else:
                 new_items.append(Item(text=str(item), type='text'))
 

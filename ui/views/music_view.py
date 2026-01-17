@@ -77,7 +77,7 @@ class MusicViewRenderer:
             return self._create_controls_item(state)
 
         if itype == 'heading':
-            return Item(text=item.get('name', ''), type='heading', selectable=True)
+            return Item(text=item.get('name', ''), type='heading', selectable=True, id=item.get('id'))
 
         if itype == 'info':
             lines = item.get('lines')

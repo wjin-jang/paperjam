@@ -40,9 +40,8 @@ class MenuController:
             return item.selectable
             
         item_type = item.get('type', 'file')
-        # Pinned items can be selectable (like controls), unless specified otherwise
-        # But commonly 'heading' and 'info' are not.
-        return item_type not in ['heading', 'info']
+        # Allow headings to be selectable
+        return item_type != 'info'
 
     def _validate_selection(self):
         """Ensure selected_index points to a selectable item if possible."""
