@@ -28,37 +28,55 @@ class Item:
 
     def __init__(self,
                  text: str = None,
-                 type: str = 'text',
                  icon: Union[str, Image.Image] = None,
                  columns: List[Union[str, Column]] = None,
                  lines: List = None,
                  image: Image.Image = None,
                  placeholder: str = None,
                  value: int = 0,
+                 # Rendering flags
+                 heading: bool = False,
+                 show_volume: bool = False,
+                 show_image: bool = False,
+                 column_nav: bool = False,
+                 # Behavior
                  selectable: bool = True,
                  pinned: bool = False,
                  wrap_text: bool = False,
                  font=None,
                  padding: tuple = None,
                  id: Any = None):
+        # Content
         self.text = text
-        self.type = type
         self.icon = icon
         self.columns = columns
         self.lines = lines
         self.image = image
         self.placeholder = placeholder or t('player.browse.no_image')
         self.value = value
+
+        # Rendering flags
+        self.heading = heading
+        self.show_volume = show_volume
+        self.show_image = show_image
+        self.column_nav = column_nav
+
+        # Behavior
         self.selectable = selectable
         self.pinned = pinned
         self.wrap_text = wrap_text
         self.font = font
         self.padding = padding
         self.id = id
-        
+
         self._wrapped_lines: List[str] = []
         self._last_width: int = 0
         self._height: Optional[int] = None
+
+    @property
+    def kind(self) -> Optional[str]:
+        """Get content kind from id dict."""
+        return self.id.get('kind') if isinstance(self.id, dict) else None
 
     def set_height(self, h: int):
         self._height = h
@@ -66,8 +84,9 @@ class Item:
     def get_height(self, width: Optional[int] = None) -> int:
         if self._height is not None:
             return self._height
-            
-        if self.type == 'info':
+
+        # Info-style items (non-selectable with content)
+        if not self.selectable or self.lines or (self.columns and not self.column_nav):
             if self.lines:
                 return len(self.lines) * cfg.ROW_HEIGHT
             if self.text and not self.columns:
@@ -76,14 +95,14 @@ class Item:
                     if width and width != self._last_width:
                         self._wrapped_lines = self._wrap_text(sanitize_text(self.text), width)
                         self._last_width = width
-                    
+
                     if self._wrapped_lines:
                         return len(self._wrapped_lines) * cfg.ROW_HEIGHT
-        
+
         return cfg.ROW_HEIGHT
 
     def get_column_count(self) -> int:
-        if self.type == 'column' and self.columns:
+        if self.column_nav and self.columns:
             return len(self.columns)
         return 1
 
@@ -91,12 +110,14 @@ class Item:
                x: int, y: int, w: int, h: int,
                selected: bool = False, selected_col: int = -1):
         """Unified render method."""
-        
-        if self.type == 'volume':
+
+        # Volume slider
+        if self.show_volume:
             self._render_volume(draw, x, y, w, h)
             return
 
-        if self.type == 'image':
+        # Image display
+        if self.show_image:
             if self.image:
                 # Paste image inside border
                 canvas.paste(self.image, (x + 1, y + 1))
@@ -107,11 +128,13 @@ class Item:
                                    invert=True, center=True)
             return
 
-        if self.type == 'column' and self.columns:
+        # Column layout with navigation (controls bar)
+        if self.column_nav and self.columns:
             self._render_column_layout(draw, canvas, x, y, w, h, selected, selected_col)
             return
 
-        if self.type == 'info':
+        # Info-style rendering (non-selectable or has lines/columns without nav)
+        if not self.selectable or self.lines or (self.columns and not self.column_nav):
             invert = (selected and self.selectable)
             if self.lines:
                 self._render_multi_line(draw, canvas, x, y, w, invert=invert)
@@ -123,25 +146,26 @@ class Item:
                 if self.wrap_text:
                     self._render_wrapped_text(draw, canvas, x, y, w, invert=invert)
                 else:
-                    self._draw_text_box(draw, canvas, sanitize_text(self.text), x, y, w, cfg.ROW_HEIGHT, 
+                    self._draw_text_box(draw, canvas, sanitize_text(self.text), x, y, w, cfg.ROW_HEIGHT,
                                        invert=invert, font=self.font, padding=self.padding)
                 return
 
-        is_heading = (self.type == 'heading')
-        invert = is_heading or (selected and self.selectable)
-        
-        if is_heading:
+        # Heading rendering
+        invert = self.heading or (selected and self.selectable)
+
+        if self.heading:
              draw.rectangle((x, y, x + w, y + h), fill=cfg.BLACK)
-        
+
         text = sanitize_text(self.text or "")
-        if is_heading: text = text.upper()
+        if self.heading:
+            text = text.upper()
 
         if self.icon:
             self._render_text_with_icon(draw, canvas, text, x, y, w, h, invert)
         else:
             self._draw_text_box(draw, canvas, text, x, y, w, h, invert=invert)
 
-        if is_heading and selected:
+        if self.heading and selected:
             draw.rectangle((x + 1, y + 1, x + w - 1, y + h - 1), outline=cfg.WHITE)
 
     def _render_text_with_icon(self, draw, canvas, text, x, y, w, h, invert):
@@ -274,7 +298,7 @@ class Item:
     def _draw_text_box(self, draw, canvas, text, x, y, w, h, invert=False, center=False, font=None, padding=None):
         if h < 1 or w < 1: return
         font = font or (self.font if self.font else cfg.FONT_MAIN)
-        padding = padding or (self.padding if self.padding else (5, 2))
+        padding = padding or (self.padding if self.padding else (5, 3))
         padding_x, padding_y = padding
         bg = cfg.BLACK if invert else cfg.WHITE
         fg = cfg.WHITE if invert else cfg.BLACK

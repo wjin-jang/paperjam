@@ -98,29 +98,45 @@ def nav_index_down(current: int, total: int) -> int:
     return (current + 1) % total
 
 
+def _is_item_selectable(item) -> bool:
+    """Check if an item is selectable (works with Item objects or dicts)."""
+    from ui.views.items import Item
+    if isinstance(item, Item):
+        return item.selectable
+    return item.get('selectable', True)
+
+
+def _is_item_heading(item) -> bool:
+    """Check if an item is a heading (works with Item objects or dicts)."""
+    from ui.views.items import Item
+    if isinstance(item, Item):
+        return item.heading
+    return item.get('heading', False)
+
+
 def nav_skip_info_up(current: int, items: list) -> int:
-    """Move index up, skipping info items. Returns new index."""
+    """Move index up, skipping non-selectable items. Returns new index."""
     if not items:
         return 0
     total = len(items)
     new_idx = (current - 1) % total
-    # Skip info items (but not headers or headings which are selectable)
+    # Skip non-selectable items
     attempts = 0
-    while items[new_idx].get('type') == 'info' and attempts < total:
+    while not _is_item_selectable(items[new_idx]) and attempts < total:
         new_idx = (new_idx - 1) % total
         attempts += 1
     return new_idx
 
 
 def nav_skip_info_down(current: int, items: list) -> int:
-    """Move index down, skipping info items. Returns new index."""
+    """Move index down, skipping non-selectable items. Returns new index."""
     if not items:
         return 0
     total = len(items)
     new_idx = (current + 1) % total
-    # Skip info items (but not headers or headings which are selectable)
+    # Skip non-selectable items
     attempts = 0
-    while items[new_idx].get('type') == 'info' and attempts < total:
+    while not _is_item_selectable(items[new_idx]) and attempts < total:
         new_idx = (new_idx + 1) % total
         attempts += 1
     return new_idx
@@ -134,7 +150,7 @@ def find_next_heading(current: int, items: list) -> int:
     idx = (current + 1) % total
     start_idx = idx
     while True:
-        if items[idx].get('type') == 'heading':
+        if _is_item_heading(items[idx]):
             return idx
         idx = (idx + 1) % total
         if idx == start_idx:

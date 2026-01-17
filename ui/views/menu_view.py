@@ -51,12 +51,12 @@ class MenuViewRenderer:
             elif isinstance(item, dict):
                 new_items.append(Item(
                     text=item.get('name', ''),
-                    type=item.get('type', 'text'),
+                    heading=item.get('heading', False),
                     id=item.get('id'),
-                    selectable=(item.get('type') != 'info')
+                    selectable=item.get('selectable', True)
                 ))
             else:
-                new_items.append(Item(text=str(item), type='text'))
+                new_items.append(Item(text=str(item)))
 
         menu.items = new_items
 
@@ -97,7 +97,7 @@ class MenuViewRenderer:
         menu = panel.create_menu()
 
         # Add volume bar item
-        menu.items = [Item(type='volume', value=volume_level)]
+        menu.items = [Item(show_volume=True, value=volume_level)]
 
         panel.render(self.canvas)
 

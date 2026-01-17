@@ -37,17 +37,17 @@ class BrowseHandler:
         track_count = self.lib.get_total_tracks()
         icons = cfg.MENU_ICONS
         return t('menu.main_menu'), [
-            {'name': t('player.browse.artists'), 'type': 'dir', 'mode': 'ARTISTS_ROOT', 'icon': icons['artist']},
-            {'name': t('player.browse.albums'), 'type': 'dir', 'mode': 'ALBUMS_ROOT', 'icon': icons['album']},
-            {'name': t('player.browse.tracks'), 'type': 'dir', 'mode': 'TRACKS_VIEW', 'icon': icons['tracks']},
-            {'name': t('player.browse.fav_artists'), 'type': 'dir', 'mode': 'FAV_ARTISTS', 'icon': icons['fav']},
-            {'name': t('player.browse.fav_albums'), 'type': 'dir', 'mode': 'FAV_ALBUMS', 'icon': icons['fav']},
-            {'name': t('player.browse.playlists'), 'type': 'dir', 'mode': 'PLAYLISTS_ROOT', 'icon': icons['playlist']},
-            {'name': t('player.browse.recent'), 'type': 'dir', 'mode': 'RECENTS', 'icon': icons['recent']},
-            {'name': t('player.browse.files'), 'type': 'dir', 'mode': 'FILES', 'path': cfg.MUSIC_PATH, 'icon': icons['dir']}
+            {'name': t('player.browse.artists'), 'id': {'kind': 'dir', 'mode': 'ARTISTS_ROOT'}, 'icon': icons['artist']},
+            {'name': t('player.browse.albums'), 'id': {'kind': 'dir', 'mode': 'ALBUMS_ROOT'}, 'icon': icons['album']},
+            {'name': t('player.browse.tracks'), 'id': {'kind': 'dir', 'mode': 'TRACKS_VIEW'}, 'icon': icons['tracks']},
+            {'name': t('player.browse.fav_artists'), 'id': {'kind': 'dir', 'mode': 'FAV_ARTISTS'}, 'icon': icons['fav']},
+            {'name': t('player.browse.fav_albums'), 'id': {'kind': 'dir', 'mode': 'FAV_ALBUMS'}, 'icon': icons['fav']},
+            {'name': t('player.browse.playlists'), 'id': {'kind': 'dir', 'mode': 'PLAYLISTS_ROOT'}, 'icon': icons['playlist']},
+            {'name': t('player.browse.recent'), 'id': {'kind': 'dir', 'mode': 'RECENTS'}, 'icon': icons['recent']},
+            {'name': t('player.browse.files'), 'id': {'kind': 'dir', 'mode': 'FILES', 'path': cfg.MUSIC_PATH}, 'icon': icons['dir']}
         ]
 
-    def _create_alphabetical_list(self, data_dict: dict, item_type: str, item_mode: str) -> List[dict]:
+    def _create_alphabetical_list(self, data_dict: dict, item_kind: str, item_mode: str) -> List[dict]:
         """Create a list with alphabetical headings if needed."""
         items = []
         current_letter = None
@@ -60,8 +60,8 @@ class BrowseHandler:
                     first_char = '#'
                 if first_char != current_letter:
                     current_letter = first_char
-                    items.append({'name': first_char, 'type': 'heading'})
-            items.append({'name': k, 'type': item_type, 'mode': item_mode})
+                    items.append({'name': first_char, 'heading': True})
+            items.append({'name': k, 'id': {'kind': item_kind, 'mode': item_mode}})
         return items
 
     def _process_track_list(self, title: str, tracks: List[dict]) -> Tuple[str, List[dict], str, str, Optional[object]]:
@@ -90,9 +90,9 @@ class BrowseHandler:
     def get_fav_artists_list(self) -> Tuple[str, List[dict]]:
         """Get list of favorite artists."""
         if not self.lib.fav_artists:
-            return t('player.browse.fav_artists'), [{'name': t('player.browse.no_fav_artists'), 'type': 'info'}]
+            return t('player.browse.fav_artists'), [{'name': t('player.browse.no_fav_artists'), 'selectable': False}]
         items = [
-            {'name': k, 'type': 'artist', 'mode': 'ARTIST_VIEW', 'icon': 'Ⓗ'}
+            {'name': k, 'id': {'kind': 'artist', 'mode': 'ARTIST_VIEW'}, 'icon': 'Ⓗ'}
             for k in sorted(self.lib.fav_artists, key=lambda s: s.lower())
         ]
         return t('player.browse.fav_artists'), items
@@ -100,18 +100,18 @@ class BrowseHandler:
     def get_fav_albums_list(self) -> Tuple[str, List[dict]]:
         """Get list of favorite albums."""
         if not self.lib.fav_albums:
-            return t('player.browse.fav_albums'), [{'name': t('player.browse.no_fav_albums'), 'type': 'info'}]
+            return t('player.browse.fav_albums'), [{'name': t('player.browse.no_fav_albums'), 'selectable': False}]
         items = [
-            {'name': k, 'type': 'album', 'mode': 'ALBUM_VIEW', 'icon': 'Ⓗ'}
+            {'name': k, 'id': {'kind': 'album', 'mode': 'ALBUM_VIEW'}, 'icon': 'Ⓗ'}
             for k in sorted(self.lib.fav_albums, key=lambda s: s.lower())
         ]
         return t('player.browse.fav_albums'), items
 
     def get_playlists_list(self) -> Tuple[str, List[dict]]:
         """Get list of playlists."""
-        items = [{'name': t('player.browse.favourites'), 'type': 'playlist', 'mode': 'FAV_TRACKS_VIEW', 'icon': 'Ⓗ'}]
+        items = [{'name': t('player.browse.favourites'), 'id': {'kind': 'playlist', 'mode': 'FAV_TRACKS_VIEW'}, 'icon': 'Ⓗ'}]
         for p in self.lib.get_playlists():
-            items.append({'name': p.stem, 'type': 'playlist', 'path': p, 'mode': 'PLAYLIST_VIEW'})
+            items.append({'name': p.stem, 'id': {'kind': 'playlist', 'path': p, 'mode': 'PLAYLIST_VIEW'}})
         return t('player.browse.playlists'), items
 
     def get_all_tracks(self, shuffle: bool = False) -> Tuple[str, List[dict], str, str, Optional[object]]:
@@ -179,20 +179,20 @@ class BrowseHandler:
                 if album != current_album:
                     current_album = album
                     tracks_with_headings.append({
-                        'type': 'heading',
+                        'heading': True,
                         'name': album
                     })
                 tracks_with_headings.append(track)
             tracks = tracks_with_headings
 
         # Count only actual tracks (not headings)
-        actual_tracks = [t for t in tracks if t.get('type') != 'heading']
+        actual_tracks = [t for t in tracks if not t.get('heading')]
         track_count = t('player.browse.track_count', count=len(actual_tracks))
         duration = format_duration(LibraryManager.get_total_duration(actual_tracks))
 
         # Add pinned info item at the beginning
         info_item = {
-            'type': 'info',
+            'selectable': False,
             'pinned': True,
             'columns': [track_count, duration]
         }
@@ -223,7 +223,7 @@ class BrowseHandler:
                     if disc != current_disc:
                         current_disc = disc
                         tracks_with_headings.append({
-                            'type': 'heading',
+                            'heading': True,
                             'name': t('player.browse.disc', num=disc)
                         })
                     tracks_with_headings.append(track)
@@ -231,7 +231,7 @@ class BrowseHandler:
 
         # Add pinned info item at the beginning
         info_item = {
-            'type': 'info',
+            'selectable': False,
             'pinned': True,
             'columns': [artist, year] if year else [artist]
         }
@@ -259,8 +259,8 @@ class BrowseHandler:
                 # Resolve paths to handle symlinks and ensure parent is within music path
                 if parent.resolve().is_relative_to(cfg.MUSIC_PATH.resolve()):
                     items.append({
-                        'name': '..', 'type': 'dir', 'mode': 'FILES',
-                        'path': parent, 'icon': 'Ⓕ'
+                        'name': '..', 'id': {'kind': 'dir', 'mode': 'FILES', 'path': parent},
+                        'icon': 'Ⓕ'
                     })
             except (ValueError, OSError):
                 # is_relative_to may raise ValueError on older Python, OSError on bad paths
@@ -290,8 +290,8 @@ class BrowseHandler:
 
                 if p.is_dir():
                     dirs.append({
-                        'name': p.name, 'type': 'dir', 'mode': 'FILES',
-                        'path': p, 'icon': 'Ⓕ'
+                        'name': p.name, 'id': {'kind': 'dir', 'mode': 'FILES', 'path': p},
+                        'icon': 'Ⓕ'
                     })
                 elif p.is_file() and p.suffix.lower() in cfg.VALID_EXTS:
                     try:
@@ -311,7 +311,7 @@ class BrowseHandler:
                     # Don't set icon - let music_view._get_item_icon() handle it
                     # based on playing state and track number
                     files.append({
-                        'name': title, 'type': 'file', 'path': p,
+                        'name': title, 'id': {'kind': 'file', 'path': p},
                         'artist': artist, 'album': album,
                         'disc': disc, 'track': track_num
                     })
@@ -345,7 +345,7 @@ class BrowseHandler:
         # Manual Queue
         manual_items = []
         if playlist.manual_queue:
-            manual_items.append({'name': t('player.browse.manual_queue'), 'type': 'heading'})
+            manual_items.append({'name': t('player.browse.manual_queue'), 'heading': True})
             for p_str in playlist.manual_queue:
                 p = Path(p_str)
                 try:
@@ -353,13 +353,13 @@ class BrowseHandler:
                 except (OSError, ValueError, AttributeError):
                     name = p.stem
                 manual_items.append({
-                    'name': name, 'type': 'file', 'path': p, 'icon': 'Q'
+                    'name': name, 'id': {'kind': 'file', 'path': p}, 'icon': 'Q'
                 })
 
         # Auto Queue
         auto_items = []
         if playlist.has_queue:
-            auto_items.append({'name': t('player.browse.auto_queue'), 'type': 'heading'})
+            auto_items.append({'name': t('player.browse.auto_queue'), 'heading': True})
             start_idx = playlist.queue_idx
             count = 0
             idx = start_idx
@@ -378,34 +378,36 @@ class BrowseHandler:
                     name = extract_track_info(p).title
                 except (OSError, ValueError, AttributeError):
                     name = p.stem
-                
+
                 # Distinguish icon based on queue position relative to playing
                 icon = str(count) if count > 0 else "P"
-                
+
                 auto_items.append({
-                    'name': name, 'type': 'file', 'path': p, 'icon': icon
+                    'name': name, 'id': {'kind': 'file', 'path': p}, 'icon': icon
                 })
-                
+
                 idx = (idx + 1) % len(playlist.queue)
-                
+
                 # Stop at end of playlist if Loop is Off
                 if idx == 0 and playlist.loop_mode == 0:
                     break
-                
+
                 if idx == start_idx: break
                 count += 1
         
         all_items = manual_items + auto_items
-        
+
         # Find and pin playing item
         playing_item = None
         if playing_path:
             for i, item in enumerate(all_items):
-                if item.get('type') == 'file' and str(item.get('path')) == str(playing_path):
+                item_kind = item.get('id', {}).get('kind') if isinstance(item.get('id'), dict) else None
+                item_path = item.get('id', {}).get('path') if isinstance(item.get('id'), dict) else None
+                if item_kind == 'file' and str(item_path) == str(playing_path):
                     playing_item = item
                     del all_items[i]
                     break
-            
+
             # If not found in list (e.g. playing from outside queue or list truncated), create it
             if not playing_item:
                 p = Path(playing_path)
@@ -413,17 +415,17 @@ class BrowseHandler:
                     name = extract_track_info(p).title
                 except (OSError, ValueError, AttributeError):
                     name = p.stem
-                playing_item = {'name': name, 'type': 'file', 'path': p, 'icon': 'P'}
+                playing_item = {'name': name, 'id': {'kind': 'file', 'path': p}, 'icon': 'P'}
 
             playing_item['pinned'] = True
             pinned_items.append(playing_item)
 
-        controls_item = {'type': 'controls', 'pinned': True}
+        controls_item = {'column_nav': True, 'pinned': True}
         pinned_items.append(controls_item)
-        
+
         scrollable_items = []
         if not all_items and not pinned_items:
-            scrollable_items = [{'name': t('player.browse.queue_empty'), 'type': 'info'}]
+            scrollable_items = [{'name': t('player.browse.queue_empty'), 'selectable': False}]
         else:
             scrollable_items = all_items
 

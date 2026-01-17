@@ -36,11 +36,11 @@ class SettingsApp(AppBase):
 
         # Main Menu
         self.main_menu = MenuController([
-            Item(text=t('settings.categories.audio'), type='text', id="AUDIO"),
-            Item(text=t('settings.categories.library'), type='text', id="LIBRARY"),
-            Item(text=t('settings.categories.network'), type='text', id="NETWORK"),
-            Item(text=t('settings.categories.system'), type='text', id="SYSTEM"),
-            Item(text=t('settings.categories.display'), type='text', id="DISPLAY")
+            Item(text=t('settings.categories.audio'), id="AUDIO"),
+            Item(text=t('settings.categories.library'), id="LIBRARY"),
+            Item(text=t('settings.categories.network'), id="NETWORK"),
+            Item(text=t('settings.categories.system'), id="SYSTEM"),
+            Item(text=t('settings.categories.display'), id="DISPLAY")
         ])
 
         # Submenus
@@ -188,7 +188,7 @@ class SettingsApp(AppBase):
             if item.id == 'SCAN_NEW':
                 self.view = 'BT_SCAN'
                 self.bt_status = t('settings.bluetooth.scanning')
-                self.bt_menu.set_items([Item(text=t('settings.bluetooth.scanning'), type='info', selectable=False)])
+                self.bt_menu.set_items([Item(text=t('settings.bluetooth.scanning'), selectable=False)])
                 self.bt.start_scan(self._bt_scan_callback)
             else:
                 self._enter_bt_device_menu(item.id) # id stores device dict
@@ -292,13 +292,12 @@ class SettingsApp(AppBase):
         net_cat = self.categories['NETWORK']
         display_items = []
         if not net_cat.wifi_networks:
-             display_items.append(Item(text=t('settings.network.no_networks'), type='info', selectable=False))
+             display_items.append(Item(text=t('settings.network.no_networks'), selectable=False))
         else:
             for net in net_cat.wifi_networks:
                 prefix = "C" if net['current'] else " "
                 display_items.append(Item(
                     text=f"{prefix} {net['ssid']}",
-                    type='text',
                     id=net
                 ))
         self.wifi_menu.set_items(display_items)
@@ -314,11 +313,10 @@ class SettingsApp(AppBase):
             prefix = "C" if is_conn else "P"
             items.append(Item(
                 text=f"{prefix} {d['name']}",
-                type='text',
                 id=d
             ))
-        
-        items.append(Item(text=t('settings.bluetooth.scan_new'), type='text', id='SCAN_NEW'))
+
+        items.append(Item(text=t('settings.bluetooth.scan_new'), id='SCAN_NEW'))
         self.bt_menu.set_items(items)
 
     def _enter_bt_device_menu(self, device):
@@ -340,7 +338,7 @@ class SettingsApp(AppBase):
                 t('general.cancel')
             ]
             
-        items = [Item(text=opt, type='text', id=opt) for opt in options]
+        items = [Item(text=opt, id=opt) for opt in options]
         self.bt_device_menu.set_items(items)
 
         self.view = 'BT_DEVICE_MENU'
@@ -382,13 +380,12 @@ class SettingsApp(AppBase):
     def _bt_scan_callback(self, devices):
         items = []
         if not devices:
-            items = [Item(text=t('settings.bluetooth.scanning'), type='info', selectable=False)]
+            items = [Item(text=t('settings.bluetooth.scanning'), selectable=False)]
         else:
             for d in devices:
                 icon = "P" if d.get('paired') else " "
                 items.append(Item(
                     text=f"{icon} {d['name']}",
-                    type='text',
                     id=d
                 ))
         self.bt_menu.set_items(items, reset_index=False)
@@ -412,7 +409,7 @@ class SettingsApp(AppBase):
             if not is_busy:
                 self.view = self.prev_view
             else:
-                frame, _ = self.renderer.render_menu(t('general.please_wait'), [Item(text=self.popup_msg, type='info')], 0, 0)
+                frame, _ = self.renderer.render_menu(t('general.please_wait'), [Item(text=self.popup_msg, selectable=False)], 0, 0)
                 return frame
 
         if self.view == 'MAIN':
@@ -445,5 +442,5 @@ class SettingsApp(AppBase):
             self.wifi_menu.scroll_offset = scroll
             return frame
             
-        frame, _ = self.renderer.render_menu(t('general.error'), [Item(text=t('general.unknown_view'), type='info')], 0, 0)
+        frame, _ = self.renderer.render_menu(t('general.error'), [Item(text=t('general.unknown_view'), selectable=False)], 0, 0)
         return frame

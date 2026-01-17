@@ -34,14 +34,13 @@ class MenuController:
         """Check if an item at the given index is selectable."""
         if not (0 <= index < len(self.items)):
             return False
-        
+
         item = self.items[index]
         if isinstance(item, Item):
             return item.selectable
-            
-        item_type = item.get('type', 'file')
-        # Allow headings to be selectable
-        return item_type != 'info'
+
+        # Legacy dict items - use selectable key if present, else default True
+        return item.get('selectable', True)
 
     def _validate_selection(self):
         """Ensure selected_index points to a selectable item if possible."""
@@ -103,16 +102,16 @@ class MenuController:
     def get_render_args(self):
         """
         Get arguments suitable for UIRenderer.render_menu.
-        Automatically derives info_indices based on item type.
+        Automatically derives info_indices based on selectable flag.
         """
         info_indices = []
         for i, item in enumerate(self.items):
             if isinstance(item, Item):
                 if not item.selectable:
                     info_indices.append(i)
-            elif item.get('type') in ['heading', 'info']:
+            elif not item.get('selectable', True):
                 info_indices.append(i)
-        
+
         return {
             'items': self.items,
             'sel_idx': self.selected_index,

@@ -195,46 +195,50 @@ class MusicPlayerApp(AppBase):
         item = self.menu.get_selected_item()
         if not item: return
 
-        item_type = item.type
+        # Get item kind from id dict
+        item_kind = item.kind if isinstance(item, Item) else (item.get('id', {}).get('kind') if isinstance(item.get('id'), dict) else None)
+        is_heading = item.heading if isinstance(item, Item) else item.get('heading', False)
+        is_column_nav = item.column_nav if isinstance(item, Item) else item.get('column_nav', False)
+        is_selectable = item.selectable if isinstance(item, Item) else item.get('selectable', True)
 
         # Controls bar - handle button press
-        if item_type == 'controls':
+        if is_column_nav:
             self._handle_controls_action()
             return
 
         # Clicking a heading jumps to the next heading
-        if item_type == 'heading':
+        if is_heading:
             # Find next heading index
             current_idx = self.menu.selected_index
             total = len(self.menu.items)
             for i in range(1, total):
                 idx = (current_idx + i) % total
                 target = self.menu.items[idx]
-                target_type = target.type if isinstance(target, Item) else target.get('type')
-                if target_type == 'heading':
+                target_heading = target.heading if isinstance(target, Item) else target.get('heading', False)
+                if target_heading:
                     self.menu.selected_index = idx
                     self._sync_state_selection()
                     return
             return
 
         # Info items are non-interactive (skipped by MenuController)
-        if item_type == 'info':
+        if not is_selectable:
             return
 
-        if item_type in ['playlist', 'dir', 'artist', 'album']:
+        if item_kind in ['playlist', 'dir', 'artist', 'album']:
             self.history.append((self.mode, self.current_path, self.menu.selected_index))
-            new_mode = item.id.get('mode') if isinstance(item, Item) and isinstance(item.id, dict) else item.get('mode')
+            new_mode = item.id.get('mode') if isinstance(item, Item) and isinstance(item.id, dict) else item.get('id', {}).get('mode')
 
             # Show loading for potentially large lists
             if new_mode in ['PLAYLIST_VIEW', 'RECENTS', 'ARTIST_VIEW', 'ALBUM_VIEW', 'FAV_TRACKS_VIEW', 'TRACKS_VIEW', 'ARTISTS_ROOT', 'ALBUMS_ROOT']:
                 self._show_loading(t('general.loading'))
 
             self.mode = new_mode
-            self.current_path = (item.id.get('path') or item.text) if isinstance(item, Item) and isinstance(item.id, dict) else (item.get('path', item.get('name')))
+            self.current_path = (item.id.get('path') or item.text) if isinstance(item, Item) and isinstance(item.id, dict) else (item.get('id', {}).get('path') or item.get('name'))
             self.refresh_list(reset_selection=True)
             self._hide_loading()
-        elif item_type == 'file':
-            tpath = item.id.get('path') if isinstance(item, Item) and isinstance(item.id, dict) else (item.id if isinstance(item, Item) else item.get('path'))
+        elif item_kind == 'file':
+            tpath = item.id.get('path') if isinstance(item, Item) and isinstance(item.id, dict) else item.get('id', {}).get('path')
             self._play_from_list(tpath)
 
     def nav_back(self):
@@ -263,18 +267,19 @@ class MusicPlayerApp(AppBase):
 
         item = self.menu.get_selected_item()
         if not item: return
-        
-        itype = item.type if isinstance(item, Item) else item.get('type')
-        
-        # Allow context menu for artists, albums, and headings (album headings in artist view)
-        if itype in ['file', 'playlist', 'artist', 'album', 'heading']:
+
+        item_kind = item.kind if isinstance(item, Item) else (item.get('id', {}).get('kind') if isinstance(item.get('id'), dict) else None)
+        is_heading = item.heading if isinstance(item, Item) else item.get('heading', False)
+
+        # Allow context menu for artists, albums, files, playlists, and headings (album headings in artist view)
+        if item_kind in ['file', 'playlist', 'artist', 'album'] or is_heading:
             # Pass queue context for queue view items
             in_queue = self.state.browse_mode == 'QUEUE_VIEW'
-            
+
             # Count pinned items
             pinned_count = len(self.state.pinned_items)
             queue_idx = self.menu.selected_index - pinned_count if in_queue else None
-            
+
             self.context_menu.open(item, in_queue_view=in_queue, queue_index=queue_idx)
             self._sync_context_state()
 
@@ -333,7 +338,8 @@ class MusicPlayerApp(AppBase):
         # Navigate controls bar buttons with next/prev when on controls item
         if from_user and not self.state.screensaver_image:
             item = self.menu.get_selected_item()
-            if item and item.get('type') == 'controls':
+            is_column_nav = item.column_nav if isinstance(item, Item) else item.get('column_nav', False) if item else False
+            if item and is_column_nav:
                 self.state.controls_index = min(cfg.CONTROLS_BUTTON_COUNT - 1, self.state.controls_index + 1)
                 return
 
@@ -367,7 +373,8 @@ class MusicPlayerApp(AppBase):
         # Navigate controls bar buttons with next/prev when on controls item
         if not self.state.screensaver_image:
             item = self.menu.get_selected_item()
-            if item and item.get('type') == 'controls':
+            is_column_nav = item.column_nav if isinstance(item, Item) else item.get('column_nav', False) if item else False
+            if item and is_column_nav:
                 self.state.controls_index = max(0, self.state.controls_index - 1)
                 return
 
@@ -493,15 +500,15 @@ class MusicPlayerApp(AppBase):
             title, pinned, scrollable, cover = self.browse.get_queue_view(self.playlist, self.state.playing_path)
             self.state.album = title
             self.state.browsing_cover_s = cover
-            
+
             # Combine logic similar to _load_tracks but handling pre-pinned
             items = list(pinned)
-            items.append({'type': 'controls'}) # Add controls
+            items.append({'column_nav': True}) # Add controls
             items.extend(scrollable)
-            
+
             # Manually set state for renderer
             self.state.pinned_items = list(pinned)
-            self.state.pinned_items.append({'type': 'controls'})
+            self.state.pinned_items.append({'column_nav': True})
             self.state.scrollable_items = scrollable
         
         # Update MenuController
@@ -523,16 +530,15 @@ class MusicPlayerApp(AppBase):
         # Separate pinned items from the rest
         pinned_items = [t for t in tracks if t.get('pinned')]
         other_items = [t for t in tracks if not t.get('pinned')]
-        
+
         # Build final list
         final_items = list(pinned_items)
-        final_items.append({'type': 'controls'}) # Add controls
-        
+        final_items.append({'column_nav': True}) # Add controls
+
         processed_items = [
-            t if t.get('type') in ('heading', 'info') else {
+            t if t.get('heading') or not t.get('selectable', True) else {
                 'name': t.get('title', ''),
-                'type': 'file',
-                'path': t.get('path'),
+                'id': {'kind': 'file', 'path': t.get('path')},
                 'artist': t.get('artist'),
                 'album': t.get('album'),
                 'track': t.get('track', 0)
@@ -540,12 +546,12 @@ class MusicPlayerApp(AppBase):
             for t in other_items
         ]
         final_items.extend(processed_items)
-        
+
         # Update state for renderer
         self.state.pinned_items = list(pinned_items)
-        self.state.pinned_items.append({'type': 'controls'})
+        self.state.pinned_items.append({'column_nav': True})
         self.state.scrollable_items = processed_items
-        
+
         return final_items
 
     def _play_screensaver_album(self):
@@ -600,7 +606,17 @@ class MusicPlayerApp(AppBase):
 
     def _play_from_list(self, path):
         """Start playing from the current list."""
-        self.playlist.playlist_source = [str(i['path']) for i in self.state.items if i['type'] == 'file']
+        # Filter to only file items using kind
+        def get_file_path(item):
+            if isinstance(item, Item):
+                return item.id.get('path') if isinstance(item.id, dict) and item.kind == 'file' else None
+            elif isinstance(item, dict):
+                item_id = item.get('id', {})
+                if isinstance(item_id, dict) and item_id.get('kind') == 'file':
+                    return item_id.get('path')
+            return None
+
+        self.playlist.playlist_source = [str(get_file_path(i)) for i in self.state.items if get_file_path(i)]
         path_str = str(path)
         if not self.playlist.playlist_source:
             return
@@ -637,10 +653,20 @@ class MusicPlayerApp(AppBase):
             if self.state.shuffle_active:
                 self.state.set_status_message(t('player.status.shuffle_on'))
                 if not self.state.playing_path:
-                    files = [item for item in self.state.items if item.get('type') == 'file']
+                    # Filter to file items using kind
+                    def is_file_item(item):
+                        if isinstance(item, Item):
+                            return item.kind == 'file'
+                        elif isinstance(item, dict):
+                            item_id = item.get('id', {})
+                            return isinstance(item_id, dict) and item_id.get('kind') == 'file'
+                        return False
+
+                    files = [item for item in self.state.items if is_file_item(item)]
                     if files:
                         target = random.choice(files)
-                        self._play_from_list(target['path'])
+                        target_path = target.id.get('path') if isinstance(target, Item) else target.get('id', {}).get('path')
+                        self._play_from_list(target_path)
             else:
                 self.state.set_status_message(t('player.status.shuffle_off'))
 

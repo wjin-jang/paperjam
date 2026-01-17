@@ -75,19 +75,21 @@ class ContextMenuHandler:
     def _update_menu_items(self, options: List[str]):
         """Update menu controller items from string list."""
         from ui.views.items import Item
-        items = [Item(text=opt, type='text', id=opt) for opt in options]
+        items = [Item(text=opt, id=opt) for opt in options]
         self.menu.set_items(items)
 
     def _get_options_for_item(self, item: Any) -> List[str]:
-        """Get context menu options based on item type."""
+        """Get context menu options based on item kind."""
         from ui.views.items import Item
-        itype = item.type if isinstance(item, Item) else item.get('type')
+        # Get item kind from id dict
+        ikind = item.kind if isinstance(item, Item) else (item.get('id', {}).get('kind') if isinstance(item.get('id'), dict) else None)
+        is_heading = item.heading if isinstance(item, Item) else item.get('heading', False)
         iartist = item.id.get('artist') if isinstance(item, Item) and isinstance(item.id, dict) else item.get('artist')
         ialbum = item.id.get('album') if isinstance(item, Item) and isinstance(item.id, dict) else item.get('album')
         iname = item.text if isinstance(item, Item) else item.get('name')
 
         # Queue view has special options for queue management
-        if self._in_queue_view and itype == 'file':
+        if self._in_queue_view and ikind == 'file':
             opts = [
                 t('player.context.remove_from_queue'),
                 t('player.context.send_to_top'),
@@ -101,25 +103,25 @@ class ContextMenuHandler:
             opts.append(t('player.context.cancel'))
             return opts
 
-        if itype == 'playlist':
+        if ikind == 'playlist':
             return [
                 t('player.context.add_to_queue'),
                 t('player.context.delete_playlist'),
                 t('player.context.cancel')
             ]
-        elif itype == 'artist':
+        elif ikind == 'artist':
             return [
                 t('player.context.add_to_queue'),
                 t('player.context.favourite_artist'),
                 t('player.context.cancel')
             ]
-        elif itype == 'album':
+        elif ikind == 'album':
             return [
                 t('player.context.add_to_queue'),
                 t('player.context.favourite_album'),
                 t('player.context.cancel')
             ]
-        elif itype == 'heading':
+        elif is_heading:
             # Check if this is an alphabetical heading (single char like A, B, #)
             # vs album/disc heading (longer name like "Album Name" or "Disc 1")
             name = iname or ''
@@ -134,7 +136,7 @@ class ContextMenuHandler:
                 t('player.context.favourite_album'),
                 t('player.context.cancel')
             ]
-        elif itype == 'file':
+        elif ikind == 'file':
             opts = [
                 t('player.context.add_to_queue'),
                 t('player.context.favourite_song'),
@@ -175,9 +177,10 @@ class ContextMenuHandler:
 
         opt = item.id if isinstance(item, Item) else item['action']
         target = self.target_item
-        
-        ttype = target.type if isinstance(target, Item) else target.get('type')
-        tpath = target.id.get('path') if isinstance(target, Item) and isinstance(target.id, dict) else (target.id if isinstance(target, Item) else target.get('path'))
+
+        tkind = target.kind if isinstance(target, Item) else (target.get('id', {}).get('kind') if isinstance(target.get('id'), dict) else None)
+        is_heading = target.heading if isinstance(target, Item) else target.get('heading', False)
+        tpath = target.id.get('path') if isinstance(target, Item) and isinstance(target.id, dict) else (target.get('id', {}).get('path') if isinstance(target.get('id'), dict) else None)
         tname = target.text if isinstance(target, Item) else target.get('name')
         tartist = target.id.get('artist') if isinstance(target, Item) and isinstance(target.id, dict) else target.get('artist')
         talbum = target.id.get('album') if isinstance(target, Item) and isinstance(target.id, dict) else target.get('album')
@@ -217,26 +220,26 @@ class ContextMenuHandler:
                 return None
 
             elif opt == t('player.context.add_to_queue'):
-                if ttype == 'file':
+                if tkind == 'file':
                     self.playlist.add_to_manual_queue(str(tpath))
 
-                elif ttype == 'album':
+                elif tkind == 'album':
                     tracks = self.lib.get_album_tracks(tname)
                     for track in tracks:
                         self.playlist.add_to_manual_queue(str(track['path']))
 
-                elif ttype == 'heading':
+                elif is_heading:
                     # Headings represent albums in artist view
                     tracks = self.lib.get_album_tracks(tname)
                     for track in tracks:
                         self.playlist.add_to_manual_queue(str(track['path']))
 
-                elif ttype == 'artist':
+                elif tkind == 'artist':
                     tracks = self.lib.get_artist_tracks(tname)
                     for track in tracks:
                         self.playlist.add_to_manual_queue(str(track['path']))
 
-                elif ttype == 'playlist':
+                elif tkind == 'playlist':
                     tracks = self.lib.get_playlist_tracks(Path(tpath))
                     for track in tracks:
                         self.playlist.add_to_manual_queue(str(track['path']))

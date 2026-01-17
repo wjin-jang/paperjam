@@ -28,7 +28,7 @@ class MusicViewRenderer:
             state: Player state with shuffle_active, loop_mode, etc.
 
         Returns:
-            ColumnItem with 4 icon columns
+            Item with columns and column_nav=True
         """
         # Determine which icons to use
         icon_keys = ['back', 'shuffle', 'loop', 'fav']
@@ -58,42 +58,43 @@ class MusicViewRenderer:
                 active=active
             ))
 
-        return Item(type='column', columns=columns, selectable=True, pinned=True)
+        return Item(column_nav=True, columns=columns, selectable=True, pinned=True)
 
     def _convert_legacy_item(self, item: dict, state, display_idx: int = None):
         """Convert legacy item format to new Item classes.
 
         Args:
-            item: Dict with 'type', 'name', etc.
+            item: Dict with flags like 'heading', 'column_nav', 'selectable'
             state: Player state for determining active items
             display_idx: Display index for track numbering
 
         Returns:
             Item instance
         """
-        itype = item.get('type')
-
-        if itype == 'controls':
+        # Check for column_nav (controls bar)
+        if item.get('column_nav'):
             return self._create_controls_item(state)
 
-        if itype == 'heading':
-            return Item(text=item.get('name', ''), type='heading', selectable=True, id=item.get('id'))
+        # Check for heading
+        if item.get('heading'):
+            return Item(text=item.get('name', ''), heading=True, selectable=True, id=item.get('id'))
 
-        if itype == 'info':
+        # Check for non-selectable (info-style items)
+        if not item.get('selectable', True):
             lines = item.get('lines')
             columns = item.get('columns')
             if lines:
-                return Item(type='info', lines=lines)
+                return Item(lines=lines, selectable=False)
             if columns:
-                return Item(type='info', columns=columns)
-            return Item(type='info', text=item.get('name', ''))
+                return Item(columns=columns, selectable=False)
+            return Item(text=item.get('name', ''), selectable=False)
 
         # Icon+text items (file, album, artist, dir, playlist, recent)
         icon_str = self._get_item_icon(item, state, display_idx)
         name = sanitize_text(item.get('title', item.get('name', '')))
 
         pinned = item.get('pinned', False)
-        return Item(text=name, type='text', icon=icon_str, selectable=True, pinned=pinned)
+        return Item(text=name, icon=icon_str, selectable=True, pinned=pinned, id=item.get('id'))
 
     def _get_item_icon(self, item: dict, state, display_idx: int = None) -> str:
         """Get icon string for an item.
@@ -106,7 +107,10 @@ class MusicViewRenderer:
         Returns:
             Icon string
         """
-        itype = item.get('type')
+        # Get kind from id dict
+        item_id = item.get('id', {})
+        ikind = item_id.get('kind') if isinstance(item_id, dict) else None
+        item_path = item_id.get('path') if isinstance(item_id, dict) else None
         icons = cfg.MENU_ICONS
 
         # Check if this is the currently playing item
@@ -114,13 +118,13 @@ class MusicViewRenderer:
         current_icon = icons.get('playing', 'Ⓟ') if is_playing else icons.get('paused', 'Ⓢ')
 
         is_active = False
-        if itype == 'file' and state.playing_path:
-            if str(item.get('path')) == str(state.playing_path):
+        if ikind == 'file' and state.playing_path:
+            if str(item_path) == str(state.playing_path):
                 is_active = True
-        elif itype == 'album' and state.playing_album:
+        elif ikind == 'album' and state.playing_album:
             if item.get('name') == state.playing_album:
                 is_active = True
-        elif itype == 'artist' and state.playing_artist:
+        elif ikind == 'artist' and state.playing_artist:
             if item.get('name') == state.playing_artist:
                 is_active = True
 
@@ -130,29 +134,29 @@ class MusicViewRenderer:
         # Use explicit icon if provided
         if 'icon' in item:
             icon = item['icon']
-            if itype == 'file' and icon == 'Ⓟ':
+            if ikind == 'file' and icon == 'Ⓟ':
                 # Stale playing icon
                 track_num = item.get('track', 0)
                 val = track_num if track_num else display_idx
                 return f"{val}." if val else ""
-            if itype == 'file' and icon not in ('Ⓢ', ''):
+            if ikind == 'file' and icon not in ('Ⓢ', ''):
                 return icon if icon.endswith('.') else f"{icon}."
             return icon
 
-        # Default icons by type
-        if itype == 'file':
+        # Default icons by kind
+        if ikind == 'file':
             track_num = item.get('track', 0)
             val = track_num if track_num else display_idx
             return f"{val}." if val else ""
-        if itype == 'dir':
+        if ikind == 'dir':
             return icons.get('dir', 'Ⓕ')
-        if itype == 'artist':
+        if ikind == 'artist':
             return icons.get('artist', 'Ⓐ')
-        if itype == 'album':
+        if ikind == 'album':
             return icons.get('album', 'Ⓑ')
-        if itype == 'recent':
+        if ikind == 'recent':
             return icons.get('recent', 'Ⓡ')
-        if itype == 'playlist':
+        if ikind == 'playlist':
             if "Fav" in item.get('name', ''):
                 return icons.get('fav', 'Ⓗ')
             return icons.get('playlist', 'Ⓛ')
@@ -180,7 +184,7 @@ class MusicViewRenderer:
         # Get appropriate cover art
         art = state.playing_cover_s if state.playing_path else state.browsing_cover_s
         # Create image item
-        art_item = Item(type='image', image=art, placeholder=t('player.browse.no_image'))
+        art_item = Item(show_image=True, image=art, placeholder=t('player.browse.no_image'))
         art_item.set_height(art_size)  # Account for border
         art_menu.items = [art_item]
 
@@ -198,7 +202,7 @@ class MusicViewRenderer:
         icon = cfg.STATUS_ICONS.get(raw_status, 'Ⓘ')
 
         # Use columns for status
-        status_item = Item(type='info', text=f"{icon} {raw_status}", font=cfg.FONT_HEADER, padding=(2, 0), selectable=False)
+        status_item = Item(text=f"{icon} {raw_status}", font=cfg.FONT_HEADER, padding=(2, 0), selectable=False)
         status_menu.items = [status_item]
 
         status_panel.render(self.canvas)
@@ -224,9 +228,11 @@ class MusicViewRenderer:
 
         # Convert scrollable items
         for i, item in enumerate(scrollable_legacy):
-            itype = item.get('type')
+            is_heading = item.get('heading', False)
+            is_controls = item.get('column_nav', False)
+            is_info = not item.get('selectable', True)
             display_idx = None
-            if itype not in ('heading', 'info', 'controls'):
+            if not is_heading and not is_controls and not is_info:
                 track_offset += 1
                 display_idx = track_offset
 
@@ -269,8 +275,8 @@ class MusicViewRenderer:
         panel = Panel(x, y, w, menu_h, header=t('player.context.options'))
         menu = panel.create_menu()
 
-        # Convert options to TextItems
-        menu.items = [Item(text=opt, type='text') for opt in state.context_options]
+        # Convert options to Items
+        menu.items = [Item(text=opt) for opt in state.context_options]
         menu.cursor.row = state.context_index
         menu.cursor.col = 0
 
@@ -290,6 +296,6 @@ class MusicViewRenderer:
 
         panel = Panel(x, y, w, h)
         menu = panel.create_menu()
-        menu.items = [Item(text=message, type='text', selectable=False)]
+        menu.items = [Item(text=message, selectable=False)]
 
         panel.render(self.canvas)

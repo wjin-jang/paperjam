@@ -41,11 +41,18 @@ class PlaylistManager:
         Build playback queue from a list of items.
 
         Args:
-            items: List of item dicts with 'path' and 'type' keys
+            items: List of item dicts with id={'kind': 'file', 'path': ...}
             start_path: Path to start playing from
             shuffle: Whether to shuffle the queue
         """
-        self.playlist_source = [str(i['path']) for i in items if i.get('type') == 'file']
+        # Filter to file items using kind from id dict
+        def get_file_path(item):
+            item_id = item.get('id', {})
+            if isinstance(item_id, dict) and item_id.get('kind') == 'file':
+                return item_id.get('path')
+            return None
+
+        self.playlist_source = [str(get_file_path(i)) for i in items if get_file_path(i)]
         if not self.playlist_source:
             return
 

@@ -238,15 +238,15 @@ class AudioCategory(SettingsCategory):
         endless = self.settings.get('endless_playback', False)
         endless_state = t('general.on') if endless else t('general.off')
         return [
-            Item(type='info', columns=[t('settings.audio.output'), output_name], selectable=True),
-            Item(text=t('settings.audio.volume'), type='text'),
-            Item(type='info', columns=[t('settings.audio.endless_play'), endless_state], selectable=True),
-            Item(text=t('settings.audio.bluetooth'), type='text')
+            Item(columns=[t('settings.audio.output'), output_name], selectable=True),
+            Item(text=t('settings.audio.volume')),
+            Item(columns=[t('settings.audio.endless_play'), endless_state], selectable=True),
+            Item(text=t('settings.audio.bluetooth'))
         ]
 
     def handle_action(self, item_index: int) -> Optional[str]:
         item = self.items[item_index]
-        item_text = item.columns[0] if item.type == 'info' else item.text
+        item_text = item.columns[0] if item.columns else item.text
 
         if t('settings.audio.bluetooth') in item_text:
             return 'BT_SAVED'
@@ -275,11 +275,11 @@ class LibraryCategory(SettingsCategory):
         if self.lib.is_scanning:
             # Show scan progress
             return [
-                Item(type='info', columns=[t('settings.library.scanning'), self.lib.scan_current_file], selectable=False),
-                Item(type='info', columns=[t('settings.library.tracks'), str(self.lib.scan_track_count)], selectable=False),
-                Item(type='info', columns=[t('settings.library.albums'), str(self.lib.scan_album_count)], selectable=False),
-                Item(type='info', columns=[t('settings.library.artists'), str(self.lib.scan_artist_count)], selectable=False),
-                Item(type='info', columns=[t('settings.library.recents_limit'), str(recents_limit)], selectable=False)
+                Item(columns=[t('settings.library.scanning'), self.lib.scan_current_file], selectable=False),
+                Item(columns=[t('settings.library.tracks'), str(self.lib.scan_track_count)], selectable=False),
+                Item(columns=[t('settings.library.albums'), str(self.lib.scan_album_count)], selectable=False),
+                Item(columns=[t('settings.library.artists'), str(self.lib.scan_artist_count)], selectable=False),
+                Item(columns=[t('settings.library.recents_limit'), str(recents_limit)], selectable=False)
             ]
         else:
             # Show library stats
@@ -287,16 +287,16 @@ class LibraryCategory(SettingsCategory):
             albums = len(self.lib.albums)
             artists = len(self.lib.artists)
             return [
-                Item(type='info', columns=[t('settings.library.tracks'), str(tracks)], selectable=False),
-                Item(type='info', columns=[t('settings.library.albums'), str(albums)], selectable=False),
-                Item(type='info', columns=[t('settings.library.artists'), str(artists)], selectable=False),
-                Item(text=t('settings.library.rescan'), type='text'),
-                Item(type='info', columns=[t('settings.library.recents_limit'), str(recents_limit)], selectable=True)
+                Item(columns=[t('settings.library.tracks'), str(tracks)], selectable=False),
+                Item(columns=[t('settings.library.albums'), str(albums)], selectable=False),
+                Item(columns=[t('settings.library.artists'), str(artists)], selectable=False),
+                Item(text=t('settings.library.rescan')),
+                Item(columns=[t('settings.library.recents_limit'), str(recents_limit)], selectable=True)
             ]
 
     def handle_action(self, item_index: int) -> Optional[str]:
         item = self.items[item_index]
-        item_text = item.columns[0] if item.type == 'info' else item.text
+        item_text = item.columns[0] if item.columns else item.text
 
         if t('settings.library.rescan') in item_text:
             self.lib.scan_async(force=True)
@@ -319,13 +319,13 @@ class DisplayCategory(SettingsCategory):
         ss_timeout = self.settings.get('screensaver_timeout', 60)
 
         return [
-            Item(type='info', columns=[t('settings.display.invert_colors'), state], selectable=True),
-            Item(type='info', columns=[t('settings.display.screensaver'), format_duration(ss_timeout)], selectable=True)
+            Item(columns=[t('settings.display.invert_colors'), state], selectable=True),
+            Item(columns=[t('settings.display.screensaver'), format_duration(ss_timeout)], selectable=True)
         ]
 
     def handle_action(self, item_index: int) -> Optional[str]:
         item = self.items[item_index]
-        item_text = item.columns[0] if item.type == 'info' else item.text
+        item_text = item.columns[0] if item.columns else item.text
 
         if t('settings.display.invert_colors') in item_text:
             self.settings.toggle('invert_colors')
@@ -573,16 +573,16 @@ class NetworkCategory(SettingsCategory):
         wifi_state = t('general.on') if self._is_wifi_enabled() else t('general.off')
         bt_state = t('general.on') if self._is_bt_enabled() else t('general.off')
         return [
-            Item(type='info', columns=[t('settings.network.wifi'), wifi_info], selectable=False),
-            Item(type='info', columns=[t('settings.network.bluetooth'), bt_info], selectable=False),
-            Item(type='info', columns=[t('settings.network.toggle_wifi'), wifi_state], selectable=True),
-            Item(text=t('settings.network.wifi_networks'), type='text'),
-            Item(type='info', columns=[t('settings.network.toggle_bt'), bt_state], selectable=True)
+            Item(columns=[t('settings.network.wifi'), wifi_info], selectable=False),
+            Item(columns=[t('settings.network.bluetooth'), bt_info], selectable=False),
+            Item(columns=[t('settings.network.toggle_wifi'), wifi_state], selectable=True),
+            Item(text=t('settings.network.wifi_networks')),
+            Item(columns=[t('settings.network.toggle_bt'), bt_state], selectable=True)
         ]
 
     def handle_action(self, item_index: int) -> Optional[str]:
         item = self.items[item_index]
-        item_text = item.columns[0] if item.type == 'info' else item.text
+        item_text = item.columns[0] if item.columns else item.text
 
         if t('settings.network.toggle_wifi') in item_text:
             self._toggle_wifi()
@@ -732,20 +732,20 @@ class SystemCategory(SettingsCategory):
         power_mode = t('settings.system.power_optimised') if self._is_power_optimised() else t('settings.system.power_normal')
         disk = self._get_disk_usage()
         return [
-            Item(type='info', columns=[t('settings.system.disk'), disk], selectable=False),
-            Item(type='info', columns=[t('settings.system.version'), f"{version.VERSION} ({version.VERSION_DATE})"], selectable=False),
-            Item(type='info', columns=[t('settings.system.power_mode'), power_mode], selectable=True),
-            Item(type='info', columns=[t('settings.system.long_press'), f"{long_press}s"], selectable=True),
-            Item(type='info', columns=[t('settings.system.auto_update'), auto_update_str], selectable=True),
-            Item(text=t('settings.system.check_updates'), type='text'),
-            Item(text=t('settings.system.restart'), type='text'),
-            Item(text=t('settings.system.reset_data'), type='text'),
-            Item(text=t('settings.system.shutdown'), type='text')
+            Item(columns=[t('settings.system.disk'), disk], selectable=False),
+            Item(columns=[t('settings.system.version'), f"{version.VERSION} ({version.VERSION_DATE})"], selectable=False),
+            Item(columns=[t('settings.system.power_mode'), power_mode], selectable=True),
+            Item(columns=[t('settings.system.long_press'), f"{long_press}s"], selectable=True),
+            Item(columns=[t('settings.system.auto_update'), auto_update_str], selectable=True),
+            Item(text=t('settings.system.check_updates')),
+            Item(text=t('settings.system.restart')),
+            Item(text=t('settings.system.reset_data')),
+            Item(text=t('settings.system.shutdown'))
         ]
 
     def handle_action(self, item_index: int) -> Optional[str]:
         item = self.items[item_index]
-        item_text = item.columns[0] if item.type == 'info' else item.text
+        item_text = item.columns[0] if item.columns else item.text
 
         if t('settings.system.power_mode') in item_text:
             self._toggle_power_mode()
