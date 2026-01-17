@@ -33,23 +33,27 @@ class ScreensaverRenderer:
 
         # Render album art fullscreen or scaled
         img = state.screensaver_image
+        img_w, img_h = img.size
         
-        # Calculate size to fit
-        # Max dimensions
+        # Limit to screen size
         max_w = cfg.SCREEN_WIDTH - 20
         max_h = cfg.SCREEN_HEIGHT - 20
         
+        # Calculate panel size to fit image
+        panel_w = min(img_w, max_w) + 2
+        panel_h = min(img_h, max_h) + 2
+        
+        x = (cfg.SCREEN_WIDTH - panel_w) // 2
+        y = (cfg.SCREEN_HEIGHT - panel_h) // 2
+        
         # Create panel
-        panel = Panel(10, 10, max_w, max_h)
+        panel = Panel(x, y, panel_w, panel_h)
         menu = panel.create_menu()
         
         art_item = Item(type='image', image=img)
-        art_item.set_height(max_h) # Fill panel
+        art_item.set_height(panel_h - 2)
         menu.items = [art_item]
         
-        # Remove border for screensaver? usually yes.
-        # Panel class draws border by default.
-        # Let's keep it consistent with other views for now.
         panel.render(self.canvas)
         
         return self.canvas
@@ -67,11 +71,12 @@ class ScreensaverRenderer:
         if image:
             y_text = cfg.SCREEN_HEIGHT - h - 10
             # Image panel
-            img_size = 80
-            img_x = (cfg.SCREEN_WIDTH - img_size) // 2
-            img_y = 20
+            img_w, img_h = image.size
+            img_size = min(img_w, 80)
+            img_x = (cfg.SCREEN_WIDTH - img_size - 2) // 2
+            img_y = 10
             
-            panel_img = Panel(img_x, img_y, img_size, img_size)
+            panel_img = Panel(img_x, img_y, img_size + 2, img_size + 2)
             menu_img = panel_img.create_menu()
             art_item = Item(type='image', image=image)
             art_item.set_height(img_size)
@@ -98,17 +103,18 @@ class ScreensaverRenderer:
         tile_w = cfg.SCREEN_WIDTH // cols
         tile_h = cfg.SCREEN_HEIGHT // rows
         
+        num_covers = len(covers)
         idx = 0
         for r in range(rows):
             for c in range(cols):
-                if idx < len(covers):
+                if num_covers > 0:
                     img = covers[idx]
                     if img:
                         # Resize if needed
                         if img.width != tile_w or img.height != tile_h:
                             img = img.resize((tile_w, tile_h))
                         self.canvas.paste(img, (c * tile_w, r * tile_h))
-                idx = (idx + 1) % len(covers)
+                    idx = (idx + 1) % num_covers
 
         # 2. Draw Dialog Overlay
         w = 180
@@ -119,14 +125,12 @@ class ScreensaverRenderer:
         # Create panel with white background (to cover tiles)
         panel = Panel(x, y, w, h, header=None)
         
-        # Manually clear the area under the panel first (since Panel draws transparent inside?)
-        # Panel draws background for items, but let's ensure it's opaque.
+        # Manually clear the area under the panel first
         self.draw.rectangle((x, y, x + w, y + h), fill=cfg.WHITE)
         
         menu = panel.create_menu()
         
         # Add text and button
-        # Using multiple items
         menu.items = [
             Item(text=dialog_text, type='info', padding=(5, 10), wrap_text=True),
             Item(text=button_text, type='text', selectable=True)

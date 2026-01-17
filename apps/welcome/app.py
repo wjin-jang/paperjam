@@ -132,7 +132,7 @@ class WelcomeApp(AppBase):
         if self.lib.scan_current_file:
             current = self.lib.scan_current_file
             # File path should wrap if long
-            items.append({'name': f"{t('welcome.file')}: {current}", 'type': 'info', 'wrap_text': True})
+            items.append({'name': f"{t('welcome.file')} | {current}", 'type': 'info', 'wrap_text': True})
 
         return self.renderer.render_menu(
             t('welcome.scanning'), items, -1, 0,

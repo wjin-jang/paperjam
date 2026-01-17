@@ -110,14 +110,23 @@ class SettingsApp(AppBase):
         return self.running
 
     def _update_submenu_items(self, category):
-        """Convert category strings to dict items for MenuController."""
-        # This is an adapter because categories currently return list of strings
-        # We should eventually refactor categories to return dicts too, but for now wrap them.
+        """Convert category items to dict items for MenuController."""
         items = []
         info_indices = category.get_info_indices()
-        for i, text in enumerate(category.items):
+        for i, item_data in enumerate(category.items):
+            # Default type based on index
             item_type = 'info' if i in info_indices else 'file'
-            items.append({'name': text, 'type': item_type, 'original_index': i})
+            
+            if isinstance(item_data, dict):
+                # Dictionary item (e.g. columns)
+                new_item = item_data.copy()
+                if 'type' not in new_item:
+                    new_item['type'] = item_type
+                new_item['original_index'] = i
+                items.append(new_item)
+            else:
+                # String item
+                items.append({'name': str(item_data), 'type': item_type, 'original_index': i})
         
         # Don't reset index if we are just refreshing the same list
         self.submenu_controller.set_items(items, reset_index=False)

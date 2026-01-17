@@ -31,9 +31,10 @@ class MenuViewRenderer:
 
         # String item
         if isinstance(item, str):
-            # Info item with colon notation -> columns
-            if is_info and ':' in item:
-                parts = item.split(':', 1)
+            # Info item with separator notation -> columns
+            separator = '|' if '|' in item else (':' if ':' in item else None)
+            if is_info and separator:
+                parts = item.split(separator, 1)
                 label = parts[0].strip()
                 right_text = parts[1].strip() if len(parts) > 1 else ''
                 if ',' in right_text:

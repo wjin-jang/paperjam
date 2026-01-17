@@ -6,7 +6,7 @@ import re
 import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, Callable
+from typing import List, Optional, Callable, Any
 
 import config as cfg
 import version
@@ -231,33 +231,31 @@ class AudioCategory(SettingsCategory):
         self._apply_volume()
         self.save_volume()
 
-    def build_menu(self) -> List[str]:
+    def build_menu(self) -> List[Any]:
         self._refresh_audio_sinks()
         output_name = self._get_current_output_name()
         endless = self.settings.get('endless_playback', False)
         endless_state = t('general.on') if endless else t('general.off')
         return [
-            f"{t('settings.audio.output')}: {output_name}",
+            {'type': 'info', 'columns': [t('settings.audio.output'), output_name]},
             t('settings.audio.volume'),
-            f"{t('settings.audio.endless_play')}: {endless_state}",
+            {'type': 'info', 'columns': [t('settings.audio.endless_play'), endless_state]},
             t('settings.audio.bluetooth')
         ]
 
     def handle_action(self, item_index: int) -> Optional[str]:
-        item_text = self.items[item_index]
+        item = self.items[item_index]
+        item_text = item['columns'][0] if isinstance(item, dict) else item
 
         if t('settings.audio.bluetooth') in item_text:
             return 'BT_SAVED'
         elif t('settings.audio.volume') in item_text:
             return 'VOLUME'
-        elif item_text.startswith(t('settings.audio.output')):
+        elif t('settings.audio.output') in item_text:
             new_output = self._cycle_audio_output()
-            self.items[item_index] = f"{t('settings.audio.output')}: {new_output}"
             return None
         elif t('settings.audio.endless_play') in item_text:
-            new_val = self.settings.toggle('endless_playback')
-            state = t('general.on') if new_val else t('general.off')
-            self.items[item_index] = f"{t('settings.audio.endless_play')}: {state}"
+            self.settings.toggle('endless_playback')
             return None
 
         return None
@@ -270,17 +268,17 @@ class LibraryCategory(SettingsCategory):
         super().__init__(t('settings.categories.library'), settings_manager)
         self.lib = library_manager
 
-    def build_menu(self) -> List[str]:
+    def build_menu(self) -> List[Any]:
         recents_limit = self.settings.get('recents_limit', 50)
 
         if self.lib.is_scanning:
             # Show scan progress
             return [
-                f"{t('settings.library.scanning')}: {self.lib.scan_current_file}",
-                f"{t('settings.library.tracks')}: {self.lib.scan_track_count}",
-                f"{t('settings.library.albums')}: {self.lib.scan_album_count}",
-                f"{t('settings.library.artists')}: {self.lib.scan_artist_count}",
-                f"{t('settings.library.recents_limit')}: {recents_limit}"
+                {'type': 'info', 'columns': [t('settings.library.scanning'), self.lib.scan_current_file]},
+                {'type': 'info', 'columns': [t('settings.library.tracks'), str(self.lib.scan_track_count)]},
+                {'type': 'info', 'columns': [t('settings.library.albums'), str(self.lib.scan_album_count)]},
+                {'type': 'info', 'columns': [t('settings.library.artists'), str(self.lib.scan_artist_count)]},
+                {'type': 'info', 'columns': [t('settings.library.recents_limit'), str(recents_limit)]}
             ]
         else:
             # Show library stats
@@ -288,21 +286,22 @@ class LibraryCategory(SettingsCategory):
             albums = len(self.lib.albums)
             artists = len(self.lib.artists)
             return [
-                f"{t('settings.library.tracks')}: {tracks}",
-                f"{t('settings.library.albums')}: {albums}",
-                f"{t('settings.library.artists')}: {artists}",
+                {'type': 'info', 'columns': [t('settings.library.tracks'), str(tracks)]},
+                {'type': 'info', 'columns': [t('settings.library.albums'), str(albums)]},
+                {'type': 'info', 'columns': [t('settings.library.artists'), str(artists)]},
                 t('settings.library.rescan'),
-                f"{t('settings.library.recents_limit')}: {recents_limit}"
+                {'type': 'info', 'columns': [t('settings.library.recents_limit'), str(recents_limit)]}
             ]
 
     def get_info_indices(self) -> List[int]:
         if self.lib.is_scanning:
-            return [0, 1, 2, 3]  # All scan info is info-only
+            return [0, 1, 2, 3, 4]  # All scan info is info-only
         else:
-            return [0, 1, 2]  # Stats are info-only
+            return [0, 1, 2, 4]  # Stats + Limit are info-only (rescan is 3)
 
     def handle_action(self, item_index: int) -> Optional[str]:
-        item_text = self.items[item_index]
+        item = self.items[item_index]
+        item_text = item['columns'][0] if isinstance(item, dict) else item
 
         if t('settings.library.rescan') in item_text:
             self.lib.scan_async(force=True)
@@ -319,26 +318,24 @@ class DisplayCategory(SettingsCategory):
     def __init__(self, settings_manager):
         super().__init__(t('settings.categories.display'), settings_manager)
 
-    def build_menu(self) -> List[str]:
+    def build_menu(self) -> List[Any]:
         invert = self.settings.get('invert_colors', False)
         state = t('general.on') if invert else t('general.off')
         ss_timeout = self.settings.get('screensaver_timeout', 60)
 
         return [
-            f"{t('settings.display.invert_colors')}: {state}",
-            f"{t('settings.display.screensaver')}: {format_duration(ss_timeout)}"
+            {'type': 'info', 'columns': [t('settings.display.invert_colors'), state]},
+            {'type': 'info', 'columns': [t('settings.display.screensaver'), format_duration(ss_timeout)]}
         ]
 
     def handle_action(self, item_index: int) -> Optional[str]:
-        item_text = self.items[item_index]
+        item = self.items[item_index]
+        item_text = item['columns'][0] if isinstance(item, dict) else item
 
         if t('settings.display.invert_colors') in item_text:
-            new_val = self.settings.toggle('invert_colors')
-            state = t('general.on') if new_val else t('general.off')
-            self.items[item_index] = f"{t('settings.display.invert_colors')}: {state}"
+            self.settings.toggle('invert_colors')
         elif t('settings.display.screensaver') in item_text:
-            new_val = self.settings.cycle('screensaver_timeout')
-            self.items[item_index] = f"{t('settings.display.screensaver')}: {format_duration(new_val)}"
+            self.settings.cycle('screensaver_timeout')
 
         return None
 
@@ -575,33 +572,34 @@ class NetworkCategory(SettingsCategory):
             logger.error(f"Failed to connect to WiFi: {e}")
             return False
 
-    def build_menu(self) -> List[str]:
+    def build_menu(self) -> List[Any]:
         wifi_state = t('general.on') if self._is_wifi_enabled() else t('general.off')
         bt_state = t('general.on') if self._is_bt_enabled() else t('general.off')
         wifi_info = self._get_wifi_info()
         bt_info = self._get_bt_status()
         return [
-            f"{t('settings.network.wifi')}: {wifi_info}",
-            f"{t('settings.network.bluetooth')}: {bt_info}",
-            f"{t('settings.network.toggle_wifi')}: {wifi_state}",
+            {'type': 'info', 'columns': [t('settings.network.wifi'), wifi_info]},
+            {'type': 'info', 'columns': [t('settings.network.bluetooth'), bt_info]},
+            {'type': 'info', 'columns': [t('settings.network.toggle_wifi'), wifi_state]},
             t('settings.network.wifi_networks'),
-            f"{t('settings.network.toggle_bt')}: {bt_state}"
+            {'type': 'info', 'columns': [t('settings.network.toggle_bt'), bt_state]}
         ]
 
     def get_info_indices(self) -> List[int]:
-        return [0, 1]  # WiFi info and BT status at top are info-only
+        return [0, 1, 2, 4]  # WiFi info, BT status, and toggles are info-only (logic handled in app)
 
     def handle_action(self, item_index: int) -> Optional[str]:
-        item_text = self.items[item_index]
+        item = self.items[item_index]
+        item_text = item['columns'][0] if isinstance(item, dict) else item
 
-        if item_text.startswith(t('settings.network.toggle_wifi')):
+        if t('settings.network.toggle_wifi') in item_text:
             self._toggle_wifi()
             self.refresh()
         elif t('settings.network.wifi_networks') in item_text:
             self.wifi_networks = self.get_known_wifi_networks()
             self.wifi_idx = 0
             return 'WIFI_NETWORKS'
-        elif item_text.startswith(t('settings.network.toggle_bt')):
+        elif t('settings.network.toggle_bt') in item_text:
             self._toggle_bt()
             self.refresh()
         return None
@@ -735,18 +733,18 @@ class SystemCategory(SettingsCategory):
         except (subprocess.SubprocessError, OSError):
             pass
 
-    def build_menu(self) -> List[str]:
+    def build_menu(self) -> List[Any]:
         long_press = self.settings.get('long_press_duration', 0.5)
         auto_update = self.settings.get('auto_update', False)
         auto_update_str = t('general.on') if auto_update else t('general.off')
         power_mode = t('settings.system.power_optimised') if self._is_power_optimised() else t('settings.system.power_normal')
         disk = self._get_disk_usage()
         return [
-            f"{t('settings.system.disk')}: {disk}",
-            f"{t('settings.system.version')}: {version.VERSION} ({version.VERSION_DATE})",
-            f"{t('settings.system.power_mode')}: {power_mode}",
-            f"{t('settings.system.long_press')}: {long_press}s",
-            f"{t('settings.system.auto_update')}: {auto_update_str}",
+            {'type': 'info', 'columns': [t('settings.system.disk'), disk]},
+            {'type': 'info', 'columns': [t('settings.system.version'), f"{version.VERSION} ({version.VERSION_DATE})"]},
+            {'type': 'info', 'columns': [t('settings.system.power_mode'), power_mode]},
+            {'type': 'info', 'columns': [t('settings.system.long_press'), f"{long_press}s"]},
+            {'type': 'info', 'columns': [t('settings.system.auto_update'), auto_update_str]},
             t('settings.system.check_updates'),
             t('settings.system.restart'),
             t('settings.system.reset_data'),
@@ -754,26 +752,24 @@ class SystemCategory(SettingsCategory):
         ]
 
     def get_info_indices(self) -> List[int]:
-        return [0, 1]  # Disk and Version lines are info-only
+        return [0, 1, 2, 3, 4]  # Disk, Ver, Power, Press, Auto-update are info-only (action handled by app)
 
     def handle_action(self, item_index: int) -> Optional[str]:
-        item_text = self.items[item_index]
+        item = self.items[item_index]
+        item_text = item['columns'][0] if isinstance(item, dict) else item
 
         if t('settings.system.power_mode') in item_text:
             self._toggle_power_mode()
             self.refresh()
         elif t('settings.system.auto_update') in item_text:
-            new_val = self.settings.toggle('auto_update')
-            state = t('general.on') if new_val else t('general.off')
-            self.items[item_index] = f"{t('settings.system.auto_update')}: {state}"
+            self.settings.toggle('auto_update')
         elif t('settings.system.check_updates') in item_text:
             if self._update_callback:
                 self._update_callback()
         elif t('settings.system.restart') in item_text:
             subprocess.run(["sudo", "reboot"], timeout=5)
         elif t('settings.system.long_press') in item_text:
-            new_val = self.settings.cycle('long_press_duration')
-            self.items[item_index] = f"{t('settings.system.long_press')}: {new_val}s"
+            self.settings.cycle('long_press_duration')
         elif t('settings.system.reset_data') in item_text:
             if self._reset_callback:
                 self._reset_callback()
