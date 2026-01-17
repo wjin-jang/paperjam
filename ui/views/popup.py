@@ -39,7 +39,7 @@ class PopupPanel(Panel):
                     level = self.state.extra.get('level', 0)
                     title = self.state.extra.get('title', "VOLUME")
                     self.header = f"{title} {level}%"
-                    self.menu.items = [Item(type='volume', value=level)]
+                    self.menu.items = [Item(show_volume=True, value=level)]
 
 
 @dataclass
@@ -153,12 +153,12 @@ class PopupManager:
         panel = PopupPanel(x, y, w, h, title=title, dismiss_mode='TIMER', timeout=timeout)
         menu = panel.create_menu()
         
-        # Convert content to TextItems
+        # Convert content to Items
         # Handle multi-line
         if '\n' in text:
-            menu.items = [Item(text=line, type='text', selectable=False) for line in text.split('\n')]
+            menu.items = [Item(text=line, selectable=False) for line in text.split('\n')]
         else:
-            menu.items = [Item(text=text, type='text', selectable=False)]
+            menu.items = [Item(text=text, selectable=False)]
             
         self.push(panel)
 
@@ -173,8 +173,8 @@ class PopupManager:
         menu = panel.create_menu()
         
         menu.items = [
-            Item(text=t('general.no'), type='text', selectable=True),
-            Item(text=t('general.yes'), type='text', selectable=True)
+            Item(text=t('general.no'), selectable=True),
+            Item(text=t('general.yes'), selectable=True)
         ]
         menu.cursor.row = 0
         
@@ -223,7 +223,7 @@ class PopupManager:
         header = f"{title} {int(level)}%"
         panel = PopupPanel(x, y, w, h, title=header, dismiss_mode='TIMER', timeout=1.5)
         menu = panel.create_menu()
-        menu.items = [Item(type='volume', value=level)]
+        menu.items = [Item(show_volume=True, value=level)]
         
         # Override standard volume rendering update logic
         panel.state = None # Will be set in push

@@ -108,7 +108,7 @@ class WelcomeApp(AppBase):
             return self._render_welcome()
         
         from ui.views.items import Item
-        frame, _ = self.renderer.render_menu(t('welcome.welcome'), [Item(text=t('general.loading'), type='info', selectable=False)], 0, 0)
+        frame, _ = self.renderer.render_menu(t('welcome.welcome'), [Item(text=t('general.loading'), selectable=False)], 0, 0)
         return frame
 
     def _render_choice(self):

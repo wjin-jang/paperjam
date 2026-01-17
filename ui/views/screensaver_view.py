@@ -27,7 +27,7 @@ class ScreensaverRenderer:
                 100, cfg.ROW_HEIGHT
             )
             menu = panel.create_menu()
-            menu.items = [Item(text="IDLE", type='text', selectable=False)]
+            menu.items = [Item(text="IDLE", selectable=False)]
             panel.render(self.canvas)
             return self.canvas
 
@@ -46,7 +46,7 @@ class ScreensaverRenderer:
         panel = Panel(x, y, panel_w, panel_h)
         menu = panel.create_menu()
         
-        art_item = Item(type='image', image=img)
+        art_item = Item(show_image=True, image=img)
         art_item.set_height(panel_h - 2)
         menu.items = [art_item]
         
@@ -74,7 +74,7 @@ class ScreensaverRenderer:
             
             panel_img = Panel(img_x, img_y, img_size + 2, img_size + 2)
             menu_img = panel_img.create_menu()
-            art_item = Item(type='image', image=image)
+            art_item = Item(show_image=True, image=image)
             art_item.set_height(img_size)
             menu_img.items = [art_item]
             panel_img.render(self.canvas)
@@ -84,7 +84,7 @@ class ScreensaverRenderer:
         # Text Panel
         panel_text = Panel(x, y_text, w, h)
         menu_text = panel_text.create_menu()
-        menu_text.items = [Item(text=text, type='text', font=cfg.FONT_HEADER, selectable=False)]
+        menu_text.items = [Item(text=text, font=cfg.FONT_HEADER, selectable=False)]
         panel_text.render(self.canvas)
 
         return self.canvas
@@ -128,8 +128,8 @@ class ScreensaverRenderer:
         
         # Add text and button
         menu.items = [
-            Item(text=dialog_text, type='info', padding=(5, 10), wrap_text=True),
-            Item(text=button_text, type='text', selectable=True)
+            Item(text=dialog_text, padding=(5, 10), wrap_text=True, selectable=False),
+            Item(text=button_text, selectable=True)
         ]
         
         # Select the button
