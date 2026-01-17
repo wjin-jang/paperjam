@@ -38,19 +38,9 @@ class UIRenderer:
         """Render music player view."""
         return self._music_view.render(state, view_items)
 
-    def render_menu(self, title, items, sel_idx, scroll_idx, info_indices=None) -> Image.Image:
+    def render_menu(self, title, items, sel_idx, scroll_idx=0, info_indices=None) -> Image.Image:
         """Render menu view."""
-        # Auto-detect info indices if not provided
-        if info_indices is None:
-            info_indices = []
-            for i, item in enumerate(items):
-                # Handle both dict items and legacy strings (though strings default to selectable unless in list)
-                if isinstance(item, dict):
-                    t = item.get('type')
-                    if t in ['heading', 'info']:
-                        info_indices.append(i)
-        
-        return self._menu_view.render_menu(title, items, sel_idx, scroll_idx, info_indices=info_indices)
+        return self._menu_view.render_menu(title, items, sel_idx, scroll_idx)
 
     def render_shutdown(self, image=None) -> Image.Image:
         """Render shutdown screen with cover art and POWER OFF text."""

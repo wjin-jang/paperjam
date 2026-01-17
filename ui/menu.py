@@ -1,16 +1,17 @@
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Union
+from ui.views.items import Item
 
 class MenuController:
     """
     Simplified controller for managing Menu/List state.
     Handles navigation logic, skipping non-selectable items, and pinning.
     """
-    def __init__(self, items: List[Dict[str, Any]], start_index: int = 0):
+    def __init__(self, items: List[Union[Dict[str, Any], Item]], start_index: int = 0):
         """
         Initialize the controller with a list of items.
         
         Args:
-            items: List of item dictionaries.
+            items: List of item dictionaries or Item objects.
             start_index: Initial selected index (will adjust to nearest selectable if needed).
         """
         self.items = items
@@ -20,7 +21,7 @@ class MenuController:
         if items:
             self._validate_selection()
 
-    def set_items(self, items: List[Dict[str, Any]], reset_index: bool = True):
+    def set_items(self, items: List[Union[Dict[str, Any], Item]], reset_index: bool = True):
         """Replace the current items list."""
         self.items = items
         if reset_index:
@@ -33,6 +34,9 @@ class MenuController:
             return False
         
         item = self.items[index]
+        if isinstance(item, Item):
+            return item.selectable
+            
         item_type = item.get('type', 'file')
         # Pinned items can be selectable (like controls), unless specified otherwise
         # But commonly 'heading' and 'info' are not.
@@ -89,8 +93,8 @@ class MenuController:
                 self.selected_index = current
                 return
 
-    def get_selected_item(self) -> Optional[Dict[str, Any]]:
-        """Return the currently selected item dict."""
+    def get_selected_item(self) -> Optional[Union[Dict[str, Any], Item]]:
+        """Return the currently selected item."""
         if 0 <= self.selected_index < len(self.items):
             return self.items[self.selected_index]
         return None
@@ -102,7 +106,10 @@ class MenuController:
         """
         info_indices = []
         for i, item in enumerate(self.items):
-            if item.get('type') in ['heading', 'info']:
+            if isinstance(item, Item):
+                if not item.selectable:
+                    info_indices.append(i)
+            elif item.get('type') in ['heading', 'info']:
                 info_indices.append(i)
         
         return {

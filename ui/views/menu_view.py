@@ -19,15 +19,35 @@ class MenuViewRenderer:
         """Convert legacy item format to new Item classes.
 
         Args:
-            item: String or dict in legacy format
+            item: String, dict, or Item instance
             is_info: Whether item should be non-selectable info
 
         Returns:
             Item instance
         """
-        # Already has 'type' field with 'info' and 'lines'
-        if isinstance(item, dict) and item.get('type') == 'info' and item.get('lines'):
-            return Item(type='info', lines=item['lines'])
+        # Already an Item instance
+        if isinstance(item, Item):
+            return item
+
+        # Dictionary item
+        if isinstance(item, dict):
+            itype = item.get('type', 'text')
+            name = item.get('name', '')
+            wrap_text = item.get('wrap_text', False)
+            
+            if itype == 'heading':
+                return Item(text=name, type='heading', wrap_text=wrap_text)
+            
+            if is_info or itype == 'info':
+                lines = item.get('lines')
+                columns = item.get('columns')
+                if lines:
+                    return Item(type='info', lines=lines)
+                if columns:
+                    return Item(type='info', columns=columns)
+                return Item(text=name if name else str(item), type='info', wrap_text=wrap_text)
+                
+            return Item(text=name if name else str(item), type='text', wrap_text=wrap_text)
 
         # String item
         if isinstance(item, str):
@@ -47,20 +67,6 @@ class MenuViewRenderer:
                 return Item(text=item, type='info')
             return Item(text=item, type='text')
 
-        # Dict with 'name' field
-        if isinstance(item, dict):
-            name = item.get('name', str(item))
-            wrap_text = item.get('wrap_text', False)
-            itype = item.get('type', 'text')
-            
-            if itype == 'heading':
-                return Item(text=name, type='heading', wrap_text=wrap_text)
-            
-            if is_info or itype == 'info':
-                return Item(text=name, type='info', wrap_text=wrap_text)
-                
-            return Item(text=name, type='text', wrap_text=wrap_text)
-
         return Item(text=str(item), type='text')
 
     def _get_item_row_count(self, item) -> int:
@@ -73,26 +79,25 @@ class MenuViewRenderer:
         """Get total row count including multi-line items."""
         return sum(self._get_item_row_count(item) for item in items)
 
-    def render_menu(self, title, items, sel_idx, scroll_idx, info_indices=None):
+    def render_menu(self, title, items, sel_idx, scroll_idx=0):
         """Render a menu with title and items.
 
         Args:
             title: Menu title
-            items: List of menu items (legacy format)
+            items: List of Item objects
             sel_idx: Selected index (-1 for no selection)
-            scroll_idx: Scroll offset (legacy, converted internally)
-            info_indices: List of indices that are info-only
+            scroll_idx: Unused (maintained for backward compatibility with API)
 
         Returns:
             Rendered canvas image
         """
         self.clear()
-        if info_indices is None:
-            info_indices = []
 
         # Calculate panel dimensions
         box_w = 160
-        total_rows = self._get_total_rows(items)
+        # For simplicity in this transition, we'll assume standard row height
+        # Advanced height calculation could be added if multi-line items are common
+        total_rows = len(items)
         full_content_h = (total_rows * cfg.ROW_HEIGHT) + cfg.ROW_HEIGHT
         box_h = min(cfg.PANEL_H, full_content_h)
         box_x = (cfg.SCREEN_WIDTH - box_w) // 2
@@ -102,11 +107,16 @@ class MenuViewRenderer:
         panel = Panel(box_x, box_y, box_w, box_h, header=title)
         menu = panel.create_menu()
 
-        # Convert legacy items to new Item objects
+        # Ensure all items are Item objects (handle legacy dicts if they leak in)
         new_items = []
-        for i, item in enumerate(items):
-            is_info = i in info_indices
-            new_items.append(self._convert_legacy_item(item, is_info))
+        for item in items:
+            if isinstance(item, Item):
+                new_items.append(item)
+            elif isinstance(item, dict):
+                # Minimal fallback
+                new_items.append(Item(text=item.get('name', ''), type=item.get('type', 'text')))
+            else:
+                new_items.append(Item(text=str(item), type='text'))
 
         menu.items = new_items
 

@@ -111,22 +111,17 @@ class SettingsApp(AppBase):
 
     def _update_submenu_items(self, category):
         """Convert category items to dict items for MenuController."""
+        from ui.views.items import Item
         items = []
-        info_indices = category.get_info_indices()
         for i, item_data in enumerate(category.items):
-            # Default type based on index
-            item_type = 'info' if i in info_indices else 'file'
-            
-            if isinstance(item_data, dict):
-                # Dictionary item (e.g. columns)
-                new_item = item_data.copy()
-                if 'type' not in new_item:
-                    new_item['type'] = item_type
-                new_item['original_index'] = i
-                items.append(new_item)
+            if isinstance(item_data, Item):
+                # We can pass the Item object directly to MenuController now
+                items.append(item_data)
+                # We still need to map the index for handle_action if needed, 
+                # but MenuController stores the list as is.
             else:
-                # String item
-                items.append({'name': str(item_data), 'type': item_type, 'original_index': i})
+                # Fallback for any legacy items
+                items.append({'name': str(item_data), 'type': 'text', 'original_index': i})
         
         # Don't reset index if we are just refreshing the same list
         self.submenu_controller.set_items(items, reset_index=False)
@@ -265,6 +260,7 @@ class SettingsApp(AppBase):
 
     def _handle_submenu_action(self):
         """Handle action in current submenu."""
+        sel_idx = self.submenu_controller.selected_index
         item = self.submenu_controller.get_selected_item()
         if not item: return
         
@@ -272,7 +268,7 @@ class SettingsApp(AppBase):
         if not cat_handler:
             return
 
-        result = cat_handler.handle_action(item['original_index'])
+        result = cat_handler.handle_action(sel_idx)
         # Refresh items after action
         self._update_submenu_items(cat_handler)
 

@@ -62,14 +62,14 @@ class ScreensaverRenderer:
         """Render shutdown screen."""
         self.clear()
 
-        # Draw "POWER OFF" text centered
+        # Draw "POWER OFF" text
         text = "POWER OFF"
-        w, h = 140, 30
-        x = (cfg.SCREEN_WIDTH - w) // 2
+        w, h = 32, cfg.ROW_HEIGHT
+        x = (cfg.SCREEN_WIDTH - w) - 8
         
         # If image provided, put text at bottom, image above
         if image:
-            y_text = cfg.SCREEN_HEIGHT - h - 10
+            y_text = cfg.SCREEN_HEIGHT - h - 8
             # Image panel
             img_w, img_h = image.size
             img_size = min(img_w, 80)

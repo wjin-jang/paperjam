@@ -88,8 +88,6 @@ class Item:
             return
 
         if self.type == 'image':
-            # Draw border for image
-            draw.rectangle((x, y, x + w, y + h), outline=cfg.BLACK)
             if self.image:
                 # Paste image inside border
                 canvas.paste(self.image, (x + 1, y + 1))
