@@ -133,7 +133,7 @@ class Item:
             self._draw_text_box(draw, canvas, text, x, y, w, h, invert=invert)
 
         if is_heading and selected:
-            draw.rectangle((x + 1, y + 1, x + w - 2, y + h - 2), outline=cfg.WHITE)
+            draw.rectangle((x + 1, y + 1, x + w - 1, y + h - 1), outline=cfg.WHITE)
 
     def _render_text_with_icon(self, draw, canvas, text, x, y, w, h, invert):
         icon_w = 12
@@ -159,13 +159,13 @@ class Item:
         bar_x = x + btn_w
 
         for bx, sym in [(x, "-"), (x + w - btn_w, "+")]:
-            draw.rectangle((bx, y, bx + btn_w - 1, y + h - 1), outline=cfg.BLACK)
+            draw.rectangle((bx, y, bx + btn_w , y + h ), outline=cfg.BLACK)
             draw.text((bx + (3 if sym == "-" else 2), y - 2), sym, font=cfg.FONT_HEADER, fill=cfg.BLACK)
 
-        draw.rectangle((bar_x, y, bar_x + bar_w - 1, y + h - 1), outline=cfg.BLACK)
+        draw.rectangle((bar_x, y, bar_x + bar_w , y + h ), outline=cfg.BLACK)
         fill_w = int(bar_w * (self.value / 100.0))
         if fill_w > 0:
-            draw.rectangle((bar_x, y, bar_x + fill_w - 1, y + h - 1), fill=cfg.BLACK)
+            draw.rectangle((bar_x, y, bar_x + fill_w , y + h ), fill=cfg.BLACK)
 
     def _render_column_layout(self, draw, canvas, x, y, w, h, selected, selected_col):
         widths = self._calculate_widths(w, len(self.columns))
@@ -177,7 +177,7 @@ class Item:
             add_border = col.active and is_col_selected
             bg = cfg.BLACK if invert else cfg.WHITE
             fg = cfg.WHITE if invert else cfg.BLACK
-            draw.rectangle((col_x, y, col_x + col_w - 1, y + h - 1), fill=bg, outline=cfg.BLACK)
+            draw.rectangle((col_x, y, col_x + col_w , y + h ), fill=bg, outline=cfg.BLACK)
             if isinstance(col.content, str):
                 self._draw_aligned_text(draw, col.content, col_x, y, col_w, h, col.align, fg)
             else:
@@ -257,7 +257,7 @@ class Item:
                 draw.text((x + padding_x, y + (i * cfg.ROW_HEIGHT) + padding_y), line, font=self.font or cfg.FONT_MAIN, fill=cfg.BLACK)
 
     def _draw_container(self, draw, x, y, w, h):
-        draw.rectangle((x, y, x + w - 1, y + h - 1), fill=cfg.WHITE, outline=cfg.BLACK)
+        draw.rectangle((x, y, x + w , y + h ), fill=cfg.WHITE, outline=cfg.BLACK)
 
     def _draw_text_box(self, draw, canvas, text, x, y, w, h, invert=False, center=False, font=None, padding=None):
         if h < 1 or w < 1: return
@@ -266,7 +266,7 @@ class Item:
         padding_x, padding_y = padding
         bg = cfg.BLACK if invert else cfg.WHITE
         fg = cfg.WHITE if invert else cfg.BLACK
-        draw.rectangle((x, y, x + w - 1, y + h - 1), fill=bg, outline=cfg.BLACK)
+        draw.rectangle((x, y, x + w , y + h ), fill=bg, outline=cfg.BLACK)
         if center:
             bbox = draw.textbbox((0, 0), text, font=font)
             draw_x = x + (w - (bbox[2] - bbox[0])) // 2 + 1
