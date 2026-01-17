@@ -194,8 +194,8 @@ class MusicPlayerApp(AppBase):
 
         item = self.menu.get_selected_item()
         if not item: return
-        
-        item_type = item.get('type')
+
+        item_type = item.type
 
         # Controls bar - handle button press
         if item_type == 'controls':
@@ -221,7 +221,7 @@ class MusicPlayerApp(AppBase):
         if item_type == 'info':
             return
 
-        if itype in ['playlist', 'dir', 'artist', 'album']:
+        if item_type in ['playlist', 'dir', 'artist', 'album']:
             self.history.append((self.mode, self.current_path, self.menu.selected_index))
             new_mode = item.id.get('mode') if isinstance(item, Item) and isinstance(item.id, dict) else item.get('mode')
 
@@ -233,7 +233,7 @@ class MusicPlayerApp(AppBase):
             self.current_path = (item.id.get('path') or item.text) if isinstance(item, Item) and isinstance(item.id, dict) else (item.get('path', item.get('name')))
             self.refresh_list(reset_selection=True)
             self._hide_loading()
-        elif itype == 'file':
+        elif item_type == 'file':
             tpath = item.id.get('path') if isinstance(item, Item) and isinstance(item.id, dict) else (item.id if isinstance(item, Item) else item.get('path'))
             self._play_from_list(tpath)
 

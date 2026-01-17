@@ -395,7 +395,7 @@ class Panel:
             return
 
         sb_x = self.x + self.width - 8
-        sb_y = self.y + self.content_y - 1
+        sb_y = self.y + self.content_y
         sb_h = self.content_height + 2
         sb_w = 8
 
@@ -419,6 +419,6 @@ class Panel:
         handle_y = sb_y + int((sb_h - handle_h) * scroll_ratio)
 
         draw.rectangle(
-            (sb_x, handle_y, sb_x + sb_w, handle_y + handle_h - 1),
+            (sb_x, handle_y, sb_x + sb_w, handle_y + handle_h),
             fill=cfg.WHITE, outline=cfg.BLACK
         )
