@@ -6,7 +6,9 @@ from typing import Dict, Optional
 
 from ui.renderer import UIRenderer
 from ui.menu import MenuController
+from ui.views.items import Item
 from core.bluetooth import BluetoothManager
+from core.i18n import t
 from core.settings_manager import get_settings_manager
 import config as cfg
 
@@ -33,7 +35,6 @@ class SettingsApp(AppBase):
         self._init_categories()
 
         # Main Menu
-        from ui.views.items import Item
         self.main_menu = MenuController([
             Item(text=t('settings.categories.audio'), type='text', id="AUDIO"),
             Item(text=t('settings.categories.library'), type='text', id="LIBRARY"),
@@ -112,7 +113,6 @@ class SettingsApp(AppBase):
 
     def _update_submenu_items(self, category):
         """Convert category items to dict items for MenuController."""
-        from ui.views.items import Item
         items = []
         for i, item_data in enumerate(category.items):
             if isinstance(item_data, Item):
@@ -188,7 +188,6 @@ class SettingsApp(AppBase):
             if item.id == 'SCAN_NEW':
                 self.view = 'BT_SCAN'
                 self.bt_status = t('settings.bluetooth.scanning')
-                from ui.views.items import Item
                 self.bt_menu.set_items([Item(text=t('settings.bluetooth.scanning'), type='info', selectable=False)])
                 self.bt.start_scan(self._bt_scan_callback)
             else:
@@ -289,10 +288,8 @@ class SettingsApp(AppBase):
     def _enter_wifi_networks(self):
         self.view = 'WIFI_NETWORKS'
         self.wifi_status = t('settings.network.select_network')
-        
+
         net_cat = self.categories['NETWORK']
-        from ui.views.items import Item
-        
         display_items = []
         if not net_cat.wifi_networks:
              display_items.append(Item(text=t('settings.network.no_networks'), type='info', selectable=False))
@@ -309,8 +306,7 @@ class SettingsApp(AppBase):
     def _enter_bt_saved_view(self):
         self.view = 'BT_SAVED'
         self.bt_status = t('settings.bluetooth.select_device')
-        
-        from ui.views.items import Item
+
         devices = self.bt.get_paired_devices()
         items = []
         for d in devices:
@@ -327,7 +323,6 @@ class SettingsApp(AppBase):
 
     def _enter_bt_device_menu(self, device):
         """Enter device options menu."""
-        from ui.views.items import Item
         self.bt_selected_device = device
         is_connected = self.bt.is_connected(device['mac'])
 
@@ -385,7 +380,6 @@ class SettingsApp(AppBase):
         self.popup_start = time.time()
 
     def _bt_scan_callback(self, devices):
-        from ui.views.items import Item
         items = []
         if not devices:
             items = [Item(text=t('settings.bluetooth.scanning'), type='info', selectable=False)]
