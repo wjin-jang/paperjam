@@ -18,7 +18,11 @@ if TYPE_CHECKING:
 
 @dataclass
 class Cursor:
-    """Cursor position within a menu."""
+    """Cursor position within a menu.
+
+    Tracks both vertical (row) and horizontal (col) position.
+    Horizontal movement only applies to items with multiple columns.
+    """
     row: int = 0
     col: int = 0
 
@@ -29,7 +33,14 @@ class Cursor:
 
 
 class Menu:
-    """A scrollable list of items with cursor navigation."""
+    """A scrollable list of items with cursor navigation.
+
+    The Menu handles:
+    - Item storage and rendering
+    - Cursor navigation (with column support)
+    - Scroll offset management
+    - Frame buffer rendering
+    """
 
     def __init__(self, width: int, height: int):
         """Create a menu.
@@ -70,19 +81,27 @@ class Menu:
         return self.get_total_height() > self.height
 
     def set_scroll_to_row(self, row_idx: int):
-        """Set scroll offset to show a specific row at the top."""
+        """Set scroll offset to show a specific row at the top.
+
+        Args:
+            row_idx: Row index to scroll to
+        """
         if row_idx <= 0 or not self.items:
             self.scroll_offset = 0
             return
 
+        # Calculate pixel offset for the row
         y = 0
         for i, item in enumerate(self.items):
             if i >= row_idx:
                 break
             y += item.get_height()
 
+        # Clamp to max scrollable area
         max_scroll = max(0, self.get_total_height() - self.height)
         self.scroll_offset = min(y, max_scroll)
+
+    # Navigation
 
     def nav_up(self) -> bool:
         """Move cursor up. Returns True if moved."""
@@ -92,6 +111,7 @@ class Menu:
         original_row = self.cursor.row
         new_row = self.cursor.row
 
+        # Find next selectable item above
         for _ in range(len(self.items)):
             new_row = (new_row - 1) % len(self.items)
             if self.items[new_row].selectable:
@@ -101,7 +121,7 @@ class Menu:
 
         if new_row != original_row:
             self.cursor.row = new_row
-            self.cursor.col = 0
+            self.cursor.col = 0  # Reset column when changing rows
             self._ensure_visible()
             return True
         return False
@@ -114,6 +134,7 @@ class Menu:
         original_row = self.cursor.row
         new_row = self.cursor.row
 
+        # Find next selectable item below
         for _ in range(len(self.items)):
             new_row = (new_row + 1) % len(self.items)
             if self.items[new_row].selectable:
@@ -123,28 +144,36 @@ class Menu:
 
         if new_row != original_row:
             self.cursor.row = new_row
-            self.cursor.col = 0
+            self.cursor.col = 0  # Reset column when changing rows
             self._ensure_visible()
             return True
         return False
 
     def nav_left(self) -> bool:
-        """Move cursor left within current item."""
+        """Move cursor left within current item. Returns True if moved."""
         item = self.get_selected_item()
-        if not item: return False
+        if not item:
+            return False
+
         col_count = item.get_column_count()
-        if col_count <= 1: return False
+        if col_count <= 1:
+            return False
+
         if self.cursor.col > 0:
             self.cursor.col -= 1
             return True
         return False
 
     def nav_right(self) -> bool:
-        """Move cursor right within current item."""
+        """Move cursor right within current item. Returns True if moved."""
         item = self.get_selected_item()
-        if not item: return False
+        if not item:
+            return False
+
         col_count = item.get_column_count()
-        if col_count <= 1: return False
+        if col_count <= 1:
+            return False
+
         if self.cursor.col < col_count - 1:
             self.cursor.col += 1
             return True
@@ -156,16 +185,19 @@ class Menu:
             self.cursor.reset()
             return
 
+        # If current item is selectable, we're fine
         if 0 <= self.cursor.row < len(self.items):
             if self.items[self.cursor.row].selectable:
                 return
 
+        # Find first selectable item
         for i, item in enumerate(self.items):
             if item.selectable:
                 self.cursor.row = i
                 self.cursor.col = 0
                 return
 
+        # No selectable items
         self.cursor.row = -1
         self.cursor.col = 0
 
@@ -174,9 +206,11 @@ class Menu:
         if not self.items or self.cursor.row < 0:
             return
 
+        # Ensure cursor is in bounds
         if self.cursor.row >= len(self.items):
             self.cursor.row = len(self.items) - 1
 
+        # Calculate cursor item position in pixels
         row_top = 0
         for i, item in enumerate(self.items):
             h = item.get_height()
@@ -187,31 +221,42 @@ class Menu:
         row_height = self.items[self.cursor.row].get_height()
         row_bottom = row_top + row_height
         
+        # Current viewport
         view_top = self.scroll_offset
         view_bottom = self.scroll_offset + self.height
         
+        # If item is taller than viewport, align top
         if row_height > self.height:
             self.scroll_offset = row_top
+        # If above viewport, align top
         elif row_top < view_top:
             self.scroll_offset = row_top
+        # If below viewport, align bottom
         elif row_bottom > view_bottom:
             self.scroll_offset = row_bottom - self.height
 
+        # Clamp to valid range
         max_scroll = max(0, self.get_total_height() - self.height)
         self.scroll_offset = max(0, min(self.scroll_offset, max_scroll))
 
     def render(self) -> Image.Image:
-        """Render menu items to a frame buffer."""
-        # Menu frame has NO internal borders - Panel handles them
+        """Render menu items to a frame buffer.
+
+        Returns:
+            PIL Image with rendered menu content
+        """
         frame = Image.new('1', (self.width, self.height), cfg.WHITE)
         draw = ImageDraw.Draw(frame)
 
+        # scroll_offset is in pixels
         render_y = -self.scroll_offset
 
         for i, item in enumerate(self.items):
             h = item.get_height()
 
+            # Check if item is visible
             if render_y + h > 0 and render_y < self.height:
+                # Determine selection state
                 is_selected = (i == self.cursor.row)
                 selected_col = self.cursor.col if is_selected else -1
 
@@ -222,6 +267,8 @@ class Menu:
                 )
 
             render_y += h
+
+            # Stop if we're past visible area
             if render_y >= self.height:
                 break
 
@@ -229,10 +276,26 @@ class Menu:
 
 
 class Panel:
-    """A bordered panel with optional header that contains a Menu."""
+    """A bordered panel with optional header that contains a Menu.
+
+    The Panel handles:
+    - Border and shadow rendering
+    - Optional header bar
+    - Menu frame compositing
+    - Scrollbar rendering
+    """
 
     def __init__(self, x: int, y: int, width: int, height: int,
                  header: str = None):
+        """Create a panel.
+
+        Args:
+            x: X position on screen
+            y: Y position on screen
+            width: Panel width including border
+            height: Panel height including border
+            header: Optional header text
+        """
         self.x = x
         self.y = y
         self.width = width
@@ -242,52 +305,56 @@ class Panel:
 
     @property
     def content_y(self) -> int:
-        """Y offset of content area (header height)."""
+        """Y offset of content area (after header)."""
         return cfg.ROW_HEIGHT if self.header else 0
 
     @property
     def content_height(self) -> int:
-        """Height of content area inside borders and header."""
-        return self.height - self.content_y - 2
+        """Height of content area."""
+        return self.height - self.content_y
 
     @property
     def content_width(self) -> int:
-        """Width of content area inside borders and accounting for scrollbar."""
-        base_w = self.width - 2
-        if self.menu and self.menu.needs_scrollbar() and base_w > 20:
-            return base_w - 8
-        return base_w
+        """Width of content area (accounting for scrollbar if needed)."""
+        if self.menu and self.menu.needs_scrollbar():
+            return self.width - 8  # Scrollbar width
+        return self.width
 
     def set_menu(self, menu: Menu):
+        """Set the menu for this panel."""
         self.menu = menu
 
     def create_menu(self) -> Menu:
         """Create and set a menu sized for this panel's content area."""
-        # Start with full width, will adjust in render if needed
-        menu = Menu(self.width - 2, self.content_height)
+        menu = Menu(self.content_width, self.content_height)
         self.menu = menu
         return menu
 
     def render(self, canvas: Image.Image):
-        """Render panel onto canvas."""
+        """Render panel onto canvas.
+
+        Args:
+            canvas: Target canvas to render onto
+        """
         draw = ImageDraw.Draw(canvas)
 
-        # Draw shadow
+        # Draw shadow (offset by 1 pixel)
         draw.rectangle(
-            (self.x + 1, self.y + 1, self.x + self.width, self.y + self.height),
+            (self.x + 1, self.y + 1,
+             self.x + self.width + 1, self.y + self.height + 1),
             outline=cfg.BLACK
         )
 
         # Draw panel border and fill
         draw.rectangle(
-            (self.x, self.y, self.x + self.width - 1, self.y + self.height - 1),
+            (self.x, self.y, self.x + self.width, self.y + self.height),
             fill=cfg.WHITE, outline=cfg.BLACK
         )
 
         # Draw header if present
         if self.header:
             draw.rectangle(
-                (self.x, self.y, self.x + self.width - 1, self.y + cfg.ROW_HEIGHT),
+                (self.x, self.y, self.x + self.width, self.y + cfg.ROW_HEIGHT),
                 fill=cfg.BLACK
             )
             draw.text(
@@ -298,45 +365,55 @@ class Panel:
 
         # Render menu content
         if self.menu:
-            # Set dimensions based on scrollbar need
+            # Update menu dimensions based on scrollbar need
             self.menu.height = self.content_height
-            self.menu.width = self.width - 2 # Try full width first
+            
+            # First pass: check if scrollbar needed with full width
+            self.menu.width = self.width 
             
             if self.menu.needs_scrollbar() and self.width > 20:
+                # Needs scrollbar -> reduce width
                 self.menu.width = self.content_width
                 
             frame = self.menu.render()
-            content_x = self.x + 1
-            content_y = self.y + self.content_y + 1
+            content_x = self.x
+            content_y = self.y + self.content_y
             canvas.paste(frame, (content_x, content_y))
 
+            # Render scrollbar if needed
             if self.menu.needs_scrollbar() and self.width > 20:
                 self._render_scrollbar(canvas, draw)
 
     def _render_scrollbar(self, canvas: Image.Image, draw: ImageDraw.Draw):
-        if not self.menu: return
+        """Render scrollbar for menu."""
+        if not self.menu:
+            return
 
-        sb_x = self.x + self.width - 9
-        sb_y = self.y + self.content_y + 1
-        sb_h = self.content_height
+        sb_x = self.x + self.width - 8
+        sb_y = self.y + self.content_y - 1
+        sb_h = self.content_height + 2
         sb_w = 8
 
-        # Track background
-        draw.rectangle((sb_x, sb_y, sb_x + sb_w - 1, sb_y + sb_h - 1), outline=cfg.BLACK, fill=cfg.WHITE)
-        strip = create_dithered_strip(sb_w - 2, sb_h - 2)
-        canvas.paste(strip, (sb_x + 1, sb_y + 1))
+        # Dithered background
+        strip = create_dithered_strip(sb_w + 1, sb_h)
+        canvas.paste(strip, (sb_x, sb_y))
 
+        # Calculate handle size and position
         total_h = self.menu.get_total_height()
-        if total_h <= 0: return
+        if total_h <= 0:
+            return
 
+        # Handle size proportional to visible area
         visible_ratio = self.content_height / total_h
         handle_h = max(6, int(sb_h * visible_ratio))
 
+        # Handle position based on scroll offset (already in pixels)
         max_scroll = max(1, total_h - self.content_height)
         scroll_ratio = min(1.0, self.menu.scroll_offset / max_scroll)
+
         handle_y = sb_y + int((sb_h - handle_h) * scroll_ratio)
 
         draw.rectangle(
-            (sb_x + 1, handle_y, sb_x + sb_w - 2, handle_y + handle_h - 1),
+            (sb_x, handle_y, sb_x + sb_w, handle_y + handle_h - 1),
             fill=cfg.WHITE, outline=cfg.BLACK
         )

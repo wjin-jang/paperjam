@@ -88,8 +88,11 @@ class Item:
             return
 
         if self.type == 'image':
+            # Draw border for image
+            draw.rectangle((x, y, x + w, y + h), outline=cfg.BLACK)
             if self.image:
-                canvas.paste(self.image, (x, y)) # Flush with content area
+                # Paste image inside border
+                canvas.paste(self.image, (x + 1, y + 1))
             else:
                 placeholder_y = y + (h // 2) - (cfg.ROW_HEIGHT // 2)
                 self._draw_text_box(draw, canvas, self.placeholder,
@@ -119,7 +122,7 @@ class Item:
         invert = is_heading or (selected and self.selectable)
         
         if is_heading:
-             draw.rectangle((x, y, x + w - 1, y + h - 1), fill=cfg.BLACK)
+             draw.rectangle((x, y, x + w, y + h), fill=cfg.BLACK)
         
         text = sanitize_text(self.text or "")
         if is_heading: text = text.upper()
