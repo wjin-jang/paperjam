@@ -327,9 +327,9 @@ class MusicPlayerApp(AppBase):
 
         self.state.is_playing = self.audio.toggle_pause()
         if self.state.is_playing:
-            self.state.set_status_message(t('player.status.playing'))
+            self.state.set_status_message('player.status.playing')
         else:
-            self.state.set_status_message(t('player.status.paused'))
+            self.state.set_status_message('player.status.paused')
 
     def next_track(self, from_user=True):
         if from_user and not self.state.screensaver_image:
@@ -353,7 +353,7 @@ class MusicPlayerApp(AppBase):
 
         if next_path:
             if from_user:
-                self.state.set_status_message(t('player.status.next'))
+                self.state.set_status_message('player.status.next')
             self._play_media(next_path)
             return
 
@@ -363,7 +363,7 @@ class MusicPlayerApp(AppBase):
         else:
             self.audio.stop()
             self.state.is_playing = False
-            self.state.set_status_message(t('player.status.idle'))
+            self.state.set_status_message('player.status.idle')
             # Don't auto-reset to the first track; stay on the current (last) track
 
     def prev_track(self):
@@ -380,7 +380,7 @@ class MusicPlayerApp(AppBase):
 
         path = self.playlist.prev_track()
         if path:
-            self.state.set_status_message(t('player.status.previous'))
+            self.state.set_status_message('player.status.previous')
             self._play_media(path)
 
     def _load_track(self, real_idx, play=True):
@@ -573,7 +573,7 @@ class MusicPlayerApp(AppBase):
 
         # Load and play first track
         self._load_track(self.playlist.queue[0])
-        self.state.set_status_message(t('player.status.playing'))
+        self.state.set_status_message('player.status.playing')
 
     def _play_random_album(self):
         """Play a random album (used for endless playback)."""
@@ -602,7 +602,7 @@ class MusicPlayerApp(AppBase):
 
         # Load and play first track
         self._load_track(self.playlist.queue[0])
-        self.state.set_status_message(t('player.status.endless'))
+        self.state.set_status_message('player.status.endless')
 
     def _play_from_list(self, path):
         """Start playing from the current list."""
@@ -651,7 +651,7 @@ class MusicPlayerApp(AppBase):
             self.playlist.toggle_shuffle() # Sync with playlist manager
 
             if self.state.shuffle_active:
-                self.state.set_status_message(t('player.status.shuffle_on'))
+                self.state.set_status_message('player.status.shuffle_on')
                 if not self.state.playing_path:
                     # Filter to file items using kind
                     def is_file_item(item):
@@ -668,7 +668,7 @@ class MusicPlayerApp(AppBase):
                         target_path = target.id.get('path') if isinstance(target, Item) else target.get('id', {}).get('path')
                         self._play_from_list(target_path)
             else:
-                self.state.set_status_message(t('player.status.shuffle_off'))
+                self.state.set_status_message('player.status.shuffle_off')
 
             if self.mode == 'QUEUE_VIEW':
                 self.refresh_list(reset_selection=False)
@@ -677,9 +677,9 @@ class MusicPlayerApp(AppBase):
             self.state.loop_mode = (self.state.loop_mode + 1) % 3
             self.playlist.loop_mode = self.state.loop_mode # Sync with playlist manager
             loop_messages = [
-                t('player.status.loop_off'),
-                t('player.status.loop_all'),
-                t('player.status.loop_one')
+                'player.status.loop_off',
+                'player.status.loop_all',
+                'player.status.loop_one'
             ]
             self.state.set_status_message(loop_messages[self.state.loop_mode])
             

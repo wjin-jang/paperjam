@@ -123,17 +123,17 @@ FONT_MAIN, FONT_HEADER, FONT_ICONS = load_fonts()
 
 # --- Status Icons ---
 STATUS_ICONS = {
-    'PLAYING': 'Ⓟ',
-    'PAUSED': 'Ⓢ',
-    'IDLE': 'Ⓘ',
-    'NEXT': 'Ⓝ',
-    'PREVIOUS': 'Ⓡ',
-    'SHUFFLE ON': 'Ⓘ',
-    'SHUFFLE OFF': 'Ⓘ',
-    'LOOP ALL': 'Ⓘ',
-    'LOOP ONE': 'Ⓘ',
-    'LOOP OFF': 'Ⓘ',
-    'ENDLESS': 'Ⓔ',
+    'player.status.playing': 'Ⓟ',
+    'player.status.paused': 'Ⓢ',
+    'player.status.idle': 'Ⓘ',
+    'player.status.next': 'Ⓝ',
+    'player.status.previous': 'Ⓡ',
+    'player.status.shuffle_on': 'Ⓘ',
+    'player.status.shuffle_off': 'Ⓘ',
+    'player.status.loop_all': 'Ⓘ',
+    'player.status.loop_one': 'Ⓘ',
+    'player.status.loop_off': 'Ⓘ',
+    'player.status.endless': 'Ⓔ',
 }
 
 # --- Menu Icons ---
