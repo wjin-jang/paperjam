@@ -70,11 +70,11 @@ class WelcomeApp(AppBase):
         item = self.choice_menu.get_selected_item()
         if not item: return
         
-        if item.get('action') == 'SCAN':
+        if item.id == 'SCAN':
             # Scan now
             self.view = 'SCANNING'
             self.lib.scan_async(force=True)
-        elif item.get('action') == 'SHUTDOWN':
+        elif item.id == 'SHUTDOWN':
             # Shutdown to add music
             if self._shutdown_callback:
                 self._shutdown_callback()
@@ -106,13 +106,14 @@ class WelcomeApp(AppBase):
     def _render_choice(self):
         """Render choice screen with multi-line info."""
         music_path = str(cfg.MUSIC_PATH)
+        from ui.views.items import Item
 
         if not self.choice_menu.items:
             # Build menu items
             items = [
-                {'name': t('welcome.music_found', path=music_path), 'type': 'info', 'wrap_text': True},
-                {'name': t('welcome.scan_now'), 'type': 'file', 'action': 'SCAN'},
-                {'name': t('welcome.shutdown_add_music'), 'type': 'file', 'action': 'SHUTDOWN'}
+                Item(text=t('welcome.music_found', path=music_path), type='info', wrap_text=True, selectable=False),
+                Item(text=t('welcome.scan_now'), type='text', id='SCAN'),
+                Item(text=t('welcome.shutdown_add_music'), type='text', id='SHUTDOWN')
             ]
             self.choice_menu.set_items(items)
 
@@ -122,21 +123,21 @@ class WelcomeApp(AppBase):
 
     def _render_scanning(self):
         """Render scanning progress."""
+        from ui.views.items import Item
         # Use columns for stats
         items = [
-            {'type': 'info', 'columns': ["Tracks", str(self.lib.scan_track_count)]},
-            {'type': 'info', 'columns': [t('settings.library.albums'), str(self.lib.scan_album_count)]},
-            {'type': 'info', 'columns': [t('settings.library.artists'), str(self.lib.scan_artist_count)]}
+            Item(type='info', columns=["Tracks", str(self.lib.scan_track_count)], selectable=False),
+            Item(type='info', columns=[t('settings.library.albums'), str(self.lib.scan_album_count)], selectable=False),
+            Item(type='info', columns=[t('settings.library.artists'), str(self.lib.scan_artist_count)], selectable=False)
         ]
 
         if self.lib.scan_current_file:
             current = self.lib.scan_current_file
             # File path should wrap if long
-            items.append({'name': f"{t('welcome.file')} | {current}", 'type': 'info', 'wrap_text': True})
+            items.append(Item(text=f"{t('welcome.file')} | {current}", type='info', wrap_text=True, selectable=False))
 
         return self.renderer.render_menu(
-            t('welcome.scanning'), items, -1, 0,
-            info_indices=[0, 1, 2, 3]
+            t('welcome.scanning'), items, -1, 0
         )
 
     def _render_welcome(self):

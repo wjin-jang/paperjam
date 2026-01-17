@@ -95,11 +95,11 @@ class MainApp:
         items = []
         # Add registered apps
         for app_id, name in self.registry.get_app_names():
-            items.append(Item(text=name, type='text'))
+            items.append(Item(text=name, type='text', id=app_id))
         
         # Add system actions
-        items.append(Item(text=t('menu.reboot'), type='text'))
-        items.append(Item(text=t('menu.shutdown'), type='text'))
+        items.append(Item(text=t('menu.reboot'), type='text', id='REBOOT'))
+        items.append(Item(text=t('menu.shutdown'), type='text', id='SHUTDOWN'))
         
         self.home_menu.set_items(items, reset_index=False)
 
@@ -344,7 +344,7 @@ class MainApp:
         item = self.home_menu.get_selected_item()
         if not item: return
         
-        item_id = item.get('id')
+        item_id = item.id
         
         if item_id == "REBOOT":
             self._start_confirm("REBOOT")

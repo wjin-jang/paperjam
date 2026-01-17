@@ -33,12 +33,13 @@ class SettingsApp(AppBase):
         self._init_categories()
 
         # Main Menu
+        from ui.views.items import Item
         self.main_menu = MenuController([
-            {"name": "Audio", "type": "dir", "id": "AUDIO"},
-            {"name": "Library", "type": "dir", "id": "LIBRARY"},
-            {"name": "Network", "type": "dir", "id": "NETWORK"},
-            {"name": "System", "type": "dir", "id": "SYSTEM"},
-            {"name": "Display", "type": "dir", "id": "DISPLAY"}
+            Item(text="Audio", type='text', id="AUDIO"),
+            Item(text="Library", type='text', id="LIBRARY"),
+            Item(text="Network", type='text', id="NETWORK"),
+            Item(text="System", type='text', id="SYSTEM"),
+            Item(text="Display", type='text', id="DISPLAY")
         ])
 
         # Submenus
@@ -175,7 +176,7 @@ class SettingsApp(AppBase):
         if self.view == 'MAIN':
             item = self.main_menu.get_selected_item()
             if item:
-                self._enter_category(item['id'])
+                self._enter_category(item.id)
                 
         elif self.view == 'SUBMENU':
             self._handle_submenu_action()
@@ -184,18 +185,19 @@ class SettingsApp(AppBase):
             item = self.bt_menu.get_selected_item()
             if not item: return
             
-            if item.get('id') == 'SCAN_NEW':
+            if item.id == 'SCAN_NEW':
                 self.view = 'BT_SCAN'
                 self.bt_status = "Scanning..."
-                self.bt_menu.set_items([{'name': "(Scanning...)", 'type': 'info'}])
+                from ui.views.items import Item
+                self.bt_menu.set_items([Item(text="(Scanning...)", type='info', selectable=False)])
                 self.bt.start_scan(self._bt_scan_callback)
             else:
-                self._enter_bt_device_menu(item['device'])
+                self._enter_bt_device_menu(item.id) # id stores device dict
                 
         elif self.view == 'BT_SCAN':
             item = self.bt_menu.get_selected_item()
-            if item and item.get('device'):
-                dev = item['device']
+            if item and item.id: # id stores device dict
+                dev = item.id
                 self.bt.stop_scan()
                 self.bt_status = f"Pairing {dev['name']}..."
                 self.bt.connect_async(dev['mac'], self._bt_connect_callback)
@@ -205,8 +207,8 @@ class SettingsApp(AppBase):
             
         elif self.view == 'WIFI_NETWORKS':
             item = self.wifi_menu.get_selected_item()
-            if item and item.get('network'):
-                network = item['network']
+            if item and item.id: # id stores network dict
+                network = item.id
                 self.wifi_status = "Connecting..."
                 net_cat = self.categories['NETWORK']
                 
@@ -299,10 +301,9 @@ class SettingsApp(AppBase):
                 prefix = "C" if net['current'] else " "
                 display_items.append(Item(
                     text=f"{prefix} {net['ssid']}",
-                    type='text'
+                    type='text',
+                    id=net
                 ))
-                # Store the network info in the item's metadata if we need to extend Item later,
-                # but for now MenuController will just use the index.
         self.wifi_menu.set_items(display_items)
 
     def _enter_bt_saved_view(self):
@@ -317,10 +318,11 @@ class SettingsApp(AppBase):
             prefix = "C" if is_conn else "P"
             items.append(Item(
                 text=f"{prefix} {d['name']}",
-                type='text'
+                type='text',
+                id=d
             ))
         
-        items.append(Item(text="[ Scan New Device ]", type='text'))
+        items.append(Item(text="[ Scan New Device ]", type='text', id='SCAN_NEW'))
         self.bt_menu.set_items(items)
 
     def _enter_bt_device_menu(self, device):
@@ -335,7 +337,7 @@ class SettingsApp(AppBase):
         else:
             options = ["Connect", "Forget", "Cancel"]
             
-        items = [Item(text=opt, type='text') for opt in options]
+        items = [Item(text=opt, type='text', id=opt) for opt in options]
         self.bt_device_menu.set_items(items)
 
         self.view = 'BT_DEVICE_MENU'
@@ -348,7 +350,7 @@ class SettingsApp(AppBase):
             self._enter_bt_saved_view()
             return
 
-        action = item['action']
+        action = item.id
         dev = self.bt_selected_device
         mac = dev['mac']
 
@@ -384,7 +386,8 @@ class SettingsApp(AppBase):
                 icon = "P" if d.get('paired') else " "
                 items.append(Item(
                     text=f"{icon} {d['name']}",
-                    type='text'
+                    type='text',
+                    id=d
                 ))
         self.bt_menu.set_items(items, reset_index=False)
 

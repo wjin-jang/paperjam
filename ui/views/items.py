@@ -38,7 +38,8 @@ class Item:
                  pinned: bool = False,
                  wrap_text: bool = False,
                  font=None,
-                 padding: tuple = None):
+                 padding: tuple = None,
+                 id: Any = None):
         self.text = text
         self.type = type
         self.icon = icon
@@ -52,6 +53,7 @@ class Item:
         self.wrap_text = wrap_text
         self.font = font
         self.padding = padding
+        self.id = id
         
         self._wrapped_lines: List[str] = []
         self._last_width: int = 0
