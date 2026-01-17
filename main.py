@@ -11,7 +11,6 @@ from core.inputs import InputHandler
 from core.system import SystemManager
 from core.logger import setup_logger
 import time
-import traceback
 
 from apps.music import MusicPlayerApp
 from apps.settings import SettingsApp
@@ -92,7 +91,6 @@ class MainApp:
 
     def _refresh_home_menu(self):
         """Rebuild home menu items."""
-        from ui.views.items import Item
         items = []
         # Add registered apps
         for app_id, name in self.registry.get_app_names():
@@ -131,7 +129,6 @@ class MainApp:
     def _welcome_shutdown(self):
         """Handle shutdown request from welcome app."""
         logger.info("User chose to shutdown for library setup")
-        from ui.views.items import Item
         frame, _ = self.renderer.render_menu("SETUP", [
             Item(type="info", lines=[
                 t('welcome.shutdown_loading'),
@@ -223,8 +220,7 @@ class MainApp:
                     try:
                         is_running = self.current_app.update()
                     except Exception as e:
-                        logger.error(f"App Update Error: {e}")
-                        traceback.print_exc()
+                        logger.exception(f"App Update Error: {e}")
 
                     if hasattr(self.current_app, 'state') and getattr(self.current_app.state, 'needs_refresh', False):
                         force_full = True
@@ -268,8 +264,7 @@ class MainApp:
         except KeyboardInterrupt:
             logger.info("Keyboard Interrupt")
         except Exception as e:
-            logger.critical(f"Critical Error: {e}")
-            traceback.print_exc()
+            logger.critical(f"Critical Error: {e}", exc_info=True)
         finally:
             self.sys.sleep_display()
 
@@ -359,9 +354,8 @@ class MainApp:
     def _start_confirm(self, target):
         self.view = 'CONFIRM'
         self.confirm_target = target
-        
+
         # Build confirm menu
-        from ui.views.items import Item
         items = [
             Item(text=t('general.no'), type='text', value=False, id=False),
             Item(text=t('general.yes'), type='text', value=True, id=True)
@@ -429,7 +423,6 @@ class MainApp:
     def _handle_shutdown_request(self, reason="User Request"):
         logger.info(f"Shutdown requested: {reason}")
         if reason == "LOW BATTERY":
-            from ui.views.items import Item
             frame, _ = self.renderer.render_menu(t('system_messages.low_battery'), [Item(text=t('system_messages.shutting_down'), type='info', selectable=False)], 0, 0)
             self._display(frame, full_refresh=True, skip_battery=False)
             time.sleep(2)

@@ -10,9 +10,12 @@ Provides global constants for:
 - Status and menu icons
 """
 import json
+import logging
 import os
 from pathlib import Path
 from PIL import ImageFont
+
+logger = logging.getLogger(__name__)
 
 # --- Defaults ---
 DEFAULT_CONFIG = {
@@ -47,7 +50,7 @@ def load_config():
             with open(CONFIG_FILE, 'r') as f:
                 return {**DEFAULT_CONFIG, **json.load(f)}
         except Exception as e:
-            print(f"Error loading config: {e}")
+            logger.error(f"Error loading config: {e}")
     return DEFAULT_CONFIG
 
 _config = load_config()
@@ -59,7 +62,7 @@ def save_config(updates):
         with open(CONFIG_FILE, 'w') as f:
             json.dump(_config, f, indent=4)
     except Exception as e:
-        print(f"Error saving config: {e}")
+        logger.error(f"Error saving config: {e}")
 
 # --- Exported Constants ---
 MUSIC_PATH = Path(_config["music_path"])

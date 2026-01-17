@@ -8,9 +8,13 @@ Provides simple audio playback with:
 
 VLC was chosen for robust codec support and simple Python bindings.
 """
-import vlc
+import logging
 import os
 import subprocess
+
+import vlc
+
+logger = logging.getLogger(__name__)
 
 
 class AudioEngine:
@@ -22,7 +26,7 @@ class AudioEngine:
         if self._check_pulseaudio():
             try:
                 self.instance = vlc.Instance('--aout=pulse')
-                print("Audio: PulseAudio selected")
+                logger.info("Audio: PulseAudio selected")
             except Exception:
                 pass
 
@@ -30,14 +34,14 @@ class AudioEngine:
         if self.instance is None:
             try:
                 self.instance = vlc.Instance('--aout=alsa')
-                print("Audio: ALSA selected")
+                logger.info("Audio: ALSA selected")
             except Exception:
                 pass
 
         # Fall back to default
         if self.instance is None:
             self.instance = vlc.Instance()
-            print("Audio: Default output selected")
+            logger.info("Audio: Default output selected")
 
         self.player = self.instance.media_player_new()
         self.current_media_path = None
