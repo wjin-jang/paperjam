@@ -72,6 +72,12 @@ class Item:
             if self.text and not self.columns:
                 if self.wrap_text and self._wrapped_lines:
                     return len(self._wrapped_lines) * cfg.ROW_HEIGHT
+                if self.wrap_text:
+                    # Eagerly compute wrapped lines if width is provided
+                    if width and width != self._last_width:
+                    
+                    if self._wrapped_lines:
+                        return len(self._wrapped_lines) * cfg.ROW_HEIGHT
         
         return cfg.ROW_HEIGHT
 
@@ -196,7 +202,7 @@ class Item:
         if align == 'center': text_x = x + (w - text_w) // 2
         elif align == 'right': text_x = x + w - text_w - 5
         else: text_x = x + 5
-        draw.text((text_x, y + 3), text, font=font, fill=fill)
+        draw.text((text_x, y + 1), text, font=font, fill=fill)
 
     def _draw_icon_content(self, canvas, icon, x, y, w, h, invert):
         if invert: icon = ImageOps.invert(icon.convert('L')).convert('1')
@@ -211,11 +217,11 @@ class Item:
         for i, line in enumerate(self.lines):
             line_y = y + (i * cfg.ROW_HEIGHT)
             if isinstance(line, list): self._render_plain_columns(draw, line, x, line_y, w, fg=fg)
-            else: draw.text((x + 5, line_y + 3), sanitize_text(str(line)), font=cfg.FONT_MAIN, fill=fg)
+            else: draw.text((x + 5, line_y + 1), sanitize_text(str(line)), font=cfg.FONT_MAIN, fill=fg)
 
     def _render_plain_columns(self, draw, columns, x, y, w, fg=cfg.BLACK):
         if not columns: return
-        draw.text((x + 5, y + 3), sanitize_text(str(columns[0])), font=cfg.FONT_MAIN, fill=fg)
+        draw.text((x + 5, y + 1), sanitize_text(str(columns[0])), font=cfg.FONT_MAIN, fill=fg)
         if len(columns) > 1:
             right_widths = [max(20, len(sanitize_text(str(c))) * 6 + 8) for c in columns[1:]]
             total_right = sum(right_widths)
@@ -267,7 +273,7 @@ class Item:
     def _draw_text_box(self, draw, canvas, text, x, y, w, h, invert=False, center=False, font=None, padding=None):
         if h < 1 or w < 1: return
         font = font or (self.font if self.font else cfg.FONT_MAIN)
-        padding = padding or (self.padding if self.padding else (5, 2))
+        padding = padding or (self.padding if self.padding else (5, 1))
         padding_x, padding_y = padding
         bg = cfg.BLACK if invert else cfg.WHITE
         fg = cfg.WHITE if invert else cfg.BLACK
