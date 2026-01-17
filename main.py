@@ -91,14 +91,15 @@ class MainApp:
 
     def _refresh_home_menu(self):
         """Rebuild home menu items."""
+        from ui.views.items import Item
         items = []
         # Add registered apps
         for app_id, name in self.registry.get_app_names():
-            items.append({'name': name, 'type': 'dir', 'id': app_id})
+            items.append(Item(text=name, type='text'))
         
         # Add system actions
-        items.append({'name': t('menu.reboot'), 'type': 'file', 'id': 'REBOOT'})
-        items.append({'name': t('menu.shutdown'), 'type': 'file', 'id': 'SHUTDOWN'})
+        items.append(Item(text=t('menu.reboot'), type='text'))
+        items.append(Item(text=t('menu.shutdown'), type='text'))
         
         self.home_menu.set_items(items, reset_index=False)
 
@@ -234,10 +235,11 @@ class MainApp:
                 else:
                     # Home Menu Logic
                     if self.view == 'HOME':
-                        frame = self.renderer.render_menu(
+                        frame, scroll = self.renderer.render_menu(
                             t('menu.home'),
                             **self.home_menu.get_render_args()
                         )
+                        self.home_menu.scroll_offset = scroll
                     elif self.view == 'CONFIRM':
                         frame = self._render_confirm()
 
@@ -378,10 +380,12 @@ class MainApp:
         target_display = t('menu.shutdown') if self.confirm_target == "SHUTDOWN" else t('menu.reboot')
         title = t('system_messages.confirm', target=target_display)
         
-        return self.renderer.render_menu(
+        frame, scroll = self.renderer.render_menu(
             title,
             **self.confirm_menu.get_render_args()
         )
+        self.confirm_menu.scroll_offset = scroll
+        return frame
 
     def _handle_confirm(self):
         item = self.confirm_menu.get_selected_item()

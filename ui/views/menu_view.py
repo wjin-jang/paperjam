@@ -86,17 +86,15 @@ class MenuViewRenderer:
             title: Menu title
             items: List of Item objects
             sel_idx: Selected index (-1 for no selection)
-            scroll_idx: Unused (maintained for backward compatibility with API)
+            scroll_idx: Initial scroll offset in pixels
 
         Returns:
-            Rendered canvas image
+            Tuple of (Rendered canvas image, Updated scroll offset)
         """
         self.clear()
 
         # Calculate panel dimensions
         box_w = 160
-        # For simplicity in this transition, we'll assume standard row height
-        # Advanced height calculation could be added if multi-line items are common
         total_rows = len(items)
         full_content_h = (total_rows * cfg.ROW_HEIGHT) + cfg.ROW_HEIGHT
         box_h = min(cfg.PANEL_H, full_content_h)
@@ -106,14 +104,14 @@ class MenuViewRenderer:
         # Create panel and menu
         panel = Panel(box_x, box_y, box_w, box_h, header=title)
         menu = panel.create_menu()
+        menu.scroll_offset = scroll_idx
 
-        # Ensure all items are Item objects (handle legacy dicts if they leak in)
+        # Ensure all items are Item objects
         new_items = []
         for item in items:
             if isinstance(item, Item):
                 new_items.append(item)
             elif isinstance(item, dict):
-                # Minimal fallback
                 new_items.append(Item(text=item.get('name', ''), type=item.get('type', 'text')))
             else:
                 new_items.append(Item(text=str(item), type='text'))
@@ -132,7 +130,7 @@ class MenuViewRenderer:
         # Render panel to canvas
         panel.render(self.canvas)
 
-        return self.canvas
+        return self.canvas, menu.scroll_offset
 
     def render_volume(self, title, volume_level):
         """Render volume control view using Panel → Menu → Item structure.

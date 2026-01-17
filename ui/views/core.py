@@ -226,7 +226,7 @@ class Menu:
         view_bottom = self.scroll_offset + self.height
         
         # If item is taller than viewport, align top
-        if row_height > self.height:
+        if row_height >= self.height:
             self.scroll_offset = row_top
         # If above viewport, align top
         elif row_top < view_top:
@@ -234,6 +234,7 @@ class Menu:
         # If below viewport, align bottom
         elif row_bottom > view_bottom:
             self.scroll_offset = row_bottom - self.height
+        # Otherwise, the item is already visible, so do nothing.
 
         # Clamp to valid range
         max_scroll = max(0, self.get_total_height() - self.height)

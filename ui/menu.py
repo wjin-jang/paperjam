@@ -16,6 +16,7 @@ class MenuController:
         """
         self.items = items
         self.selected_index = start_index
+        self.scroll_offset = 0 # Persistent pixel offset
         
         # Ensure initial selection is valid
         if items:
@@ -26,6 +27,7 @@ class MenuController:
         self.items = items
         if reset_index:
             self.selected_index = 0
+            self.scroll_offset = 0
         self._validate_selection()
 
     def _is_selectable(self, index: int) -> bool:
@@ -115,6 +117,6 @@ class MenuController:
         return {
             'items': self.items,
             'sel_idx': self.selected_index,
-            'scroll_idx': 0, # Renderer handles auto-scroll now
+            'scroll_idx': self.scroll_offset,
             'info_indices': info_indices
         }

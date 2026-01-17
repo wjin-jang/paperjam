@@ -38,7 +38,7 @@ class UIRenderer:
         """Render music player view."""
         return self._music_view.render(state, view_items)
 
-    def render_menu(self, title, items, sel_idx, scroll_idx=0, info_indices=None) -> Image.Image:
+    def render_menu(self, title, items, sel_idx, scroll_idx=0, info_indices=None) -> tuple[Image.Image, int]:
         """Render menu view."""
         return self._menu_view.render_menu(title, items, sel_idx, scroll_idx)
 

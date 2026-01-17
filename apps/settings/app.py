@@ -289,43 +289,43 @@ class SettingsApp(AppBase):
         self.wifi_status = "Select Network"
         
         net_cat = self.categories['NETWORK']
-        # This triggers a scan/list update in the category
-        # But we need to build the menu items for MenuController
-        # The category method get_known_wifi_networks returns raw dicts
+        from ui.views.items import Item
         
         display_items = []
         if not net_cat.wifi_networks:
-             display_items.append({'name': "(No networks)", 'type': 'info'})
+             display_items.append(Item(text="(No networks)", type='info', selectable=False))
         else:
             for net in net_cat.wifi_networks:
                 prefix = "C" if net['current'] else " "
-                display_items.append({
-                    'name': f"{prefix} {net['ssid']}",
-                    'type': 'file',
-                    'network': net
-                })
+                display_items.append(Item(
+                    text=f"{prefix} {net['ssid']}",
+                    type='text'
+                ))
+                # Store the network info in the item's metadata if we need to extend Item later,
+                # but for now MenuController will just use the index.
         self.wifi_menu.set_items(display_items)
 
     def _enter_bt_saved_view(self):
         self.view = 'BT_SAVED'
         self.bt_status = "Select Device"
         
+        from ui.views.items import Item
         devices = self.bt.get_paired_devices()
         items = []
         for d in devices:
             is_conn = self.bt.is_connected(d['mac'])
             prefix = "C" if is_conn else "P"
-            items.append({
-                'name': f"{prefix} {d['name']}",
-                'type': 'file',
-                'device': d
-            })
+            items.append(Item(
+                text=f"{prefix} {d['name']}",
+                type='text'
+            ))
         
-        items.append({'name': "[ Scan New Device ]", 'type': 'file', 'id': 'SCAN_NEW'})
+        items.append(Item(text="[ Scan New Device ]", type='text'))
         self.bt_menu.set_items(items)
 
     def _enter_bt_device_menu(self, device):
         """Enter device options menu."""
+        from ui.views.items import Item
         self.bt_selected_device = device
         is_connected = self.bt.is_connected(device['mac'])
 
@@ -335,7 +335,7 @@ class SettingsApp(AppBase):
         else:
             options = ["Connect", "Forget", "Cancel"]
             
-        items = [{'name': opt, 'type': 'file', 'action': opt} for opt in options]
+        items = [Item(text=opt, type='text') for opt in options]
         self.bt_device_menu.set_items(items)
 
         self.view = 'BT_DEVICE_MENU'
@@ -375,17 +375,17 @@ class SettingsApp(AppBase):
         self.popup_start = time.time()
 
     def _bt_scan_callback(self, devices):
+        from ui.views.items import Item
         items = []
         if not devices:
-            items = [{'name': "(Scanning...)", 'type': 'info'}]
+            items = [Item(text="(Scanning...)", type='info', selectable=False)]
         else:
             for d in devices:
                 icon = "P" if d.get('paired') else " "
-                items.append({
-                    'name': f"{icon} {d['name']}",
-                    'type': 'file',
-                    'device': d
-                })
+                items.append(Item(
+                    text=f"{icon} {d['name']}",
+                    type='text'
+                ))
         self.bt_menu.set_items(items, reset_index=False)
 
     def _bt_connect_callback(self, success, msg):
@@ -407,24 +407,38 @@ class SettingsApp(AppBase):
             if not is_busy:
                 self.view = self.prev_view
             else:
-                return self.renderer.render_menu("PLEASE WAIT", [self.popup_msg], 0, 0)
+                frame, _ = self.renderer.render_menu("PLEASE WAIT", [Item(text=self.popup_msg, type='info')], 0, 0)
+                return frame
 
         if self.view == 'MAIN':
-            return self.renderer.render_menu("SETTINGS", **self.main_menu.get_render_args())
+            frame, scroll = self.renderer.render_menu("SETTINGS", **self.main_menu.get_render_args())
+            self.main_menu.scroll_offset = scroll
+            return frame
 
         elif self.view == 'SUBMENU':
-            return self.renderer.render_menu(self.current_category, **self.submenu_controller.get_render_args())
+            frame, scroll = self.renderer.render_menu(self.current_category, **self.submenu_controller.get_render_args())
+            self.submenu_controller.scroll_offset = scroll
+            return frame
 
         elif self.view == 'BT_SAVED':
-            return self.renderer.render_menu(f"BT: {self.bt_status}", **self.bt_menu.get_render_args())
+            frame, scroll = self.renderer.render_menu(f"BT: {self.bt_status}", **self.bt_menu.get_render_args())
+            self.bt_menu.scroll_offset = scroll
+            return frame
 
         elif self.view == 'BT_SCAN':
-            return self.renderer.render_menu(f"BT: {self.bt_status}", **self.bt_menu.get_render_args())
+            frame, scroll = self.renderer.render_menu(f"BT: {self.bt_status}", **self.bt_menu.get_render_args())
+            self.bt_menu.scroll_offset = scroll
+            return frame
 
         elif self.view == 'BT_DEVICE_MENU':
-            return self.renderer.render_menu(f"BT: {self.bt_status}", **self.bt_device_menu.get_render_args())
+            frame, scroll = self.renderer.render_menu(f"BT: {self.bt_status}", **self.bt_device_menu.get_render_args())
+            self.bt_device_menu.scroll_offset = scroll
+            return frame
 
         elif self.view == 'WIFI_NETWORKS':
-            return self.renderer.render_menu(f"WiFi: {self.wifi_status}", **self.wifi_menu.get_render_args())
+            frame, scroll = self.renderer.render_menu(f"WiFi: {self.wifi_status}", **self.wifi_menu.get_render_args())
+            self.wifi_menu.scroll_offset = scroll
+            return frame
             
-        return self.renderer.render_menu("ERROR", ["Unknown View"], 0, 0)
+        frame, _ = self.renderer.render_menu("ERROR", [Item(text="Unknown View", type='info')], 0, 0)
+        return frame

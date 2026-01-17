@@ -34,14 +34,10 @@ class ScreensaverRenderer:
         # Render album art fullscreen or scaled
         img = state.screensaver_image
         img_w, img_h = img.size
-        
-        # Limit to screen size
-        max_w = cfg.SCREEN_WIDTH - 20
-        max_h = cfg.SCREEN_HEIGHT - 20
-        
+                
         # Calculate panel size to fit image
-        panel_w = min(img_w, max_w) + 2
-        panel_h = min(img_h, max_h) + 2
+        panel_w = img_w + 2
+        panel_h = img_h + 2
         
         x = (cfg.SCREEN_WIDTH - panel_w) // 2
         y = (cfg.SCREEN_HEIGHT - panel_h) // 2

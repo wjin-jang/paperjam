@@ -265,7 +265,7 @@ class Item:
     def _draw_text_box(self, draw, canvas, text, x, y, w, h, invert=False, center=False, font=None, padding=None):
         if h < 1 or w < 1: return
         font = font or (self.font if self.font else cfg.FONT_MAIN)
-        padding = padding or (self.padding if self.padding else (5, 3))
+        padding = padding or (self.padding if self.padding else (5, 2))
         padding_x, padding_y = padding
         bg = cfg.BLACK if invert else cfg.WHITE
         fg = cfg.WHITE if invert else cfg.BLACK
