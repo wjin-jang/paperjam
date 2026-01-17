@@ -10,8 +10,9 @@ from core.library import LibraryManager
 from core.i18n import t
 from ui.image_utils import get_cover
 from core.track_info import extract_track_info
-from core.navigation import nav_skip_info_up, nav_skip_info_down, find_next_heading
+from core.navigation import find_next_heading
 from ui.renderer import UIRenderer
+from ui.menu import MenuController
 import config as cfg
 
 from apps.music.state import PlayerState
@@ -37,6 +38,9 @@ class MusicPlayerApp(AppBase):
         self.playlist = PlaylistManager()
         self.context_menu = ContextMenuHandler(self.lib, self.playlist)
         self.browse = BrowseHandler(self.lib)
+        
+        # Menu Controller for navigation
+        self.menu = MenuController([])
 
         # Clear browse cache when library scan completes
         self.lib.set_on_scan_complete(self.browse.clear_cache)
@@ -55,6 +59,13 @@ class MusicPlayerApp(AppBase):
         # Volume callbacks (set by main.py)
         self._vol_up_callback = None
         self._vol_down_callback = None
+        
+        # Resume playback if queue loaded
+        if self.playlist.has_queue:
+            path = self.playlist.get_current_path()
+            if path:
+                self._play_media(path, play=False)
+                self.state.playing_path = path
 
         self.refresh_list()
 
@@ -114,10 +125,9 @@ class MusicPlayerApp(AppBase):
         if self._wake_from_screensaver():
             return
         
-        self.history.append((self.mode, self.current_path, self.state.selection_index))
+        self.history.append((self.mode, self.current_path, self.menu.selected_index))
         self.mode = 'QUEUE_VIEW'
-        self.state.selection_index = 0
-        self.refresh_list()
+        self.refresh_list(reset_selection=True)
 
     def _wake_from_screensaver(self):
         """Wake from screensaver if active. Returns True if was active."""
@@ -134,8 +144,8 @@ class MusicPlayerApp(AppBase):
     def _sync_context_state(self):
         """Sync context menu state to player state."""
         self.state.context_menu_active = self.context_menu.active
-        self.state.context_options = self.context_menu.options
-        self.state.context_index = self.context_menu.index
+        self.state.context_options = self.context_menu.menu.items # Use menu items
+        self.state.context_index = self.context_menu.menu.selected_index
         self.state.context_target_item = self.context_menu.target_item
         self.state.context_layer = self.context_menu.layer
 
@@ -148,9 +158,8 @@ class MusicPlayerApp(AppBase):
             self.context_menu.select_up()
             self._sync_context_state()
         else:
-            if not self.state.items:
-                return
-            self.state.selection_index = nav_skip_info_up(self.state.selection_index, self.state.items)
+            self.menu.move_selection(-1)
+            self._sync_state_selection()
 
     def nav_down(self):
         if self._wake_from_screensaver():
@@ -160,9 +169,12 @@ class MusicPlayerApp(AppBase):
             self.context_menu.select_down()
             self._sync_context_state()
         else:
-            if not self.state.items:
-                return
-            self.state.selection_index = nav_skip_info_down(self.state.selection_index, self.state.items)
+            self.menu.move_selection(1)
+            self._sync_state_selection()
+            
+    def _sync_state_selection(self):
+        """Update state selection index from menu controller."""
+        self.state.selection_index = self.menu.selected_index
 
     def nav_enter(self):
         if self._wake_from_screensaver():
@@ -173,17 +185,15 @@ class MusicPlayerApp(AppBase):
             self._sync_context_state()
 
             if nav_req:
-                self.history.append((self.mode, self.current_path, self.state.selection_index))
+                self.history.append((self.mode, self.current_path, self.menu.selected_index))
                 self.mode = nav_req['mode']
                 self.current_path = nav_req['path']
-                self.state.selection_index = 0
-                self.refresh_list()
+                self.refresh_list(reset_selection=True)
             return
 
-        # Bounds check before accessing items
-        if not self.state.items or not (0 <= self.state.selection_index < len(self.state.items)):
-            return
-        item = self.state.items[self.state.selection_index]
+        item = self.menu.get_selected_item()
+        if not item: return
+        
         item_type = item.get('type')
 
         # Controls bar - handle button press
@@ -192,16 +202,20 @@ class MusicPlayerApp(AppBase):
             return
 
         # Clicking a heading jumps to the next heading
+        # MenuController usually skips headings, but if one was selected somehow (programmatically)
+        # we can still handle it, though it's less likely now.
         if item_type == 'heading':
-            self.state.selection_index = find_next_heading(self.state.selection_index, self.state.items)
+            # Logic to find next heading - implemented manually or via helper
+            # But with MenuController, user can't select headings usually.
+            # So this might be dead code now, which is fine.
             return
 
-        # Info items are non-interactive
+        # Info items are non-interactive (skipped by MenuController)
         if item_type == 'info':
             return
 
         if item['type'] in ['playlist', 'dir', 'artist', 'album']:
-            self.history.append((self.mode, self.current_path, self.state.selection_index))
+            self.history.append((self.mode, self.current_path, self.menu.selected_index))
             new_mode = item['mode']
 
             # Show loading for potentially large lists
@@ -210,8 +224,7 @@ class MusicPlayerApp(AppBase):
 
             self.mode = new_mode
             self.current_path = item.get('path', item.get('name'))
-            self.state.selection_index = 0
-            self.refresh_list()
+            self.refresh_list(reset_selection=True)
             self._hide_loading()
         elif item['type'] == 'file':
             self._play_from_list(item['path'])
@@ -230,8 +243,9 @@ class MusicPlayerApp(AppBase):
             return
 
         self.mode, self.current_path, idx = self.history.pop()
-        self.refresh_list()
-        self.state.selection_index = idx
+        self.refresh_list(reset_selection=False)
+        self.menu.selected_index = idx
+        self._sync_state_selection()
 
     def nav_enter_long(self):
         if self._wake_from_screensaver():
@@ -239,16 +253,28 @@ class MusicPlayerApp(AppBase):
         if self.state.context_menu_active:
             return
 
-        # Bounds check before accessing items
-        if not self.state.items or not (0 <= self.state.selection_index < len(self.state.items)):
-            return
-        item = self.state.items[self.state.selection_index]
+        item = self.menu.get_selected_item()
+        if not item: return
+        
         # Allow context menu for artists, albums, and headings (album headings in artist view)
         if item['type'] in ['file', 'playlist', 'artist', 'album', 'heading']:
             # Pass queue context for queue view items
             in_queue = self.state.browse_mode == 'QUEUE_VIEW'
             # Queue index is selection_index minus 1 (for controls item)
-            queue_idx = self.state.selection_index - 1 if in_queue else None
+            # CAUTION: If we pinned multiple items, this offset logic might be fragile.
+            # Ideally we pass the object itself or ID.
+            # For now, let's look at how _load_tracks constructs the list.
+            # It puts pinned items first, then controls.
+            # In QUEUE_VIEW, pinned items are [playing_item, controls].
+            # So index 0 is playing, index 1 is controls. Queue starts at 2.
+            # This offset logic is definitely fragile. 
+            # ContextMenuHandler needs updating or we need to pass better context.
+            # But let's stick to existing logic for now, updated for MenuController.
+            
+            # Count pinned items
+            pinned_count = len(self.state.pinned_items)
+            queue_idx = self.menu.selected_index - pinned_count if in_queue else None
+            
             self.context_menu.open(item, in_queue_view=in_queue, queue_index=queue_idx)
             self._sync_context_state()
 
@@ -283,7 +309,7 @@ class MusicPlayerApp(AppBase):
             self.lib.add_recent(Path(path))
 
         if self.mode == 'QUEUE_VIEW':
-            self.refresh_list()
+            self.refresh_list(reset_selection=False)
 
     def toggle_play(self):
         if not self.state.screensaver_image:
@@ -306,7 +332,7 @@ class MusicPlayerApp(AppBase):
 
         # Navigate controls bar buttons with next/prev when on controls item
         if from_user and not self.state.screensaver_image:
-            item = self.state.items[self.state.selection_index] if self.state.items else None
+            item = self.menu.get_selected_item()
             if item and item.get('type') == 'controls':
                 self.state.controls_index = min(cfg.CONTROLS_BUTTON_COUNT - 1, self.state.controls_index + 1)
                 return
@@ -340,7 +366,7 @@ class MusicPlayerApp(AppBase):
 
         # Navigate controls bar buttons with next/prev when on controls item
         if not self.state.screensaver_image:
-            item = self.state.items[self.state.selection_index] if self.state.items else None
+            item = self.menu.get_selected_item()
             if item and item.get('type') == 'controls':
                 self.state.controls_index = max(0, self.state.controls_index - 1)
                 return
@@ -379,15 +405,6 @@ class MusicPlayerApp(AppBase):
 
         return self.running
 
-    def _set_initial_selection(self):
-        """Set selection to the first selectable item (skipping headers/controls)."""
-        self.state.selection_index = 0
-        for i, item in enumerate(self.state.items):
-            itype = item.get('type')
-            if itype not in ('heading', 'info', 'controls'):
-                self.state.selection_index = i
-                break
-
     def refresh_list(self, reset_selection=True):
         """Refresh the current list based on mode."""
         self.running = True
@@ -395,133 +412,122 @@ class MusicPlayerApp(AppBase):
         self.state.browse_mode = self.mode
         self.state.reset_browsing_state(reset_controls=reset_selection)
 
+        # Get items from BrowseHandler
         if self.mode == 'ROOT':
-            self.state.album, self.state.items = self.browse.get_root_menu()
-            self.state.scrollable_items = self.state.items
-
+            self.state.album, items = self.browse.get_root_menu()
+            
         elif self.mode == 'ARTISTS_ROOT':
-            self.state.album, self.state.items = self.browse.get_artists_list()
-            self.state.scrollable_items = self.state.items
+            self.state.album, items = self.browse.get_artists_list()
 
         elif self.mode == 'ALBUMS_ROOT':
-            self.state.album, self.state.items = self.browse.get_albums_list()
-            self.state.scrollable_items = self.state.items
+            self.state.album, items = self.browse.get_albums_list()
 
         elif self.mode == 'FAV_ARTISTS':
-            self.state.album, self.state.items = self.browse.get_fav_artists_list()
-            self.state.scrollable_items = self.state.items
+            self.state.album, items = self.browse.get_fav_artists_list()
 
         elif self.mode == 'FAV_ALBUMS':
-            self.state.album, self.state.items = self.browse.get_fav_albums_list()
-            self.state.scrollable_items = self.state.items
+            self.state.album, items = self.browse.get_fav_albums_list()
 
         elif self.mode == 'PLAYLISTS_ROOT':
-            self.state.album, self.state.items = self.browse.get_playlists_list()
-            self.state.scrollable_items = self.state.items
+            self.state.album, items = self.browse.get_playlists_list()
 
         elif self.mode == 'TRACKS_VIEW':
             shuffle = self.state.shuffle_active
             album, tracks, track_count, duration, cover = self.browse.get_all_tracks(shuffle=shuffle)
             self.state.album = album
-            if not tracks:
-                self.state.items = [{'name': '(No Tracks)', 'type': 'info'}]
-                self.state.scrollable_items = self.state.items
-            else:
-                self._load_tracks(tracks)
+            items = tracks if tracks else [{'name': '(No Tracks)', 'type': 'info'}]
+            if tracks:
                 self.state.browsing_cover_s = cover
             self.state.artist = track_count
             self.state.year = duration
+            if tracks: items = self._process_tracks(items)
 
         elif self.mode == 'FAV_TRACKS_VIEW':
             album, tracks, track_count, duration, cover = self.browse.get_fav_tracks()
             self.state.album = album
-            if not tracks:
-                self.state.items = [{'name': '(No Fav Songs)', 'type': 'info'}]
-                self.state.scrollable_items = self.state.items
-            else:
-                self._load_tracks(tracks)
+            items = tracks if tracks else [{'name': '(No Fav Songs)', 'type': 'info'}]
+            if tracks:
                 self.state.browsing_cover_s = cover
             self.state.artist = track_count
             self.state.year = duration
+            if tracks: items = self._process_tracks(items)
 
         elif self.mode == 'PLAYLIST_VIEW':
             album, tracks, track_count, duration, cover = self.browse.get_playlist_tracks(self.current_path)
             self.state.album = album
-            self._load_tracks(tracks)
             self.state.browsing_cover_s = cover
             self.state.artist = track_count
             self.state.year = duration
+            items = self._process_tracks(tracks)
 
         elif self.mode == 'RECENTS':
             album, tracks, track_count, duration, cover = self.browse.get_recents_tracks()
             self.state.album = album
-            self._load_tracks(tracks)
             self.state.browsing_cover_s = cover
             self.state.artist = track_count
             self.state.year = duration
+            items = self._process_tracks(tracks)
 
         elif self.mode == 'ARTIST_VIEW':
             album, tracks, track_count, duration, cover = self.browse.get_artist_tracks(self.current_path)
             self.state.album = album
-            self._load_tracks(tracks)
             self.state.browsing_cover_s = cover
             self.state.artist = track_count
             self.state.year = duration
+            items = self._process_tracks(tracks)
 
         elif self.mode == 'ALBUM_VIEW':
             album, tracks, artist, year, cover = self.browse.get_album_tracks(self.current_path)
             self.state.album = album
-            self._load_tracks(tracks)
             self.state.browsing_cover_s = cover
             self.state.artist = artist
             self.state.year = year
+            items = self._process_tracks(tracks)
 
         elif self.mode == 'FILES':
             album, items, cover = self.browse.get_files_list(self.current_path, self.state.playing_path)
             self.state.album = album
-            self.state.items = items
-            self.state.scrollable_items = items
             self.state.browsing_cover_s = cover
 
         elif self.mode == 'QUEUE_VIEW':
             title, pinned, scrollable, cover = self.browse.get_queue_view(self.playlist, self.state.playing_path)
             self.state.album = title
-            self.state.pinned_items = pinned
-            self.state.scrollable_items = scrollable
-            self.state.items = pinned + scrollable
             self.state.browsing_cover_s = cover
+            
+            # Combine logic similar to _load_tracks but handling pre-pinned
+            items = list(pinned)
+            items.append({'type': 'controls'}) # Add controls
+            items.extend(scrollable)
+            
+            # Manually set state for renderer
+            self.state.pinned_items = list(pinned)
+            self.state.pinned_items.append({'type': 'controls'})
+            self.state.scrollable_items = scrollable
+        
+        # Update MenuController
+        self.menu.set_items(items, reset_index=reset_selection)
+        
+        # Determine scrollable items if not set by track logic
+        if self.mode not in ['TRACKS_VIEW', 'FAV_TRACKS_VIEW', 'PLAYLIST_VIEW', 'RECENTS', 'ARTIST_VIEW', 'ALBUM_VIEW', 'QUEUE_VIEW']:
+             self.state.scrollable_items = items
+             self.state.items = items # For consistency
+             self.state.pinned_items = []
+        else:
+             self.state.items = items
 
         self.state.total_items = len(self.state.items)
-        
-        if reset_selection:
-            self._set_initial_selection()
-        else:
-            # Clamp selection to bounds if list shrank
-            if self.state.items:
-                self.state.selection_index = max(0, min(self.state.selection_index, self.state.total_items - 1))
-            else:
-                self.state.selection_index = 0
+        self._sync_state_selection()
 
-    def _load_tracks(self, tracks):
+    def _process_tracks(self, tracks):
         """Convert track list to state items with controls bar."""
         # Separate pinned items from the rest
         pinned_items = [t for t in tracks if t.get('pinned')]
         other_items = [t for t in tracks if not t.get('pinned')]
-
-        # Build items: pinned first, then controls bar
-        self.state.items = list(pinned_items)
-        self.state.pinned_items = list(pinned_items)
         
-        controls_idx = len(self.state.items)
-        self.state.items.append({'type': 'controls'})
-        self.state.pinned_items.append({'type': 'controls'})
-
-        # Set initial selection to controls bar
-        self.state.selection_index = controls_idx
-
-        # Optimized list construction
-        # Pre-process items that don't need conversion (heading, info)
-        # and convert track items in one pass using list comprehension
+        # Build final list
+        final_items = list(pinned_items)
+        final_items.append({'type': 'controls'}) # Add controls
+        
         processed_items = [
             t if t.get('type') in ('heading', 'info') else {
                 'name': t.get('title', ''),
@@ -533,9 +539,14 @@ class MusicPlayerApp(AppBase):
             }
             for t in other_items
         ]
+        final_items.extend(processed_items)
         
-        self.state.items.extend(processed_items)
+        # Update state for renderer
+        self.state.pinned_items = list(pinned_items)
+        self.state.pinned_items.append({'type': 'controls'})
         self.state.scrollable_items = processed_items
+        
+        return final_items
 
     def _play_screensaver_album(self):
         """Play the album shown on the screensaver."""
@@ -610,7 +621,8 @@ class MusicPlayerApp(AppBase):
             self.playlist.queue_idx = 0
         else:
             self.playlist.queue_idx = real_idx
-
+        
+        self.playlist.save_queue() # Save after building new queue
         self._load_track(real_idx)
 
     def _handle_controls_action(self):

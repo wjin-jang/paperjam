@@ -1,504 +1,231 @@
-"""
-Popup panel system for overlays and dialogs.
-
-Provides a unified system for:
-- Loading screens (programmatic dismissal)
-- Volume control (timer-based dismissal)
-- Confirmation dialogs (input-based dismissal)
-- Context menus (input-based dismissal)
-"""
-from enum import Enum, auto
-from dataclasses import dataclass, field
-from typing import Optional, Callable, List, Dict, Any
-import time
-from PIL import Image, ImageDraw
+from ui.views.core import Panel, Menu
+from ui.views.items import Item
 import config as cfg
-from core.i18n import t
-from ui.views.core import Panel
-from ui.views.items import TextItem, ColumnItem, Column, VolumeBarItem
+import time
+from dataclasses import dataclass, field
+from typing import Dict, Callable, Optional, List, Any
+from PIL import Image
 
 
-class PopupTermination(Enum):
-    """How a popup should terminate."""
-    INPUT = auto()       # Wait for user input (confirm/cancel)
-    PROGRAMMATIC = auto()  # Killed programmatically (loading screens)
-    TIMER = auto()       # Auto-dismiss after timeout
+class PopupPanel(Panel):
+    """
+    Specialized panel for popups.
+    """
+    def __init__(self, x, y, w, h, title=None, dismiss_mode='INPUT', timeout=2.0):
+        super().__init__(x, y, w, h, header=title)
+        self.dismiss_mode = dismiss_mode
+        self.timeout = timeout
+        self.start_time = 0
+        self.created_time = 0
+        self.menu = None
+        self.state = None # Optional state object
 
+    def create_menu(self):
+        self.menu = Menu(self.x + 1, self.y + 1 + (cfg.ROW_HEIGHT if self.header else 0),
+                         self.w - 2, self.h - 2 - (cfg.ROW_HEIGHT if self.header else 0))
+        return self.menu
 
-@dataclass
-class PopupConfig:
-    """Configuration for a popup panel."""
-    header: Optional[str] = None
-    termination: PopupTermination = PopupTermination.INPUT
-    timeout: float = 1.5
-    width: int = 140
-    min_height: int = 24
-    max_height: int = 96
-    centered: bool = True
-    shadow: bool = True
-    # For volume-style popups with custom rendering
-    custom_render: Optional[Callable] = None
+    def update(self, items=None, extra=None):
+        """Update popup content."""
+        if items:
+            self.menu.items = items
+        if extra:
+            # Update state if exists
+            if self.state:
+                self.state.extra.update(extra)
+                # Rebuild items if needed (e.g. volume)
+                if self.state.extra.get('is_volume'):
+                    level = self.state.extra.get('level', 0)
+                    title = self.state.extra.get('title', "VOLUME")
+                    self.header = f"{title} {level}%"
+                    self.menu.items = [Item(type='volume', value=level)]
 
 
 @dataclass
 class PopupState:
-    """Runtime state for an active popup."""
-    config: PopupConfig
-    content: List[Any]
-    selection_index: int = 0
-    created_at: float = field(default_factory=time.time)
-    dismissed: bool = False
-    result: Any = None
-    # Extra data for custom rendering (e.g., volume level)
+    """State for an active popup."""
+    panel: PopupPanel
+    callbacks: Dict[str, Callable]
+    on_close: Optional[Callable]
     extra: Dict[str, Any] = field(default_factory=dict)
-
-    @property
-    def is_expired(self) -> bool:
-        """Check if timer-based popup has expired."""
-        if self.config.termination != PopupTermination.TIMER:
-            return False
-        return (time.time() - self.created_at) >= self.config.timeout
-
-    def reset_timer(self):
-        """Reset the timer (for updating content while keeping popup alive)."""
-        self.created_at = time.time()
-
-
-class PopupPanel:
-    """A popup overlay panel.
-
-    Supports three termination modes:
-    - INPUT: Waits for user to confirm or cancel
-    - PROGRAMMATIC: Stays until explicitly dismissed
-    - TIMER: Auto-dismisses after timeout
-    """
-
-    def __init__(self, config: PopupConfig):
-        """Create a popup panel.
-
-        Args:
-            config: Popup configuration
-        """
-        self.config = config
-        self.state: Optional[PopupState] = None
-        self._callbacks: Dict[str, Callable] = {}
-
-    def show(self, content: List[Any], initial_selection: int = 0,
-             extra: Dict[str, Any] = None) -> 'PopupPanel':
-        """Show the popup with given content.
-
-        Args:
-            content: List of items to display
-            initial_selection: Initially selected index
-            extra: Extra data for custom rendering
-
-        Returns:
-            Self for chaining
-        """
-        self.state = PopupState(
-            config=self.config,
-            content=content,
-            selection_index=initial_selection,
-            extra=extra or {}
-        )
-        return self
-
-    def update(self, content: List[Any] = None, extra: Dict[str, Any] = None):
-        """Update popup content and reset timer.
-
-        Args:
-            content: New content list (optional)
-            extra: New extra data (optional)
-        """
-        if self.state:
-            if content is not None:
-                self.state.content = content
-            if extra is not None:
-                self.state.extra.update(extra)
-            self.state.reset_timer()
-
-    def dismiss(self, result: Any = None):
-        """Dismiss the popup.
-
-        Args:
-            result: Result value to store
-        """
-        if self.state:
-            self.state.dismissed = True
-            self.state.result = result
-
-    def is_active(self) -> bool:
-        """Check if popup is still active."""
-        if not self.state:
-            return False
-        if self.state.dismissed:
-            return False
-        if self.state.is_expired:
-            return False
-        return True
-
-    def get_result(self) -> Any:
-        """Get the result after popup is dismissed."""
-        return self.state.result if self.state else None
-
-    def get_callbacks(self) -> Dict[str, Callable]:
-        """Get input callbacks for this popup.
-
-        Returns:
-            Dict of callback name -> function
-        """
-        if self.config.termination == PopupTermination.TIMER:
-            return {}
-
-        if self.config.termination == PopupTermination.PROGRAMMATIC:
-            return {}
-
-        return {
-            'up': self._on_up,
-            'down': self._on_down,
-            'enter': self._on_enter,
-            'back': self._on_back
-        }
-
-    def on_select(self, callback: Callable[[int, Any], None]) -> 'PopupPanel':
-        """Set callback for selection confirmation.
-
-        Args:
-            callback: Function taking (index, item)
-
-        Returns:
-            Self for chaining
-        """
-        self._callbacks['on_select'] = callback
-        return self
-
-    def on_cancel(self, callback: Callable[[], None]) -> 'PopupPanel':
-        """Set callback for cancellation.
-
-        Args:
-            callback: Function with no arguments
-
-        Returns:
-            Self for chaining
-        """
-        self._callbacks['on_cancel'] = callback
-        return self
-
-    def _on_up(self):
-        """Handle up navigation."""
-        if self.state and self.state.content:
-            n = len(self.state.content)
-            self.state.selection_index = (self.state.selection_index - 1) % n
-
-    def _on_down(self):
-        """Handle down navigation."""
-        if self.state and self.state.content:
-            n = len(self.state.content)
-            self.state.selection_index = (self.state.selection_index + 1) % n
-
-    def _on_enter(self):
-        """Handle enter/confirm."""
-        if self.state:
-            cb = self._callbacks.get('on_select')
-            if cb and self.state.content:
-                item = self.state.content[self.state.selection_index]
-                cb(self.state.selection_index, item)
-            self.dismiss(self.state.selection_index)
-
-    def _on_back(self):
-        """Handle back/cancel."""
-        cb = self._callbacks.get('on_cancel')
-        if cb:
-            cb()
-        self.dismiss(None)
-
-    def render(self, base_canvas: Image.Image) -> Image.Image:
-        """Render popup onto base canvas.
-
-        Args:
-            base_canvas: Canvas to render onto
-
-        Returns:
-            Canvas with popup rendered
-        """
-        if not self.state:
-            return base_canvas
-
-        # Use custom renderer if provided
-        if self.config.custom_render:
-            return self.config.custom_render(base_canvas, self.state)
-
-        # Calculate dimensions (always multiples of ROW_HEIGHT)
-        header_h = cfg.ROW_HEIGHT if self.config.header else 0
-        content_h = len(self.state.content) * cfg.ROW_HEIGHT if self.state.content else cfg.ROW_HEIGHT
-        total_h = header_h + content_h
-
-        # Round to nearest multiple of ROW_HEIGHT
-        def round_to_row(val):
-            return ((val + cfg.ROW_HEIGHT - 1) // cfg.ROW_HEIGHT) * cfg.ROW_HEIGHT
-
-        min_h = round_to_row(self.config.min_height)
-        max_h = round_to_row(self.config.max_height)
-        h = min(max_h, max(min_h, round_to_row(total_h)))
-        w = self.config.width
-
-        if self.config.centered:
-            x = (cfg.SCREEN_WIDTH - w) // 2
-            y = (cfg.SCREEN_HEIGHT - h) // 2
-        else:
-            x = (cfg.SCREEN_WIDTH - w) // 2
-            y = cfg.SCREEN_HEIGHT - h - 8
-
-        # Create panel using core.Panel
-        panel = Panel(x, y, w, h, header=self.config.header)
-        menu = panel.create_menu()
-
-        # Convert content to TextItems
-        items = []
-        for item in (self.state.content or []):
-            if isinstance(item, str):
-                text = item
-            elif isinstance(item, dict):
-                text = item.get('name', str(item))
-            else:
-                text = str(item)
-            items.append(TextItem(text, selectable=True))
-
-        menu.items = items
-        menu.cursor.row = self.state.selection_index
-        menu.cursor.col = 0
-
-        # Render panel to base canvas
-        panel.render(base_canvas)
-
-        return base_canvas
 
 
 class PopupManager:
-    """Manages popup stack and input routing.
-
-    Provides a central point for managing all popups in the application.
-    Popups are stacked, with the topmost popup receiving input.
-    """
+    """Manages the stack of active popups."""
 
     def __init__(self):
         """Create a popup manager."""
-        self._stack: List[PopupPanel] = []
-        self._needs_refresh = False  # Set when popup expires to trigger display refresh
+        self._stack: List[PopupState] = []
+        self._refresh_needed = False
 
-    def push(self, popup: PopupPanel) -> PopupPanel:
-        """Push a popup onto the stack.
+    def push(self, panel: PopupPanel, callbacks: Dict[str, Callable] = None, on_close: Callable = None):
+        """Push a new popup onto the stack."""
+        state = PopupState(panel, callbacks or {}, on_close)
+        panel.state = state
+        panel.created_time = time.time()
+        
+        # If TIMER mode, start the timer
+        if panel.dismiss_mode == 'TIMER':
+            panel.start_time = time.time()
+            
+        self._stack.append(state)
 
-        Args:
-            popup: Popup to add
-
-        Returns:
-            The popup for chaining
-        """
-        self._stack.append(popup)
-        return popup
-
-    def pop(self) -> Optional[PopupPanel]:
-        """Pop the top popup.
-
-        Returns:
-            The removed popup, or None if stack was empty
-        """
+    def pop(self):
+        """Remove the top popup."""
         if self._stack:
-            return self._stack.pop()
-        return None
+            state = self._stack.pop()
+            if state.on_close:
+                state.on_close()
+            self._refresh_needed = True
 
     def peek(self) -> Optional[PopupPanel]:
-        """Get the top popup without removing it.
-
-        Returns:
-            The top popup, or None if stack is empty
-        """
-        return self._stack[-1] if self._stack else None
-
-    def clear(self):
-        """Clear all popups."""
-        self._stack.clear()
-
-    def has_active_popup(self) -> bool:
-        """Check if there's an active popup.
-
-        Returns:
-            True if at least one active popup exists
-        """
-        self._cleanup_expired()
-        return bool(self._stack)
-
-    def get_callbacks(self) -> Optional[Dict[str, Callable]]:
-        """Get callbacks for active popup.
-
-        Returns:
-            Callback dict, or None if no popup or popup doesn't accept input
-        """
-        self._cleanup_expired()
-        top = self.peek()
-        if top and top.is_active():
-            callbacks = top.get_callbacks()
-            return callbacks if callbacks else None
+        """Get the active popup panel."""
+        if self._stack:
+            return self._stack[-1].panel
         return None
 
-    def render(self, base_canvas: Image.Image) -> Image.Image:
-        """Render all active popups onto canvas.
+    def render(self, frame: Image.Image) -> Image.Image:
+        """Render active popups onto the frame."""
+        if not self._stack:
+            return frame
 
-        Args:
-            base_canvas: Canvas to render onto
+        # Check timeouts
+        now = time.time()
+        active = self._stack[-1]
+        panel = active.panel
+        
+        if panel.dismiss_mode == 'TIMER' and (now - panel.start_time > panel.timeout):
+            self.pop()
+            # If stack empty, return frame (cleared), else recurse/loop?
+            # For simplicity, just return frame, next loop will render next popup or base
+            return frame
 
-        Returns:
-            Canvas with all popups rendered
-        """
-        self._cleanup_expired()
-        for popup in self._stack:
-            if popup.is_active():
-                base_canvas = popup.render(base_canvas)
-        return base_canvas
+        # Render top popup
+        # Create a temp canvas or draw directly?
+        # Drawing directly onto the frame is fine
+        # We need to use the panel's render method but redirect it to our frame
+        # Panel.render takes a canvas and pastes onto it.
+        panel.render(frame)
+        
+        return frame
 
-    def _cleanup_expired(self):
-        """Remove expired popups from stack."""
-        old_count = len(self._stack)
-        self._stack = [p for p in self._stack if p.is_active()]
-        if len(self._stack) < old_count:
-            self._needs_refresh = True
+    def get_callbacks(self) -> Optional[Dict[str, Callable]]:
+        """Get callbacks for the active popup."""
+        if self._stack:
+            # If INPUT mode, return callbacks (which might be empty -> blocks input)
+            # If TIMER or PROGRAMMATIC, usually we might want to block input or allow pass-through?
+            # Existing logic implies popups capture input.
+            
+            # Default close on 'back' or 'enter' if not specified for INPUT mode?
+            callbacks = self._stack[-1].callbacks.copy()
+            
+            # Auto-dismiss handlers
+            if self._stack[-1].panel.dismiss_mode == 'INPUT':
+                if 'back' not in callbacks:
+                    callbacks['back'] = self.pop
+                if 'enter' not in callbacks:
+                    callbacks['enter'] = self.pop
+            
+            return callbacks
+        return None
+
+    def has_active_popup(self) -> bool:
+        return len(self._stack) > 0
 
     def consume_refresh_flag(self) -> bool:
-        """Check and clear the refresh flag.
-
-        Returns:
-            True if a refresh is needed due to popup expiry
-        """
-        if self._needs_refresh:
-            self._needs_refresh = False
+        if self._refresh_needed:
+            self._refresh_needed = False
             return True
         return False
 
-    # Factory methods for common popup types
+    # --- Factory Methods ---
 
-    def show_loading(self, message: str) -> PopupPanel:
-        """Show a loading popup (programmatic dismissal).
+    def show_message(self, title, text, timeout=2.0):
+        """Show a temporary message popup."""
+        w = 200
+        # Estimate height
+        lines = len(text.split('\n')) # Simple estimation
+        h = (lines * cfg.ROW_HEIGHT) + cfg.ROW_HEIGHT + 10
+        x = (cfg.SCREEN_WIDTH - w) // 2
+        y = (cfg.SCREEN_HEIGHT - h) // 2
+        
+        panel = PopupPanel(x, y, w, h, title=title, dismiss_mode='TIMER', timeout=timeout)
+        menu = panel.create_menu()
+        
+        # Convert content to TextItems
+        # Handle multi-line
+        if '\n' in text:
+            menu.items = [Item(text=line, type='text', selectable=False) for line in text.split('\n')]
+        else:
+            menu.items = [Item(text=text, type='text', selectable=False)]
+            
+        self.push(panel)
 
-        Args:
-            message: Loading message to display
+    def show_confirm(self, title, on_yes, on_no=None):
+        """Show a confirmation dialog."""
+        w = 160
+        h = 80
+        x = (cfg.SCREEN_WIDTH - w) // 2
+        y = (cfg.SCREEN_HEIGHT - h) // 2
+        
+        panel = PopupPanel(x, y, w, h, title=title, dismiss_mode='INPUT')
+        menu = panel.create_menu()
+        
+        menu.items = [
+            Item(text="No", type='text', selectable=True),
+            Item(text="Yes", type='text', selectable=True)
+        ]
+        menu.cursor.row = 0
+        
+        def handle_enter():
+            idx = menu.cursor.row
+            self.pop()
+            if idx == 1:
+                on_yes()
+            elif on_no:
+                on_no()
+                
+        def handle_up():
+            menu.cursor.row = (menu.cursor.row - 1) % 2
+            
+        def handle_down():
+            menu.cursor.row = (menu.cursor.row + 1) % 2
 
-        Returns:
-            The popup for later dismissal
-        """
-        config = PopupConfig(
-            header=None,
-            termination=PopupTermination.PROGRAMMATIC,
-            width=120,
-            min_height=cfg.ROW_HEIGHT + 8,
-            shadow=True
-        )
-        popup = PopupPanel(config)
-        popup.show([message])
-        return self.push(popup)
+        callbacks = {
+            'enter': handle_enter,
+            'up': handle_up,
+            'down': handle_down,
+            'back': lambda: (self.pop(), on_no() if on_no else None)
+        }
+        
+        self.push(panel, callbacks)
 
-    def show_volume(self, title: str, level: int) -> PopupPanel:
-        """Show volume popup (timer dismissal).
+    def show_loading(self, title="Loading..."):
+        """Show a loading spinner/text (programmatic dismiss)."""
+        w = 140
+        h = 50
+        x = (cfg.SCREEN_WIDTH - w) // 2
+        y = (cfg.SCREEN_HEIGHT - h) // 2
+        
+        panel = PopupPanel(x, y, w, h, title=title, dismiss_mode='PROGRAMMATIC')
+        # No menu items needed really, or just static text
+        self.push(panel)
+        return panel # Return handle to close
 
-        Args:
-            title: Title text (e.g., "VOLUME")
-            level: Volume level (0-100)
-
-        Returns:
-            The popup for updating level
-        """
-        def render_volume_panel(canvas: Image.Image, state: PopupState) -> Image.Image:
-            vol = state.extra.get('level', 0)
-            title_text = state.extra.get('title', 'VOLUME')
-
-            panel_w = 160
-            panel_h = cfg.ROW_HEIGHT * 2
-            x = (cfg.SCREEN_WIDTH - panel_w) // 2
-            y = (cfg.SCREEN_HEIGHT - panel_h) // 2
-
-            # Create panel with volume header
-            header_text = f"{title_text} {int(vol)}%"
-            panel = Panel(x, y, panel_w, panel_h, header=header_text)
-            menu = panel.create_menu()
-
-            # Add volume bar item
-            menu.items = [VolumeBarItem(level=vol)]
-
-            panel.render(canvas)
-            return canvas
-
-        config = PopupConfig(
-            header=None,
-            termination=PopupTermination.TIMER,
-            timeout=1.5,
-            width=160,
-            custom_render=render_volume_panel
-        )
-        popup = PopupPanel(config)
-        popup.show([], extra={'title': title, 'level': level})
-        return self.push(popup)
-
-    def show_confirm(self, title: str, options: List[str] = None,
-                     default: int = 0) -> PopupPanel:
-        """Show confirmation dialog (input dismissal).
-
-        Args:
-            title: Dialog title
-            options: List of option strings (default: ["No", "Yes"])
-            default: Default selected index
-
-        Returns:
-            The popup for setting callbacks
-        """
-        if options is None:
-            options = [t('general.no'), t('general.yes')]
-
-        config = PopupConfig(
-            header=title,
-            termination=PopupTermination.INPUT,
-            width=140
-        )
-        popup = PopupPanel(config)
-        popup.show(options, initial_selection=default)
-        return self.push(popup)
-
-    def show_context_menu(self, title: str, options: List[str]) -> PopupPanel:
-        """Show context menu popup.
-
-        Args:
-            title: Menu title
-            options: List of menu options
-
-        Returns:
-            The popup for setting callbacks
-        """
-        config = PopupConfig(
-            header=title,
-            termination=PopupTermination.INPUT,
-            width=120,
-            max_height=96
-        )
-        popup = PopupPanel(config)
-        popup.show(options)
-        return self.push(popup)
-
-    def show_message(self, message: str, timeout: float = 1.5) -> PopupPanel:
-        """Show a temporary message popup.
-
-        Args:
-            message: Message to display
-            timeout: Auto-dismiss timeout
-
-        Returns:
-            The popup
-        """
-        config = PopupConfig(
-            header=None,
-            termination=PopupTermination.TIMER,
-            timeout=timeout,
-            width=140,
-            min_height=cfg.ROW_HEIGHT + 8
-        )
-        popup = PopupPanel(config)
-        popup.show([message])
-        return self.push(popup)
+    def show_volume(self, title, level):
+        """Show volume overlay."""
+        w = 160
+        h = cfg.ROW_HEIGHT * 2
+        x = (cfg.SCREEN_WIDTH - w) // 2
+        y = (cfg.SCREEN_HEIGHT - h) // 2
+        
+        header = f"{title} {int(level)}%"
+        panel = PopupPanel(x, y, w, h, title=header, dismiss_mode='TIMER', timeout=1.5)
+        menu = panel.create_menu()
+        menu.items = [Item(type='volume', value=level)]
+        
+        # Override standard volume rendering update logic
+        panel.state = None # Will be set in push
+        
+        self.push(panel)
+        return panel

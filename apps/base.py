@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Callable, Optional
 from PIL import Image
 
+from ui.menu import MenuController
 
 class AppBase(ABC):
     """
@@ -18,6 +19,8 @@ class AppBase(ABC):
     def __init__(self, name: str = "App"):
         self.running = True
         self._name = name
+        # Helper for apps that use a single main menu
+        self.menu = MenuController([])
 
     @property
     def name(self) -> str:

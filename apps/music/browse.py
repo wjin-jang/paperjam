@@ -71,7 +71,7 @@ class BrowseHandler:
             covers = get_cover(Path(tracks[0]['path']))
             cover = covers[0] if covers else None
 
-        track_count = f"{len(tracks)} tracks"
+        track_count = t('player.browse.track_count', count=len(tracks))
         duration = format_duration(LibraryManager.get_total_duration(tracks))
         return title, tracks, track_count, duration, cover
 
@@ -187,7 +187,7 @@ class BrowseHandler:
 
         # Count only actual tracks (not headings)
         actual_tracks = [t for t in tracks if t.get('type') != 'heading']
-        track_count = f"{len(actual_tracks)} tracks"
+        track_count = t('player.browse.track_count', count=len(actual_tracks))
         duration = format_duration(LibraryManager.get_total_duration(actual_tracks))
 
         # Add pinned info item at the beginning

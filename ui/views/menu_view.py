@@ -4,7 +4,7 @@ Menu view rendering using Panel → Menu → Item hierarchy.
 from PIL import Image, ImageDraw
 import config as cfg
 from ui.views.core import Panel
-from ui.views.items import TextItem, InfoItem, ColumnItem, Column, VolumeBarItem
+from ui.views.items import Item, Column, VolumeBarItem
 
 
 class MenuViewRenderer:
@@ -30,7 +30,7 @@ class MenuViewRenderer:
         """
         # Already has 'type' field with 'info' and 'lines'
         if isinstance(item, dict) and item.get('type') == 'info' and item.get('lines'):
-            return InfoItem(lines=item['lines'])
+            return Item(type='info', lines=item['lines'])
 
         # String item
         if isinstance(item, str):
@@ -43,20 +43,20 @@ class MenuViewRenderer:
                     right_cols = [c.strip() for c in right_text.split(',')]
                 else:
                     right_cols = [right_text] if right_text else []
-                return InfoItem(columns=[label] + right_cols)
+                return Item(type='info', columns=[label] + right_cols)
             # Regular text
             if is_info:
-                return InfoItem(text=item)
-            return TextItem(item)
+                return Item(text=item, type='info')
+            return Item(text=item, type='text')
 
         # Dict with 'name' field
         if isinstance(item, dict):
             name = item.get('name', str(item))
             if is_info:
-                return InfoItem(text=name)
-            return TextItem(name)
+                return Item(text=name, type='info')
+            return Item(text=name, type='text')
 
-        return TextItem(str(item))
+        return Item(text=str(item), type='text')
 
     def _get_item_row_count(self, item) -> int:
         """Get the number of rows an item should span (legacy support)."""
@@ -142,7 +142,7 @@ class MenuViewRenderer:
         menu = panel.create_menu()
 
         # Add volume bar item
-        menu.items = [VolumeBarItem(level=volume_level)]
+        menu.items = [Item(type='volume', value=volume_level)]
 
         panel.render(self.canvas)
 

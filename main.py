@@ -1,20 +1,7 @@
-"""
-PaperJam - E-ink Music Player for Raspberry Pi
-
-Main application entry point. Handles:
-- System initialization (audio, display, inputs)
-- Application lifecycle (music player, settings, welcome)
-- Main event loop with display refresh optimization
-- Global callbacks (volume, shutdown, battery monitoring)
-
-E-paper display considerations:
-- Periodic full refresh prevents ghosting (every 30 partials)
-- Frame change detection skips redundant refreshes
-- Display sleeps during screensaver to save power
-- Wake on user input with full refresh
-"""
-import time
-import traceback
+from core.app_registry import AppRegistry
+from core.i18n import t
+from ui.renderer import UIRenderer
+from ui.menu import MenuController
 
 import config as cfg
 import version
@@ -22,8 +9,8 @@ from core.audio import AudioEngine
 from core.inputs import InputHandler
 from core.system import SystemManager
 from core.logger import setup_logger
-from core.app_registry import AppRegistry
-from ui.renderer import UIRenderer
+import time
+import traceback
 
 from apps.music import MusicPlayerApp
 from apps.settings import SettingsApp
@@ -59,9 +46,11 @@ class MainApp:
         # UI State
         self.current_app = None
         self.view = 'HOME' # HOME, APP, CONFIRM
-        self.menu_idx = 0
+        
+        # Menu Controllers
+        self.home_menu = MenuController([])
+        self.confirm_menu = MenuController([])
         self.confirm_target = None
-        self.confirm_idx = 0
         
         # Display State
         self.first_render = True
@@ -83,6 +72,7 @@ class MainApp:
         self.music_app.set_volume_callbacks(self._vol_up, self._vol_down)
 
         # Initial Input Setup
+        self._refresh_home_menu()
         self.inputs.set_callbacks(self._get_home_callbacks())
 
         # Welcome App (for first run)
@@ -98,6 +88,19 @@ class MainApp:
             self._check_auto_update()
             # Check if version requires library rescan
             self._check_needs_rescan()
+
+    def _refresh_home_menu(self):
+        """Rebuild home menu items."""
+        items = []
+        # Add registered apps
+        for app_id, name in self.registry.get_app_names():
+            items.append({'name': name, 'type': 'dir', 'id': app_id})
+        
+        # Add system actions
+        items.append({'name': t('menu.reboot'), 'type': 'file', 'id': 'REBOOT'})
+        items.append({'name': t('menu.shutdown'), 'type': 'file', 'id': 'SHUTDOWN'})
+        
+        self.home_menu.set_items(items, reset_index=False)
 
     def _run_first_startup(self):
         """Handle first run using WelcomeApp."""
@@ -128,9 +131,9 @@ class MainApp:
         logger.info("User chose to shutdown for library setup")
         frame = self.renderer.render_menu("SETUP", [
             {"type": "info", "lines": [
-                "Shutting down...",
+                t('welcome.shutdown_loading'),
                 "",
-                "Add music to:",
+                t('welcome.add_music_prompt'),
                 f"{str(cfg.MUSIC_PATH)[:22]}"
             ]}
         ], -1, 0, info_indices=[0])
@@ -146,7 +149,7 @@ class MainApp:
         logger.info("Version requires library rescan")
 
         # Show rescan message
-        frame = self.renderer.render_menu("UPDATE", ["Rescanning library..."], -1, 0)
+        frame = self.renderer.render_menu("UPDATE", [t('welcome.scanning_library')], -1, 0)
         self._display(frame, full_refresh=True)
 
         # Trigger async rescan
@@ -160,7 +163,7 @@ class MainApp:
         logger.info("Auto-update enabled, checking for updates...")
 
         # Show checking status
-        frame = self.renderer.render_menu("AUTO-UPDATE", ["Checking..."], -1, 0)
+        frame = self.renderer.render_menu("AUTO-UPDATE", [t('updates.checking')], -1, 0)
         self._display(frame, full_refresh=True)
 
         # Check for updates
@@ -168,13 +171,13 @@ class MainApp:
 
         if has_updates:
             logger.info("Updates available, installing...")
-            frame = self.renderer.render_menu("AUTO-UPDATE", ["Installing..."], -1, 0)
+            frame = self.renderer.render_menu("AUTO-UPDATE", [t('updates.installing')], -1, 0)
             self._display(frame, full_refresh=True)
 
             success, result_msg = self.sys.perform_update()
             if not success:
                 logger.error(f"Auto-update failed: {result_msg}")
-                frame = self.renderer.render_menu("AUTO-UPDATE", [f"Failed: {result_msg[:18]}"], -1, 0)
+                frame = self.renderer.render_menu("AUTO-UPDATE", [t('updates.failed', msg=result_msg[:18])], -1, 0)
                 self._display(frame, full_refresh=True)
                 time.sleep(2)
             # If successful, perform_update will restart the app
@@ -231,8 +234,10 @@ class MainApp:
                 else:
                     # Home Menu Logic
                     if self.view == 'HOME':
-                        items = [n for _, n in self.registry.get_app_names()] + ["Reboot", "Shut Down"]
-                        frame = self.renderer.render_menu("HOME MENU", items, self.menu_idx, 0)
+                        frame = self.renderer.render_menu(
+                            t('menu.home'),
+                            **self.home_menu.get_render_args()
+                        )
                     elif self.view == 'CONFIRM':
                         frame = self._render_confirm()
 
@@ -314,47 +319,55 @@ class MainApp:
         """Show or update volume popup."""
         # Check if there's already a volume popup
         popup = self.renderer.popups.peek()
+        title = t('general.volume_popup')
         if popup and hasattr(popup, 'state') and popup.state and popup.state.extra.get('is_volume'):
             # Update existing popup
-            popup.update(extra={'level': level, 'title': 'VOLUME', 'is_volume': True})
+            popup.update(extra={'level': level, 'title': title, 'is_volume': True})
         else:
             # Create new volume popup
-            popup = self.renderer.popups.show_volume("VOLUME", level)
+            popup = self.renderer.popups.show_volume(title, level)
             popup.state.extra['is_volume'] = True
 
     # --- Home Menu Interaction ---
     def _get_home_callbacks(self):
         return {
-            'up': lambda: setattr(self, 'menu_idx', (self.menu_idx - 1) % (len(self.registry.get_all_apps()) + 2)),
-            'down': lambda: setattr(self, 'menu_idx', (self.menu_idx + 1) % (len(self.registry.get_all_apps()) + 2)),
+            'up': lambda: self.home_menu.move_selection(-1),
+            'down': lambda: self.home_menu.move_selection(1),
             'enter': self._handle_home_selection,
             'vol_up': self._vol_up,
             'vol_down': self._vol_down
         }
 
     def _handle_home_selection(self):
-        apps = self.registry.get_app_names()
-        count = len(apps)
+        item = self.home_menu.get_selected_item()
+        if not item: return
         
-        if self.menu_idx < count:
-            app_id, _ = apps[self.menu_idx]
-            self.launch_app(app_id)
-        elif self.menu_idx == count: # Reboot
+        item_id = item.get('id')
+        
+        if item_id == "REBOOT":
             self._start_confirm("REBOOT")
-        elif self.menu_idx == count + 1: # Shutdown
+        elif item_id == "SHUTDOWN":
             self._start_confirm("SHUTDOWN")
+        else:
+            self.launch_app(item_id)
 
     # --- Confirmation Dialog ---
     def _start_confirm(self, target):
         self.view = 'CONFIRM'
         self.confirm_target = target
-        self.confirm_idx = 0
+        
+        # Build confirm menu
+        items = [
+            {'name': t('general.no'), 'type': 'file', 'value': False},
+            {'name': t('general.yes'), 'type': 'file', 'value': True}
+        ]
+        self.confirm_menu.set_items(items)
         self.inputs.set_callbacks(self._get_confirm_callbacks())
 
     def _get_confirm_callbacks(self):
         return {
-            'up': lambda: setattr(self, 'confirm_idx', 1 - self.confirm_idx),
-            'down': lambda: setattr(self, 'confirm_idx', 1 - self.confirm_idx),
+            'up': lambda: self.confirm_menu.move_selection(-1),
+            'down': lambda: self.confirm_menu.move_selection(1),
             'enter': self._handle_confirm,
             'back': self._cancel_confirm,
             'vol_up': self._vol_up,
@@ -362,18 +375,27 @@ class MainApp:
         }
 
     def _render_confirm(self):
-        title = f"CONFIRM {self.confirm_target}?"
-        opts = ["No", "Yes"]
-        return self.renderer.render_menu(title, opts, self.confirm_idx, 0)
+        target_display = t('menu.shutdown') if self.confirm_target == "SHUTDOWN" else t('menu.reboot')
+        title = t('system_messages.confirm', target=target_display)
+        
+        return self.renderer.render_menu(
+            title,
+            **self.confirm_menu.get_render_args()
+        )
 
     def _handle_confirm(self):
-        if self.confirm_idx == 1:
+        item = self.confirm_menu.get_selected_item()
+        if item and item.get('value') is True:
             if self.confirm_target == "REBOOT":
-                self._perform_system_action("REBOOTING...", self.sys.reboot)
+                self._perform_system_action(t('system_messages.rebooting'), self.sys.reboot)
             elif self.confirm_target == "SHUTDOWN":
                 self._perform_shutdown()
         else:
             self._cancel_confirm()
+
+    def _cancel_confirm(self):
+        self.view = 'HOME'
+        self.inputs.set_callbacks(self._get_home_callbacks())
 
     def _perform_shutdown(self):
         """Perform shutdown with random cover art display."""
@@ -387,15 +409,11 @@ class MainApp:
         time.sleep(1)
         self.sys.shutdown()
 
-    def _cancel_confirm(self):
-        self.view = 'HOME'
-        self.inputs.set_callbacks(self._get_home_callbacks())
-
     def _perform_system_action(self, msg, action):
         # Save volume before system action (reboot)
         self.settings_app.categories['AUDIO'].save_volume()
 
-        frame = self.renderer.render_menu("SYSTEM", [msg], 0, 0)
+        frame = self.renderer.render_menu(t('settings.categories.system'), [msg], 0, 0)
         self._display(frame, full_refresh=True)
         time.sleep(2)
         action()
@@ -403,7 +421,7 @@ class MainApp:
     def _handle_shutdown_request(self, reason="User Request"):
         logger.info(f"Shutdown requested: {reason}")
         if reason == "LOW BATTERY":
-            frame = self.renderer.render_menu("LOW BATTERY", ["Shutting down..."], 0, 0)
+            frame = self.renderer.render_menu(t('system_messages.low_battery'), [t('system_messages.shutting_down')], 0, 0)
             self._display(frame, full_refresh=True, skip_battery=False)
             time.sleep(2)
         self._perform_shutdown()
@@ -418,19 +436,19 @@ class MainApp:
         logger.info("Checking for updates")
 
         # Show checking status
-        frame = self.renderer.render_menu("UPDATE", ["Checking..."], -1, 0)
+        frame = self.renderer.render_menu("UPDATE", [t('updates.checking')], -1, 0)
         self._display(frame, full_refresh=True)
 
         # Check for updates
         has_updates, msg = self.sys.check_for_updates()
 
         if has_updates:
-            frame = self.renderer.render_menu("UPDATE", ["Updating..."], -1, 0)
+            frame = self.renderer.render_menu("UPDATE", [t('updates.updating')], -1, 0)
             self._display(frame, full_refresh=True)
 
             success, result_msg = self.sys.perform_update()
             if not success:
-                frame = self.renderer.render_menu("UPDATE", [f"Error: {result_msg}"], -1, 0)
+                frame = self.renderer.render_menu("UPDATE", [t('general.error_prefix', msg=result_msg)], -1, 0)
                 self._display(frame, full_refresh=True)
                 time.sleep(2)
         else:
@@ -443,7 +461,7 @@ class MainApp:
         logger.info("Resetting data and rebooting")
 
         # Show resetting status
-        frame = self.renderer.render_menu("RESET", ["Resetting data..."], -1, 0)
+        frame = self.renderer.render_menu(t('system_messages.reset'), [t('system_messages.resetting')], -1, 0)
         self._display(frame, full_refresh=True)
 
         # Delete data files
@@ -511,4 +529,3 @@ class MainApp:
 if __name__ == "__main__":
     app = MainApp()
     app.run()
-            

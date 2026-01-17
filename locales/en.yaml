@@ -7,6 +7,8 @@ menu:
   main_menu: "MAIN MENU"
   music: "Music"
   settings: "Settings"
+  reboot: "Reboot"
+  shutdown: "Shut Down"
 
 # Music player
 player:
@@ -49,6 +51,7 @@ player:
     unknown: "Unknown"
     disc: "Disc {num}"
     no_image: "NO IMAGE"
+    track_count: "{count} tracks"
 
   context:
     options: "OPTIONS"
@@ -143,6 +146,8 @@ welcome:
   music_found: "Your music was found at {path}"
   scan_now: "Scan Library Now"
   shutdown_add_music: "Shutdown (Add Music)"
+  shutdown_loading: "Shutting down..."
+  add_music_prompt: "Add music to:"
   scanning_tracks: "Scanning: {count} tracks"
   file: "File"
 
@@ -157,14 +162,27 @@ general:
   error: "Error"
   power_off: "POWER OFF"
   default: "Default"
+  volume_popup: "VOLUME"
+  error_prefix: "Error: {msg}"
 
 # Update messages
 updates:
   checking: "Checking..."
+  installing: "Installing..."
   available: "Updates available"
   up_to_date: "Up to date"
   no_internet: "No internet"
   connection_failed: "Connection failed"
   timeout: "Connection timeout"
   updating: "Updating..."
+  failed: "Failed: {msg}"
   restart: "Restarting..."
+
+# System Messages
+system_messages:
+  rebooting: "REBOOTING..."
+  shutting_down: "Shutting down..."
+  low_battery: "LOW BATTERY"
+  reset: "RESET"
+  resetting: "Resetting data..."
+  confirm: "CONFIRM {target}?"

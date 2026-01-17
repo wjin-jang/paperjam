@@ -3,12 +3,16 @@ Playlist and queue management for the music player.
 """
 import random
 import threading
+import json
 from collections import deque
 from pathlib import Path
 from typing import List, Optional, Callable
 
+import config as cfg
 from ui.image_utils import get_cover
+from core.logger import setup_logger
 
+logger = setup_logger()
 
 class PlaylistManager:
     """Manages playback queue and playlist operations."""
@@ -28,6 +32,9 @@ class PlaylistManager:
         self.shuffle_active: bool = False
         self.loop_mode: int = 0  # 0=off, 1=all, 2=one
         self._on_track_change = on_track_change
+        
+        # Load persisted queue on startup
+        self.load_queue()
 
     def build_queue_from_items(self, items: List[dict], start_path: Path, shuffle: bool = False):
         """
@@ -61,6 +68,8 @@ class PlaylistManager:
             self.queue_idx = 0
         else:
             self.queue_idx = real_idx
+            
+        self.save_queue()
 
     def get_current_path(self) -> Optional[str]:
         """Get the current track path."""
@@ -73,17 +82,20 @@ class PlaylistManager:
         """Add a track to the manual queue (thread-safe)."""
         with self._lock:
             self.manual_queue.append(path)
+        self.save_queue()
 
     def clear_manual_queue(self):
         """Clear the manual queue (thread-safe)."""
         with self._lock:
             self.manual_queue.clear()
+        self.save_queue()
 
     def remove_from_queue(self, index: int):
         """Remove a track from the manual queue by index (thread-safe)."""
         with self._lock:
             if 0 <= index < len(self.manual_queue):
                 del self.manual_queue[index]
+        self.save_queue()
 
     def move_in_queue(self, from_index: int, to_index: int):
         """Move a track in the manual queue from one position to another (thread-safe)."""
@@ -95,6 +107,7 @@ class PlaylistManager:
                     item = self.manual_queue[from_index]
                     del self.manual_queue[from_index]
                     self.manual_queue.insert(to_index, item)
+        self.save_queue()
 
     def next_track(self, auto_advance=False) -> Optional[str]:
         """
@@ -106,16 +119,14 @@ class PlaylistManager:
         """
         # Priority 1: Manual Queue
         if self.manual_queue:
-            return self.manual_queue.popleft()
+            path = self.manual_queue.popleft()
+            self.save_queue()
+            return path
 
         # Priority 2: Auto Queue
         if not self.queue:
             return None
 
-        # Loop One handled by caller (usually replaying current path)
-        # But if caller calls this, it means we WANT the next track.
-        # Except if Loop One logic was missed? No, let's assume caller handles Loop One repeat.
-        
         next_idx = (self.queue_idx + 1) % len(self.queue)
         at_end = next_idx == 0
         
@@ -127,6 +138,11 @@ class PlaylistManager:
         # Loop All (1) or One (2) -> Wrap to start (next_idx is 0)
             
         self.queue_idx = next_idx
+        # Don't save on every auto-advance to avoid excessive writes, 
+        # but maybe we should to resume playback? 
+        # For now, let's only save if it's a significant change or periodically?
+        # Actually, saving current index is useful for resume.
+        self.save_queue()
         return self.get_current_path()
 
 
@@ -137,6 +153,7 @@ class PlaylistManager:
 
         # User navigation overrides Loop One, so we always move back
         self.queue_idx = (self.queue_idx - 1) % len(self.queue)
+        self.save_queue()
         return self.get_current_path()
 
     def load_track_covers(self, path: str):
@@ -169,14 +186,57 @@ class PlaylistManager:
                     self.queue_idx = 0
                 except ValueError:
                     pass
+        self.save_queue()
         return self.shuffle_active
 
     def cycle_loop_mode(self) -> int:
         """Cycle through loop modes (off -> all -> one -> off)."""
         self.loop_mode = (self.loop_mode + 1) % 3
+        self.save_queue()
         return self.loop_mode
 
     @property
     def has_queue(self) -> bool:
         """Check if there's an active queue."""
         return bool(self.queue and self.playlist_source)
+        
+    def save_queue(self):
+        """Save current queue state to disk."""
+        try:
+            state = {
+                'playlist_source': self.playlist_source,
+                'queue': self.queue,
+                'queue_idx': self.queue_idx,
+                'manual_queue': list(self.manual_queue),
+                'shuffle': self.shuffle_active,
+                'loop_mode': self.loop_mode
+            }
+            queue_file = cfg.CONFIG_DIR / 'queue.json'
+            with open(queue_file, 'w') as f:
+                json.dump(state, f)
+        except Exception as e:
+            logger.error(f"Failed to save queue: {e}")
+
+    def load_queue(self):
+        """Load queue state from disk."""
+        queue_file = cfg.CONFIG_DIR / 'queue.json'
+        if not queue_file.exists():
+            return
+            
+        try:
+            with open(queue_file, 'r') as f:
+                state = json.load(f)
+                
+            self.playlist_source = state.get('playlist_source', [])
+            self.queue = state.get('queue', [])
+            self.queue_idx = state.get('queue_idx', 0)
+            self.manual_queue = deque(state.get('manual_queue', []))
+            self.shuffle_active = state.get('shuffle', False)
+            self.loop_mode = state.get('loop_mode', 0)
+            
+            # Validate indices
+            if self.queue and self.queue_idx >= len(self.queue):
+                self.queue_idx = 0
+                
+        except Exception as e:
+            logger.error(f"Failed to load queue: {e}")

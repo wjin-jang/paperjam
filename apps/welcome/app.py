@@ -10,6 +10,7 @@ import time
 from typing import Callable, Optional, Dict
 
 from ui.renderer import UIRenderer
+from ui.menu import MenuController
 import config as cfg
 from core.i18n import t
 from core.logger import setup_logger
@@ -29,9 +30,11 @@ class WelcomeApp(AppBase):
 
         self.running = True
         self.view = 'CHOICE'  # CHOICE, SCANNING, WELCOME
-        self.choice_idx = 0
         self.first_render = True
-
+        
+        # Menu Controllers
+        self.choice_menu = MenuController([])
+        
         # Callback for system operations
         self._shutdown_callback: Optional[Callable] = None
         self._display_callback: Optional[Callable] = None
@@ -51,8 +54,8 @@ class WelcomeApp(AppBase):
         """Get input callbacks for current view."""
         if self.view == 'CHOICE':
             return {
-                'up': self._choice_up,
-                'down': self._choice_down,
+                'up': lambda: self.choice_menu.move_selection(-1),
+                'down': lambda: self.choice_menu.move_selection(1),
                 'enter': self._choice_enter
             }
         elif self.view == 'WELCOME':
@@ -63,18 +66,15 @@ class WelcomeApp(AppBase):
             }
         return {}
 
-    def _choice_up(self):
-        self.choice_idx = (self.choice_idx - 1) % 2
-
-    def _choice_down(self):
-        self.choice_idx = (self.choice_idx + 1) % 2
-
     def _choice_enter(self):
-        if self.choice_idx == 0:
+        item = self.choice_menu.get_selected_item()
+        if not item: return
+        
+        if item.get('action') == 'SCAN':
             # Scan now
             self.view = 'SCANNING'
             self.lib.scan_async(force=True)
-        else:
+        elif item.get('action') == 'SHUTDOWN':
             # Shutdown to add music
             if self._shutdown_callback:
                 self._shutdown_callback()
@@ -110,35 +110,33 @@ class WelcomeApp(AppBase):
         if len(music_path) > 22:
             music_path = music_path[:22]
 
-        items = [
-            t('welcome.music_found', path=music_path),
-            t('welcome.scan_now'),
-            t('welcome.shutdown_add_music')
-        ]
-
-        # Map choice_idx (0-1) to actual menu indices (1-2)
-        sel_idx = self.choice_idx + 1
+        if not self.choice_menu.items:
+            # Build menu items
+            items = [
+                {'name': t('welcome.music_found', path=music_path), 'type': 'info', 'lines': [t('welcome.music_found', path=music_path)]},
+                {'name': t('welcome.scan_now'), 'type': 'file', 'action': 'SCAN'},
+                {'name': t('welcome.shutdown_add_music'), 'type': 'file', 'action': 'SHUTDOWN'}
+            ]
+            self.choice_menu.set_items(items)
 
         return self.renderer.render_menu(
-            t('welcome.welcome'), items, sel_idx, 0,
-            info_indices=[0]
+            t('welcome.welcome'), **self.choice_menu.get_render_args()
         )
 
     def _render_scanning(self):
         """Render scanning progress."""
         items = [
-            t('welcome.scanning_tracks', count=self.lib.scan_track_count),
-            f"{t('settings.library.albums')}: {self.lib.scan_album_count}",
-            f"{t('settings.library.artists')}: {self.lib.scan_artist_count}"
+            {'name': t('welcome.scanning_tracks', count=self.lib.scan_track_count), 'type': 'info'},
+            {'name': f"{t('settings.library.albums')}: {self.lib.scan_album_count}", 'type': 'info'},
+            {'name': f"{t('settings.library.artists')}: {self.lib.scan_artist_count}", 'type': 'info'}
         ]
 
         if self.lib.scan_current_file:
             current = self.lib.scan_current_file[:22]
-            items.append(f"{t('welcome.file')}: {current}")
+            items.append({'name': f"{t('welcome.file')}: {current}", 'type': 'info'})
 
         return self.renderer.render_menu(
-            t('welcome.scanning'), items, -1, 0,
-            info_indices=[0, 1, 2, 3]
+            t('welcome.scanning'), items, -1, 0, info_indices=[0, 1, 2, 3] # Still passed manually for pure info screen
         )
 
     def _render_welcome(self):
@@ -157,7 +155,8 @@ class WelcomeApp(AppBase):
         """Called when app starts."""
         self.running = True
         self.view = 'CHOICE'
-        self.choice_idx = 0
+        self.choice_menu.selected_index = 0
+        self.choice_menu.set_items([]) # Clear to rebuild with correct path
         self.first_render = True
         self._welcome_covers = None  # Reset cover cache for fresh load
 

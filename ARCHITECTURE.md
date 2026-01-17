@@ -31,6 +31,7 @@ paperjam/
 │   └── i18n.py          # Internationalization (translations)
 ├── ui/                  # UI rendering
 │   ├── renderer.py      # Main renderer facade
+│   ├── menu.py          # Menu controller logic
 │   ├── overlays.py      # Status bar, battery indicator
 │   ├── image_utils.py   # Cover art extraction/processing
 │   └── views/           # View components
@@ -59,7 +60,7 @@ paperjam/
 - Orchestrates music playback and browsing
 - Delegates to specialized handlers:
   - `PlayerState`: UI state, playing track info
-  - `PlaylistManager`: Queue management, shuffle, loop
+  - `PlaylistManager`: Queue management, shuffle, loop, persistence
   - `BrowseHandler`: Artists, albums, files navigation
   - `ContextMenuHandler`: Long-press actions
 
@@ -68,6 +69,12 @@ paperjam/
 - Categories: Audio, Library, Network, Display, System
 
 ### UI Architecture
+
+**Menu Controller** (`ui/menu.py`):
+- `MenuController`: Encapsulates selection state and navigation logic
+- Automatically skips non-selectable items (headers, info text)
+- Manages list data and cursor position
+- Used by Main Menu, Settings, Context Menus, and First Run
 
 **Panel → Menu → Item** hierarchy:
 - `Panel`: Container with optional header, draws borders and shadow
@@ -132,6 +139,7 @@ Key mappings support:
 - Queue with manual additions
 - Shuffle and loop modes (Off, All, One)
 - Endless playback (random albums)
+- Queue persistence (restores on restart)
 
 ### Library Management
 
@@ -173,6 +181,7 @@ User Input → InputHandler → Callbacks → App State
 - `recents.json`: Recently played tracks
 - `favorites.json`: Favorite tracks/albums/artists
 - `volume.json`: Persisted volume level
+- `queue.json`: Persisted playback queue
 - `playlists/`: User playlists
 
 ### Internationalization
@@ -198,3 +207,4 @@ label = t('player.status.playing')  # Returns "PLAYING"
 5. **Modular apps**: Clean separation, easy to add new apps
 6. **View hierarchy**: Reusable UI components
 7. **Panel → Menu → Item**: Consistent UI rendering pattern
+8. **MenuController**: Centralized navigation logic

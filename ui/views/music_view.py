@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw
 import config as cfg
 from core.i18n import t
 from ui.views.core import Panel, Menu
-from ui.views.items import TextItem, ImageItem, HeadingItem, InfoItem, ColumnItem, Column
+from ui.views.items import Item, Column
 from ui.graphics import UI_ICONS
 from core.metadata import sanitize_text
 
@@ -21,7 +21,7 @@ class MusicViewRenderer:
         """Clear the canvas."""
         self.draw.rectangle((0, 0, cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), fill=cfg.WHITE)
 
-    def _create_controls_item(self, state) -> ColumnItem:
+    def _create_controls_item(self, state) -> Item:
         """Create controls bar as a ColumnItem.
 
         Args:
@@ -58,7 +58,7 @@ class MusicViewRenderer:
                 active=active
             ))
 
-        return ColumnItem(columns, selectable=True, pinned=True)
+        return Item(type='column', columns=columns, selectable=True, pinned=True)
 
     def _convert_legacy_item(self, item: dict, state, display_idx: int = None):
         """Convert legacy item format to new Item classes.
@@ -77,23 +77,23 @@ class MusicViewRenderer:
             return self._create_controls_item(state)
 
         if itype == 'heading':
-            return HeadingItem(item.get('name', ''), selectable=True)
+            return Item(text=item.get('name', ''), type='heading', selectable=True)
 
         if itype == 'info':
             lines = item.get('lines')
             columns = item.get('columns')
             if lines:
-                return InfoItem(lines=lines)
+                return Item(type='info', lines=lines)
             if columns:
-                return InfoItem(columns=columns)
-            return InfoItem(text=item.get('name', ''))
+                return Item(type='info', columns=columns)
+            return Item(type='info', text=item.get('name', ''))
 
         # Icon+text items (file, album, artist, dir, playlist, recent)
         icon_str = self._get_item_icon(item, state, display_idx)
         name = sanitize_text(item.get('title', item.get('name', '')))
 
         pinned = item.get('pinned', False)
-        return TextItem(name, icon=icon_str, selectable=True, pinned=pinned)
+        return Item(text=name, type='text', icon=icon_str, selectable=True, pinned=pinned)
 
     def _get_item_icon(self, item: dict, state, display_idx: int = None) -> str:
         """Get icon string for an item.
@@ -179,7 +179,8 @@ class MusicViewRenderer:
 
         # Get appropriate cover art
         art = state.playing_cover_s if state.playing_path else state.browsing_cover_s
-        art_item = ImageItem(image=art, placeholder=t('player.browse.no_image'))
+        # Create image item
+        art_item = Item(type='image', image=art, placeholder=t('player.browse.no_image'))
         art_item.set_height(art_size)  # Account for border
         art_menu.items = [art_item]
 
@@ -198,7 +199,7 @@ class MusicViewRenderer:
         status_text = f"{icon} {raw_status}"
 
         # Use InfoItem with FONT_HEADER and padding (2, 0)
-        status_item = InfoItem(text=status_text, font=cfg.FONT_HEADER, padding=(2, 0))
+        status_item = Item(text=status_text, type='info', font=cfg.FONT_HEADER, padding=(2, 0))
         status_menu.items = [status_item]
 
         status_panel.render(self.canvas)
@@ -269,7 +270,7 @@ class MusicViewRenderer:
         menu = panel.create_menu()
 
         # Convert options to TextItems
-        menu.items = [TextItem(opt) for opt in state.context_options]
+        menu.items = [Item(text=opt, type='text') for opt in state.context_options]
         menu.cursor.row = state.context_index
         menu.cursor.col = 0
 
@@ -289,6 +290,6 @@ class MusicViewRenderer:
 
         panel = Panel(x, y, w, h)
         menu = panel.create_menu()
-        menu.items = [TextItem(message, selectable=False)]
+        menu.items = [Item(text=message, type='text', selectable=False)]
 
         panel.render(self.canvas)

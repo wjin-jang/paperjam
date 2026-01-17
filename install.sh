@@ -59,11 +59,25 @@ echo
 echo "[2/9] Enabling I2C and SPI..."
 
 # Enable I2C
-if ! grep -q "^dtparam=i2c_arm=on" "$BOOT_CONFIG" 2>/dev/null; then
-    echo 'dtparam=i2c_arm=on' | sudo tee -a "$BOOT_CONFIG" > /dev/null
-    echo "  I2C enabled"
+if grep -q "^dtparam=i2c_arm=on" "$BOOT_CONFIG"; then
+    echo "  I2C already enabled in config.txt"
 else
-    echo "  I2C already enabled"
+    # Check if it exists but is commented out
+    if grep -q "^#dtparam=i2c_arm=on" "$BOOT_CONFIG"; then
+        echo "  Uncommenting I2C in config.txt..."
+        sudo sed -i 's/^#dtparam=i2c_arm=on/dtparam=i2c_arm=on/' "$BOOT_CONFIG"
+    else
+        echo "  Appending I2C to config.txt..."
+        echo 'dtparam=i2c_arm=on' | sudo tee -a "$BOOT_CONFIG" > /dev/null
+    fi
+fi
+
+# Load i2c-dev module
+if ! grep -q "^i2c-dev" /etc/modules; then
+    echo "  Adding i2c-dev to /etc/modules..."
+    echo "i2c-dev" | sudo tee -a /etc/modules > /dev/null
+else
+    echo "  i2c-dev module already listed"
 fi
 
 # Enable SPI

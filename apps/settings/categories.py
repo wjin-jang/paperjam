@@ -200,7 +200,7 @@ class AudioCategory(SettingsCategory):
         """Cycle to the next audio output device."""
         self._refresh_audio_sinks()
         if not self._audio_sinks:
-            return "None"
+            return t('settings.bluetooth.none')
         if len(self._audio_sinks) == 1:
             return self._audio_sinks[0]['display']
 

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import config as cfg
 from core.i18n import t
+from ui.menu import MenuController
 
 
 class ContextMenuHandler:
@@ -25,12 +26,13 @@ class ContextMenuHandler:
         self._on_navigate = on_navigate
 
         self.active = False
-        self.options: List[str] = []
-        self.index = 0
         self.target_item: Optional[dict] = None
         self.target_queue_index: Optional[int] = None  # Index in queue for queue items
         self.layer = 0
         self._in_queue_view = False
+        
+        # Menu controller
+        self.menu = MenuController([])
 
     def open(self, item: dict, in_queue_view: bool = False, queue_index: int = None):
         """
@@ -42,32 +44,38 @@ class ContextMenuHandler:
             queue_index: Index of the item in the queue (for queue management)
         """
         self.active = True
-        self.index = 0
         self.target_item = item
         self.target_queue_index = queue_index
         self.layer = 0
         self._in_queue_view = in_queue_view
-        self.options = self._get_options_for_item(item)
+        
+        # Build options
+        options = self._get_options_for_item(item)
+        self._update_menu_items(options)
 
     def close(self):
         """Close the context menu."""
         self.active = False
-        self.options = []
-        self.index = 0
         self.target_item = None
         self.target_queue_index = None
         self.layer = 0
         self._in_queue_view = False
+        self.menu.set_items([])
 
     def go_back(self):
         """Handle back action in context menu."""
         if self.layer == 1:
             # Return to main context menu
             self.layer = 0
-            self.index = 0
-            self.options = self._get_options_for_item(self.target_item)
+            options = self._get_options_for_item(self.target_item)
+            self._update_menu_items(options)
         else:
             self.close()
+            
+    def _update_menu_items(self, options: List[str]):
+        """Update menu controller items from string list."""
+        items = [{'name': opt, 'type': 'file', 'action': opt} for opt in options]
+        self.menu.set_items(items)
 
     def _get_options_for_item(self, item: dict) -> List[str]:
         """Get context menu options based on item type."""
@@ -135,13 +143,13 @@ class ContextMenuHandler:
 
     def select_up(self):
         """Move selection up."""
-        if self.options:
-            self.index = (self.index - 1) % len(self.options)
+        if self.active:
+            self.menu.move_selection(-1)
 
     def select_down(self):
         """Move selection down."""
-        if self.options:
-            self.index = (self.index + 1) % len(self.options)
+        if self.active:
+            self.menu.move_selection(1)
 
     def execute_action(self, current_mode: str, on_refresh: Callable) -> Optional[dict]:
         """
@@ -154,10 +162,10 @@ class ContextMenuHandler:
         Returns:
             Navigation info dict if navigation required, None otherwise
         """
-        if not self.options:
-            return None
+        item = self.menu.get_selected_item()
+        if not item: return None
 
-        opt = self.options[self.index]
+        opt = item['action']
         target = self.target_item
 
         if self.layer == 0:
@@ -252,11 +260,11 @@ class ContextMenuHandler:
 
             elif opt == t('player.context.add_to_playlist'):
                 self.layer = 1
-                self.index = 0
                 pl_files = self.lib.get_playlists()
-                self.options = [t('player.context.new_playlist')] + [
+                options = [t('player.context.new_playlist')] + [
                     t('player.context.add_to', name=p.stem) for p in pl_files
                 ]
+                self._update_menu_items(options)
                 return None
 
             elif opt == t('player.context.go_to_artist'):

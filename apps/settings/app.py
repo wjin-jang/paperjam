@@ -5,8 +5,8 @@ import time
 from typing import Dict, Optional
 
 from ui.renderer import UIRenderer
+from ui.menu import MenuController
 from core.bluetooth import BluetoothManager
-from core.navigation import nav_index_up, nav_index_down, nav_skip_info_up, nav_skip_info_down
 from core.settings_manager import get_settings_manager
 import config as cfg
 
@@ -32,14 +32,22 @@ class SettingsApp(AppBase):
         # Initialize categories
         self._init_categories()
 
-        self.main_menu = ["Audio", "Library", "Network", "System", "Display"]
+        # Main Menu
+        self.main_menu = MenuController([
+            {"name": "Audio", "type": "dir", "id": "AUDIO"},
+            {"name": "Library", "type": "dir", "id": "LIBRARY"},
+            {"name": "Network", "type": "dir", "id": "NETWORK"},
+            {"name": "System", "type": "dir", "id": "SYSTEM"},
+            {"name": "Display", "type": "dir", "id": "DISPLAY"}
+        ])
 
+        # Submenus
+        self.submenu_controller = MenuController([])
+        
+        # View State
         self.view = 'MAIN'
-        self.idx = 0
-        self.submenu_idx = 0
         self.current_category: Optional[str] = None
-        self.current_submenu = []
-
+        
         self.running = True
 
         # Load settings
@@ -47,14 +55,13 @@ class SettingsApp(AppBase):
         self.settings.sync_to_config()
 
         # Bluetooth state
-        self.bt_devices = []
-        self.bt_idx = 0
+        self.bt_menu = MenuController([])
+        self.bt_device_menu = MenuController([])
         self.bt_status = "Idle"
         self.bt_selected_device = None
-        self.bt_menu_idx = 0
-        self.bt_menu_options = []
 
         # WiFi state
+        self.wifi_menu = MenuController([])
         self.wifi_status = "Select Network"
 
         # Popup state
@@ -66,8 +73,7 @@ class SettingsApp(AppBase):
         """Called when app is launched - reset running state."""
         self.running = True
         self.view = 'MAIN'
-        self.idx = 0
-        self.submenu_idx = 0
+        self.main_menu.selected_index = 0
         self.current_category = None
 
     def _init_categories(self):
@@ -100,70 +106,54 @@ class SettingsApp(AppBase):
             category = self.categories.get('LIBRARY')
             if category:
                 category.refresh()
-                self.current_submenu = category.items
+                self._update_submenu_items(category)
         return self.running
 
-    def _get_info_indices(self) -> list:
-        """Get info indices for current category."""
-        cat_handler = self.categories.get(self.current_category)
-        if cat_handler:
-            return cat_handler.get_info_indices()
-        return []
-
-    def _nav_submenu(self, direction: int):
-        """Navigate submenu, skipping info-only items."""
-        if not self.current_submenu:
-            self.submenu_idx = -1
-            return
-
-        # Use shared navigation logic to skip info items
-        if direction > 0:
-            self.submenu_idx = nav_skip_info_down(self.submenu_idx, self.current_submenu)
-        else:
-            self.submenu_idx = nav_skip_info_up(self.submenu_idx, self.current_submenu)
+    def _update_submenu_items(self, category):
+        """Convert category strings to dict items for MenuController."""
+        # This is an adapter because categories currently return list of strings
+        # We should eventually refactor categories to return dicts too, but for now wrap them.
+        items = []
+        info_indices = category.get_info_indices()
+        for i, text in enumerate(category.items):
+            item_type = 'info' if i in info_indices else 'file'
+            items.append({'name': text, 'type': item_type, 'original_index': i})
+        
+        # Don't reset index if we are just refreshing the same list
+        self.submenu_controller.set_items(items, reset_index=False)
 
     # --- Navigation ---
     def nav_up(self):
         if self.view == 'VOLUME':
             self._audio_category.set_volume(5)
             return
+            
         if self.view == 'MAIN':
-            self.idx = nav_index_up(self.idx, len(self.main_menu))
+            self.main_menu.move_selection(-1)
         elif self.view == 'SUBMENU':
-            self._nav_submenu(-1)
+            self.submenu_controller.move_selection(-1)
         elif self.view in ['BT_SAVED', 'BT_SCAN']:
-            limit = len(self.bt_devices) + (1 if self.view == 'BT_SAVED' else 0)
-            if limit > 0:
-                self.bt_idx = nav_index_up(self.bt_idx, limit)
+            self.bt_menu.move_selection(-1)
         elif self.view == 'BT_DEVICE_MENU':
-            self.bt_menu_idx = nav_index_up(self.bt_menu_idx, len(self.bt_menu_options))
+            self.bt_device_menu.move_selection(-1)
         elif self.view == 'WIFI_NETWORKS':
-            networks = self.categories['NETWORK'].wifi_networks
-            if networks:
-                self.categories['NETWORK'].wifi_idx = nav_index_up(
-                    self.categories['NETWORK'].wifi_idx, len(networks)
-                )
+            self.wifi_menu.move_selection(-1)
 
     def nav_down(self):
         if self.view == 'VOLUME':
             self._audio_category.set_volume(-5)
             return
+            
         if self.view == 'MAIN':
-            self.idx = nav_index_down(self.idx, len(self.main_menu))
+            self.main_menu.move_selection(1)
         elif self.view == 'SUBMENU':
-            self._nav_submenu(1)
+            self.submenu_controller.move_selection(1)
         elif self.view in ['BT_SAVED', 'BT_SCAN']:
-            limit = len(self.bt_devices) + (1 if self.view == 'BT_SAVED' else 0)
-            if limit > 0:
-                self.bt_idx = nav_index_down(self.bt_idx, limit)
+            self.bt_menu.move_selection(1)
         elif self.view == 'BT_DEVICE_MENU':
-            self.bt_menu_idx = nav_index_down(self.bt_menu_idx, len(self.bt_menu_options))
+            self.bt_device_menu.move_selection(1)
         elif self.view == 'WIFI_NETWORKS':
-            networks = self.categories['NETWORK'].wifi_networks
-            if networks:
-                self.categories['NETWORK'].wifi_idx = nav_index_down(
-                    self.categories['NETWORK'].wifi_idx, len(networks)
-                )
+            self.wifi_menu.move_selection(1)
 
     def nav_left(self):
         if self.view == 'VOLUME':
@@ -177,39 +167,52 @@ class SettingsApp(AppBase):
         if self.view == 'VOLUME':
             self.view = 'SUBMENU'
             return
+            
         if self.view == 'MAIN':
-            self._enter_category(self.main_menu[self.idx])
+            item = self.main_menu.get_selected_item()
+            if item:
+                self._enter_category(item['id'])
+                
         elif self.view == 'SUBMENU':
             self._handle_submenu_action()
+            
         elif self.view == 'BT_SAVED':
-            if self.bt_idx == len(self.bt_devices):
+            item = self.bt_menu.get_selected_item()
+            if not item: return
+            
+            if item.get('id') == 'SCAN_NEW':
                 self.view = 'BT_SCAN'
-                self.bt_idx = 0
                 self.bt_status = "Scanning..."
-                self.bt_devices = []
+                self.bt_menu.set_items([{'name': "(Scanning...)", 'type': 'info'}])
                 self.bt.start_scan(self._bt_scan_callback)
             else:
-                if self.bt_devices:
-                    self._enter_bt_device_menu(self.bt_devices[self.bt_idx])
+                self._enter_bt_device_menu(item['device'])
+                
         elif self.view == 'BT_SCAN':
-            if self.bt_devices:
-                dev = self.bt_devices[self.bt_idx]
+            item = self.bt_menu.get_selected_item()
+            if item and item.get('device'):
+                dev = item['device']
                 self.bt.stop_scan()
                 self.bt_status = f"Pairing {dev['name']}..."
                 self.bt.connect_async(dev['mac'], self._bt_connect_callback)
+                
         elif self.view == 'BT_DEVICE_MENU':
             self._handle_bt_device_action()
+            
         elif self.view == 'WIFI_NETWORKS':
-            net_cat = self.categories['NETWORK']
-            if net_cat.wifi_networks:
-                network = net_cat.wifi_networks[net_cat.wifi_idx]
+            item = self.wifi_menu.get_selected_item()
+            if item and item.get('network'):
+                network = item['network']
                 self.wifi_status = "Connecting..."
+                net_cat = self.categories['NETWORK']
+                
                 if net_cat.connect_to_wifi(network['id']):
                     # Wait briefly for connection to establish
                     time.sleep(2)
                     self.wifi_status = "Connected"
                 else:
                     self.wifi_status = "Failed"
+                    
                 # Refresh network list and parent category
                 net_cat.wifi_networks = net_cat.get_known_wifi_networks()
                 net_cat.refresh()  # Refresh parent menu to show new connection
@@ -229,10 +232,9 @@ class SettingsApp(AppBase):
             self.wifi_status = "Select Network"
             # Refresh network category to show updated connection status
             self.categories['NETWORK'].refresh()
-            self.current_submenu = self.categories['NETWORK'].items
+            self._update_submenu_items(self.categories['NETWORK'])
         elif self.view == 'SUBMENU':
             self.view = 'MAIN'
-            self.submenu_idx = 0
         elif self.view == 'MAIN':
             self.running = False
         return True
@@ -241,33 +243,29 @@ class SettingsApp(AppBase):
     def _audio_category(self) -> AudioCategory:
         return self.categories['AUDIO']
 
-    def _enter_category(self, category: str):
+    def _enter_category(self, category_id: str):
         """Enter a settings category."""
-        self.current_category = category.upper()
-        self.submenu_idx = -1  # -1 means no selection
-
+        self.current_category = category_id
+        
         cat_handler = self.categories.get(self.current_category)
         if cat_handler:
             cat_handler.refresh()
-            self.current_submenu = cat_handler.items
-            # Find first non-info item
-            info_indices = cat_handler.get_info_indices()
-            for i in range(len(self.current_submenu)):
-                if i not in info_indices:
-                    self.submenu_idx = i
-                    break
+            self._update_submenu_items(cat_handler)
+            self.submenu_controller.selected_index = 0
             self.view = 'SUBMENU'
 
     def _handle_submenu_action(self):
         """Handle action in current submenu."""
-        if self.submenu_idx < 0:
-            return  # No selectable item
+        item = self.submenu_controller.get_selected_item()
+        if not item: return
+        
         cat_handler = self.categories.get(self.current_category)
         if not cat_handler:
             return
 
-        result = cat_handler.handle_action(self.submenu_idx)
-        self.current_submenu = cat_handler.items
+        result = cat_handler.handle_action(item['original_index'])
+        # Refresh items after action
+        self._update_submenu_items(cat_handler)
 
         # Handle view changes
         if result == 'VOLUME':
@@ -275,40 +273,77 @@ class SettingsApp(AppBase):
         elif result == 'BT_SAVED':
             self._enter_bt_saved_view()
         elif result == 'WIFI_NETWORKS':
-            self.view = 'WIFI_NETWORKS'
-            self.wifi_status = "Select Network"
+            self._enter_wifi_networks()
 
         # Sync settings to config
         self.settings.sync_to_config()
         self.invert_colors = self.settings.get('invert_colors', False)
+        
+    def _enter_wifi_networks(self):
+        self.view = 'WIFI_NETWORKS'
+        self.wifi_status = "Select Network"
+        
+        net_cat = self.categories['NETWORK']
+        # This triggers a scan/list update in the category
+        # But we need to build the menu items for MenuController
+        # The category method get_known_wifi_networks returns raw dicts
+        
+        display_items = []
+        if not net_cat.wifi_networks:
+             display_items.append({'name': "(No networks)", 'type': 'info'})
+        else:
+            for net in net_cat.wifi_networks:
+                prefix = "C" if net['current'] else " "
+                display_items.append({
+                    'name': f"{prefix} {net['ssid']}",
+                    'type': 'file',
+                    'network': net
+                })
+        self.wifi_menu.set_items(display_items)
 
     def _enter_bt_saved_view(self):
         self.view = 'BT_SAVED'
         self.bt_status = "Select Device"
-        self.bt_devices = self.bt.get_paired_devices()
-        self.bt_idx = 0
+        
+        devices = self.bt.get_paired_devices()
+        items = []
+        for d in devices:
+            is_conn = self.bt.is_connected(d['mac'])
+            prefix = "C" if is_conn else "P"
+            items.append({
+                'name': f"{prefix} {d['name']}",
+                'type': 'file',
+                'device': d
+            })
+        
+        items.append({'name': "[ Scan New Device ]", 'type': 'file', 'id': 'SCAN_NEW'})
+        self.bt_menu.set_items(items)
 
     def _enter_bt_device_menu(self, device):
         """Enter device options menu."""
         self.bt_selected_device = device
-        self.bt_menu_idx = 0
         is_connected = self.bt.is_connected(device['mac'])
 
+        options = []
         if is_connected:
-            self.bt_menu_options = ["Disconnect", "Forget", "Cancel"]
+            options = ["Disconnect", "Forget", "Cancel"]
         else:
-            self.bt_menu_options = ["Connect", "Forget", "Cancel"]
+            options = ["Connect", "Forget", "Cancel"]
+            
+        items = [{'name': opt, 'type': 'file', 'action': opt} for opt in options]
+        self.bt_device_menu.set_items(items)
 
         self.view = 'BT_DEVICE_MENU'
         self.bt_status = device['name'][:16]
 
     def _handle_bt_device_action(self):
         """Handle action in BT device menu."""
-        if not self.bt_selected_device or not self.bt_menu_options:
+        item = self.bt_device_menu.get_selected_item()
+        if not item or not self.bt_selected_device:
             self._enter_bt_saved_view()
             return
 
-        action = self.bt_menu_options[self.bt_menu_idx]
+        action = item['action']
         dev = self.bt_selected_device
         mac = dev['mac']
 
@@ -335,7 +370,18 @@ class SettingsApp(AppBase):
         self.popup_start = time.time()
 
     def _bt_scan_callback(self, devices):
-        self.bt_devices = devices
+        items = []
+        if not devices:
+            items = [{'name': "(Scanning...)", 'type': 'info'}]
+        else:
+            for d in devices:
+                icon = "P" if d.get('paired') else " "
+                items.append({
+                    'name': f"{icon} {d['name']}",
+                    'type': 'file',
+                    'device': d
+                })
+        self.bt_menu.set_items(items, reset_index=False)
 
     def _bt_connect_callback(self, success, msg):
         self.bt_status = msg
@@ -359,41 +405,21 @@ class SettingsApp(AppBase):
                 return self.renderer.render_menu("PLEASE WAIT", [self.popup_msg], 0, 0)
 
         if self.view == 'MAIN':
-            return self.renderer.render_menu("SETTINGS", self.main_menu, self.idx, 0)
+            return self.renderer.render_menu("SETTINGS", **self.main_menu.get_render_args())
 
         elif self.view == 'SUBMENU':
-            info_indices = self._get_info_indices()
-            return self.renderer.render_menu(self.current_category, self.current_submenu, self.submenu_idx, 0, info_indices=info_indices)
+            return self.renderer.render_menu(self.current_category, **self.submenu_controller.get_render_args())
 
         elif self.view == 'BT_SAVED':
-            display_list = []
-            for d in self.bt_devices:
-                is_conn = self.bt.is_connected(d['mac'])
-                prefix = "C" if is_conn else "P"
-                display_list.append(f"{prefix} {d['name']}")
-            display_list.append("[ Scan New Device ]")
-            return self.renderer.render_menu(f"BT: {self.bt_status}", display_list, self.bt_idx, 0)
+            return self.renderer.render_menu(f"BT: {self.bt_status}", **self.bt_menu.get_render_args())
 
         elif self.view == 'BT_SCAN':
-            if not self.bt_devices:
-                display_list = ["(Scanning...)"]
-            else:
-                display_list = []
-                for d in self.bt_devices:
-                    icon = "P" if d.get('paired') else " "
-                    display_list.append(f"{icon} {d['name']}")
-            return self.renderer.render_menu(f"BT: {self.bt_status}", display_list, self.bt_idx, 0)
+            return self.renderer.render_menu(f"BT: {self.bt_status}", **self.bt_menu.get_render_args())
 
         elif self.view == 'BT_DEVICE_MENU':
-            return self.renderer.render_menu(f"BT: {self.bt_status}", self.bt_menu_options, self.bt_menu_idx, 0)
+            return self.renderer.render_menu(f"BT: {self.bt_status}", **self.bt_device_menu.get_render_args())
 
         elif self.view == 'WIFI_NETWORKS':
-            net_cat = self.categories['NETWORK']
-            display_list = []
-            if not net_cat.wifi_networks:
-                display_list = ["(No networks)"]
-            else:
-                for net in net_cat.wifi_networks:
-                    prefix = "C" if net['current'] else " "
-                    display_list.append(f"{prefix} {net['ssid']}")
-            return self.renderer.render_menu(f"WiFi: {self.wifi_status}", display_list, net_cat.wifi_idx, 0)
+            return self.renderer.render_menu(f"WiFi: {self.wifi_status}", **self.wifi_menu.get_render_args())
+            
+        return self.renderer.render_menu("ERROR", ["Unknown View"], 0, 0)
