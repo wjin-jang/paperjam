@@ -198,11 +198,10 @@ class MusicViewRenderer:
         status_menu = status_panel.create_menu()
 
         # Combine icon and status text
-        raw_status = state.get_status_text()
-        icon = cfg.STATUS_ICONS[raw_status]
+        raw_status = t(state.get_status_text())
 
         # Use columns for status
-        status_item = Item(text=f"{icon} {raw_status}", font=cfg.FONT_HEADER, padding=(2, 0), selectable=False)
+        status_item = Item(text=f"{raw_status}", font=cfg.FONT_HEADER, padding=(2, 0), selectable=False)
         status_menu.items = [status_item]
 
         status_panel.render(self.canvas)
