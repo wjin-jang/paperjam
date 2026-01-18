@@ -13,7 +13,7 @@ menu:
 # Music player
 player:
   status:
-    playing: "Ⓟ PLAYING"
+    playing: "Ⓟ PLAYING Ⓟ "
     paused: "Ⓢ PAUSED"
     idle: "Ⓘ IDLE"
     next: "Ⓝ NEXT"
