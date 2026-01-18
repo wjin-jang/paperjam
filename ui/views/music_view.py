@@ -199,7 +199,7 @@ class MusicViewRenderer:
 
         # Combine icon and status text
         raw_status = state.get_status_text()
-        icon = cfg.STATUS_ICONS.get(raw_status, 'Ⓘ')
+        icon = cfg.STATUS_ICONS[raw_status]
 
         # Use columns for status
         status_item = Item(text=f"{icon} {t(raw_status)}", font=cfg.FONT_HEADER, padding=(2, 0), selectable=False)

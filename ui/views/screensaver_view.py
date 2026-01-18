@@ -83,7 +83,7 @@ class ScreensaverRenderer:
         # Text Panel
         panel_text = Panel(x, y_text, w, h)
         menu_text = panel_text.create_menu()
-        menu_text.items = [Item(text=text, font=cfg.FONT_HEADER, selectable=False)]
+        menu_text.items = [Item(text=text, font=cfg.FONT_HEADER, padding=(2, 0), selectable=False)]
         panel_text.render(self.canvas)
 
         return self.canvas
@@ -113,7 +113,7 @@ class ScreensaverRenderer:
 
         # 2. Draw Dialog Overlay
         w = 180
-        h = 80
+        h = 96
         x = (cfg.SCREEN_WIDTH - w) // 2
         y = (cfg.SCREEN_HEIGHT - h) // 2
 
