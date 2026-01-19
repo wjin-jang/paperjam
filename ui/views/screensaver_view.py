@@ -1,5 +1,6 @@
 from PIL import Image, ImageDraw
 import config as cfg
+from core.i18n import t
 from ui.views.core import Panel
 from ui.views.items import Item
 
@@ -34,25 +35,61 @@ class ScreensaverRenderer:
         # Render album art fullscreen or scaled
         img = state.screensaver_image
         img_w, img_h = img.size
-                
+
         # Calculate panel size to fit image
         panel_w = img_w + 1
         panel_h = img_h + 1
-        
-        x = (cfg.SCREEN_WIDTH - panel_w) // 2
+
+        x = (cfg.SCREEN_WIDTH - panel_w) // 2 - 80
         y = (cfg.SCREEN_HEIGHT - panel_h) // 2
-        
+
         # Create panel
         panel = Panel(x, y, panel_w, panel_h)
         menu = panel.create_menu()
-        
+
         art_item = Item(show_image=True, image=img)
         art_item.set_height(panel_h - 2)
         menu.items = [art_item]
-        
+
         panel.render(self.canvas)
-        
+
+        # If playing a track, show track info panel
+        if state.playing_path:
+            self._render_track_info_panel(state)
+
         return self.canvas
+
+    def _render_track_info_panel(self, state):
+        """Render track info panel with title, album, artist, and status."""
+        # Get status text with icon
+        status_key = state.get_status_text()
+        status_icon = cfg.STATUS_ICONS.get(status_key, '')
+        status_text = f"{status_icon} {t(status_key)}" if status_icon else t(status_key)
+
+        # Get track info
+        title = state.playing_title or ""
+        artist = state.playing_artist or ""
+        album = state.playing_album or ""
+
+        # Panel dimensions
+        info_w = 96
+        info_h = cfg.ROW_HEIGHT * 4
+        info_x = cfg.SCREEN_WIDTH - info_w - 8
+        info_y = cfg.SCREEN_HEIGHT - info_h - 8
+
+        # Create panel
+        info_panel = Panel(info_x, info_y, info_w, info_h)
+        info_menu = info_panel.create_menu()
+
+        # Add items for status, title, artist, album
+        info_menu.items = [
+            Item(text=status_text, font=cfg.FONT_HEADER, padding=(2, 0), selectable=False, sanitize=False),
+            Item(text=title, selectable=False),
+            Item(text=artist, selectable=False),
+            Item(text=album, selectable=False),
+        ]
+
+        info_panel.render(self.canvas)
 
     def render_shutdown(self, image=None):
         """Render shutdown screen."""
@@ -60,7 +97,7 @@ class ScreensaverRenderer:
 
         # Draw "POWER OFF" text
         text = "POWER OFF"
-        w, h = 80, cfg.ROW_HEIGHT
+        w, h = 64, cfg.ROW_HEIGHT
         x = (cfg.SCREEN_WIDTH - w) - 8
         
         # If image provided, put text at bottom, image above

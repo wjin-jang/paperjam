@@ -24,6 +24,7 @@ class PlayerState:
     shuffle_active: bool = False
     loop_mode: int = 0
     playing_path: Optional[str] = None
+    playing_title: Optional[str] = None
     playing_artist: Optional[str] = None
     playing_album: Optional[str] = None
 

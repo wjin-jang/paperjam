@@ -289,9 +289,11 @@ class MusicPlayerApp(AppBase):
         # Update playing metadata
         try:
             info = extract_track_info(Path(path))
+            self.state.playing_title = info.title
             self.state.playing_artist = info.artist
             self.state.playing_album = info.album
         except (OSError, ValueError, AttributeError):
+            self.state.playing_title = None
             self.state.playing_artist = None
             self.state.playing_album = None
 
