@@ -596,14 +596,7 @@ class MusicPlayerApp(AppBase):
             random.shuffle(self.playlist.queue)
         self.playlist.queue_idx = 0
 
-        # Wake screensaver to show new album
-        if self.state.screensaver_image is not None:
-            self.state.screensaver_image = None
-            self.state.screensaver_album = None
-            self.state.needs_refresh = True
-            self.last_input_time = time.time()  # Reset timer to keep display on
-
-        # Load and play first track
+        # Load and play first track (screensaver will be updated by _play_media)
         self._load_track(self.playlist.queue[0])
         self.state.set_status_message('player.status.endless')
 
