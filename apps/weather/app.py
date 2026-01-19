@@ -44,6 +44,7 @@ class WeatherApp(AppBase):
         self.selected_section = SECTION_DAY
         self.day_offset = 0
         self.chart_scroll = 0
+        self.menu_scroll = 0
 
         # Setup state
         self.search_query = ""
@@ -57,6 +58,7 @@ class WeatherApp(AppBase):
         self.selected_section = SECTION_DAY
         self.day_offset = 0
         self.chart_scroll = 0
+        self.menu_scroll = 0
 
         if not self.weather.is_configured:
             self.view = 'SETUP'
@@ -229,12 +231,14 @@ class WeatherApp(AppBase):
         weather_data = self.weather.data
         title = self.weather.config.location_name or t('menu.weather')
 
-        return self.renderer.render(
+        frame, self.menu_scroll = self.renderer.render(
             weather_data,
             title,
             selected_section=self.selected_section,
             day_offset=self.day_offset,
             chart_scroll=self.chart_scroll,
+            menu_scroll=self.menu_scroll,
             updating=self.weather.is_updating,
             error=self.weather.last_error if not weather_data else None
         )
+        return frame

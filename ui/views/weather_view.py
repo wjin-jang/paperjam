@@ -115,10 +115,10 @@ def render_current_section(weather: WeatherData, width: int, height: int,
         img.paste(icon, (2, 2))
 
     temp_text = f"{int(temp)}°"
-    draw.text((32, 4), temp_text, font=cfg.FONT_HEADER, fill=cfg.BLACK)
+    draw.text((40, 4), temp_text, font=cfg.FONT_HEADER, fill=cfg.BLACK)
 
     cond_text = SHORT_CONDITIONS.get(condition_name, '???').upper()
-    draw.text((32, 16), cond_text, font=cfg.FONT_HEADER, fill=cfg.BLACK)
+    draw.text((40, 16), cond_text, font=cfg.FONT_HEADER, fill=cfg.BLACK)
 
     # Vertical divider
     draw.line((col_w, 0, col_w, height - 1), fill=cfg.BLACK)
@@ -240,7 +240,7 @@ def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
         text_bbox = cfg.FONT_MAIN.getbbox(val_text)
         text_w = text_bbox[2]
         text_h = text_bbox[3]
-        text_x = center - text_w // 2
+        text_x = 0
         text_y = 0
 
         # Create text image
@@ -322,8 +322,9 @@ class WeatherViewRenderer:
 
     def render(self, weather: Optional[WeatherData], title: str,
                selected_section: int = 0, day_offset: int = 0,
-               chart_scroll: int = 0, updating: bool = False,
-               error: Optional[str] = None) -> Image.Image:
+               chart_scroll: int = 0, menu_scroll: int = 0,
+               updating: bool = False,
+               error: Optional[str] = None) -> tuple:
         """Render weather view."""
         self.canvas = Image.new('1', (cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), cfg.WHITE)
 
@@ -340,7 +341,7 @@ class WeatherViewRenderer:
                 Item(text=error, selectable=False),
             ])
             panel.render(self.canvas)
-            return self.canvas
+            return self.canvas, 0
 
         if not weather or not weather.current:
             menu.set_items([
@@ -348,7 +349,7 @@ class WeatherViewRenderer:
                 Item(text=t('weather.setup_location'), selectable=False),
             ])
             panel.render(self.canvas)
-            return self.canvas
+            return self.canvas, 0
 
         items = []
         content_w = panel.content_width - 2
@@ -406,6 +407,7 @@ class WeatherViewRenderer:
         items.append(weekly_item)
 
         menu.set_items(items)
+        menu.scroll_offset = menu_scroll
 
         # Map section to row
         row_map = {
@@ -418,7 +420,7 @@ class WeatherViewRenderer:
         menu._ensure_visible()
 
         panel.render(self.canvas)
-        return self.canvas
+        return self.canvas, menu.scroll_offset
 
     def _get_hourly(self, hourly: List[HourlyForecast], day_offset: int) -> List[HourlyForecast]:
         """Get hourly data for selected day.
