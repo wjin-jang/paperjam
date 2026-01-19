@@ -142,7 +142,7 @@ class MainApp:
                 t('welcome.shutdown_loading'),
                 "",
                 t('welcome.add_music_prompt'),
-                f"{str(cfg.MUSIC_PATH)[:22]}"
+                f"{str(cfg.MUSIC_PATH)}"
             ], selectable=False)
         ], -1, 0)
         self._display(frame, full_refresh=True)

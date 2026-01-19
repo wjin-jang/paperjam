@@ -150,7 +150,7 @@ class LibraryManager:
                 try:
                     # Update progress with lock
                     with self._scan_lock:
-                        self._scan_current_file = p.name[:30]
+                        self._scan_current_file = p.name
 
                     track = extract_track_info(p)
 

@@ -214,7 +214,7 @@ class SystemManager:
             return False, "Connection timeout"
         except (subprocess.SubprocessError, OSError, ValueError) as e:
             logger.error(f"Update check failed: {e}")
-            return False, f"Error: {str(e)[:20]}"
+            return False, f"Error: {str(e)}"
 
     def perform_update(self):
         """Pull updates from git and restart the application.
@@ -244,7 +244,7 @@ class SystemManager:
             )
 
             if result.returncode != 0:
-                return False, f"Git error: {result.stderr[:30]}"
+                return False, f"Git error: {result.stderr}"
 
             # Check if update was successful
             if "Already up to date" in result.stdout:
@@ -273,4 +273,4 @@ class SystemManager:
         except subprocess.TimeoutExpired:
             return False, "Update timed out"
         except (subprocess.SubprocessError, OSError) as e:
-            return False, f"Error: {str(e)[:20]}"
+            return False, f"Error: {str(e)}"

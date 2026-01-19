@@ -414,7 +414,7 @@ class SettingsApp(AppBase):
         self.wifi_network_menu.set_items(items)
 
         self.view = 'WIFI_NETWORK_MENU'
-        self.wifi_status = network['ssid'][:14]
+        self.wifi_status = network['ssid']
 
     def _handle_wifi_network_action(self):
         """Handle action in WiFi network menu."""
@@ -485,7 +485,7 @@ class SettingsApp(AppBase):
         """Enter password entry view for a WiFi network."""
         self.view = 'WIFI_PASSWORD'
         self.wifi_password_mode = 'input'  # Start in character input mode
-        self.wifi_status = ssid[:12]  # Truncate for title
+        self.wifi_status = ssid  # Truncate for title
 
         net_cat = self.categories['NETWORK']
         net_cat.reset_password_entry(ssid)
@@ -553,7 +553,7 @@ class SettingsApp(AppBase):
         self.bt_device_menu.set_items(items)
 
         self.view = 'BT_DEVICE_MENU'
-        self.bt_status = device['name'][:16]
+        self.bt_status = device['name']
 
     def _handle_bt_device_action(self):
         """Handle action in BT device menu."""

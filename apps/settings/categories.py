@@ -169,7 +169,7 @@ class AudioCategory(SettingsCategory):
                 elif line.startswith('Description:'):
                     desc = line.split(':', 1)[1].strip()
                     # Truncate long descriptions
-                    current_sink['display'] = desc[:20] if len(desc) > 20 else desc
+                    current_sink['display'] = desc if len(desc) > 20 else desc
 
             # Don't forget the last sink
             if current_sink.get('name'):
@@ -540,7 +540,7 @@ class NetworkCategory(SettingsCategory):
             paired = self.bt.get_paired_devices()
             for dev in paired:
                 if self.bt.is_connected(dev['mac']):
-                    return dev['name'][:16]
+                    return dev['name']
             return t('settings.network.not_connected')
         except (subprocess.SubprocessError, OSError, KeyError):
             return t('settings.network.unavailable')
