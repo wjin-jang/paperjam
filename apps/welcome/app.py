@@ -141,8 +141,7 @@ class WelcomeApp(AppBase):
 
         if self.lib.scan_current_file:
             current = self.lib.scan_current_file
-            # File path should wrap if long
-            items.append(Item(text=f"{t('welcome.file')} | {current}", wrap_text=True, selectable=False))
+            items.append(Item(columns=[t('welcome.file'), current], selectable=False))
 
         return self.renderer.render_menu(
             t('welcome.scanning'), items, -1, self.scroll_offset
