@@ -13,17 +13,17 @@ menu:
 # Music player
 player:
   status:
-    playing: "Ⓟ PLAYING Ⓟ "
-    paused: "Ⓢ PAUSED"
-    idle: "Ⓘ IDLE"
-    next: "Ⓝ NEXT"
-    previous: "Ⓡ PREVIOUS"
-    shuffle_on: "Ⓘ SHUFFLE ON"
-    shuffle_off: "Ⓘ SHUFFLE OFF"
-    loop_all: "Ⓘ LOOP ALL"
-    loop_one: "Ⓘ LOOP ONE"
-    loop_off: "Ⓘ LOOP OFF"
-    endless: "Ⓘ ENDLESS"
+    playing: "PLAYING"
+    paused: "PAUSED"
+    idle: "IDLE"
+    next: "NEXT"
+    previous: "PREVIOUS"
+    shuffle_on: "SHUFFLE ON"
+    shuffle_off: "SHUFFLE OFF"
+    loop_all: "LOOP ALL"
+    loop_one: "LOOP ONE"
+    loop_off: "LOOP OFF"
+    endless: "ENDLESS"
 
   browse:
     library: "Library"

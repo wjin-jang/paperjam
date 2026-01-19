@@ -45,7 +45,8 @@ class Item:
                  wrap_text: bool = False,
                  font=None,
                  padding: tuple = None,
-                 id: Any = None):
+                 id: Any = None,
+                 sanitize: bool = True):
         # Content
         self.text = text
         self.icon = icon
@@ -68,6 +69,7 @@ class Item:
         self.font = font
         self.padding = padding
         self.id = id
+        self.sanitize = sanitize
 
         self._wrapped_lines: List[str] = []
         self._last_width: int = 0
@@ -146,7 +148,8 @@ class Item:
                 if self.wrap_text:
                     self._render_wrapped_text(draw, canvas, x, y, w, invert=invert)
                 else:
-                    self._draw_text_box(draw, canvas, sanitize_text(self.text), x, y, w, cfg.ROW_HEIGHT,
+                    display_text = sanitize_text(self.text) if self.sanitize else self.text
+                    self._draw_text_box(draw, canvas, display_text, x, y, w, cfg.ROW_HEIGHT,
                                        invert=invert, font=self.font, padding=self.padding)
                 return
 
@@ -156,7 +159,7 @@ class Item:
         if self.heading:
              draw.rectangle((x, y, x + w, y + h), fill=cfg.BLACK)
 
-        text = sanitize_text(self.text or "")
+        text = sanitize_text(self.text or "") if self.sanitize else (self.text or "")
         if self.heading:
             text = text.upper()
 

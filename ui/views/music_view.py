@@ -197,11 +197,11 @@ class MusicViewRenderer:
         status_panel = Panel(status_x, status_y, status_w, status_h)
         status_menu = status_panel.create_menu()
 
-        # Combine icon and status text
-        raw_status = t(state.get_status_text())
-
-        # Use columns for status
-        status_item = Item(text=f"{raw_status}", font=cfg.FONT_HEADER, padding=(2, 0), selectable=False)
+        # Get status key and look up icon from STATUS_ICONS
+        status_key = state.get_status_text()
+        status_icon = cfg.STATUS_ICONS.get(status_key, '')
+        status_text = f"{status_icon} {t(status_key)}" if status_icon else t(status_key)
+        status_item = Item(text=status_text, font=cfg.FONT_HEADER, padding=(2, 0), selectable=False, sanitize=False)
         status_menu.items = [status_item]
 
         status_panel.render(self.canvas)
@@ -274,8 +274,8 @@ class MusicViewRenderer:
         panel = Panel(x, y, w, menu_h, header=t('player.context.options'))
         menu = panel.create_menu()
 
-        # Convert options to Items
-        menu.items = [Item(text=opt) for opt in state.context_options]
+        # Use context_options directly (already Item objects from context_menu.menu.items)
+        menu.items = list(state.context_options)
         menu.cursor.row = state.context_index
         menu.cursor.col = 0
 
