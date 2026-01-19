@@ -145,7 +145,7 @@ def load_fonts():
         # Use BASIC layout engine (no harfbuzz) for pixel fonts
         return ImageFont.truetype(str(path), size, layout_engine=ImageFont.Layout.BASIC)
 
-    main = get_font(_config.get("font_main", "BMmini.ttf"), 9)
+    main = get_font(_config.get("font_main", "BMmini.ttf"), 12)
     header = get_font(_config.get("font_header", "Nintendo-DS-BIOS.ttf"), 12)
 
     # CJK fonts (Galmuri)
