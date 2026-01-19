@@ -108,7 +108,7 @@ class TextInput:
         """
         font = font or cfg.FONT_MAIN
         cjk_font = cfg.FONT_CJK_HEADER if font == cfg.FONT_HEADER else cfg.FONT_CJK_MAIN
-        padding = padding or (5, 3)
+        padding = padding or (5, 2)
         padding_x, padding_y = padding
 
         # Draw background box
@@ -478,7 +478,7 @@ class Item:
             total_h = len(lines) * cfg.ROW_HEIGHT
             self._draw_container(draw, x, y, w, total_h, invert=invert)
             padding_x = self.padding[0] if self.padding else 5
-            padding_y = self.padding[1] if self.padding else 3
+            padding_y = self.padding[1] if self.padding else 2
             fg = cfg.WHITE if invert else cfg.BLACK
             font = self.font or cfg.FONT_MAIN
             cjk_font = cfg.FONT_CJK_HEADER if font == cfg.FONT_HEADER else cfg.FONT_CJK_MAIN
