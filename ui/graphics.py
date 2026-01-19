@@ -20,7 +20,7 @@ from mutagen import File
 from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
 
-from config import SCREEN_WIDTH, SCREEN_HEIGHT, BLACK
+from config import SCREEN_WIDTH, SCREEN_HEIGHT, BLACK, FONT_CJK_MAIN, FONT_CJK_HEADER
 
 logger = logging.getLogger(__name__)
 
@@ -171,7 +171,7 @@ def get_cover(file_path: Path) -> Tuple[Optional[Image.Image], Optional[Image.Im
         try:
             img_obj = Image.open(io.BytesIO(cover_bytes))
             final_small = dither_image(img_obj.copy(), target_size=(83, 83))
-            final_large = dither_image(img_obj.copy(), target_size=(112, 112))
+            final_large = dither_image(img_obj.copy(), target_size=(113, 113))
 
             # Cache the processed images
             if final_small:
@@ -182,6 +182,109 @@ def get_cover(file_path: Path) -> Tuple[Optional[Image.Image], Optional[Image.Im
             pass
 
     return (final_small, final_large)
+
+
+# --- CJK Text Rendering ---
+
+def is_cjk(char):
+    """Check if a character is CJK (Chinese, Japanese, Korean)."""
+    code = ord(char)
+    return (
+        0x4E00 <= code <= 0x9FFF or      # CJK Unified Ideographs
+        0x3400 <= code <= 0x4DBF or      # CJK Unified Ideographs Extension A
+        0xAC00 <= code <= 0xD7AF or      # Hangul Syllables (Korean)
+        0x3040 <= code <= 0x309F or      # Hiragana
+        0x30A0 <= code <= 0x30FF or      # Katakana
+        0x1100 <= code <= 0x11FF or      # Hangul Jamo
+        0x3130 <= code <= 0x318F         # Hangul Compatibility Jamo
+    )
+
+
+def draw_text_with_cjk(draw, xy, text, font, cjk_font, fill=0):
+    """
+    Draw text using regular font for non-CJK and Galmuri font for CJK characters.
+
+    Args:
+        draw: PIL ImageDraw object
+        xy: (x, y) position tuple
+        text: Text string to render
+        font: Regular font for non-CJK characters
+        cjk_font: Galmuri font for CJK characters
+        fill: Color value (default 0 = black)
+    """
+    if not text:
+        return
+
+    x, y = xy
+    current_text = ""
+    current_is_cjk = None
+
+    for char in text:
+        char_is_cjk = is_cjk(char)
+
+        if current_is_cjk is None:
+            current_is_cjk = char_is_cjk
+            current_text = char
+        elif char_is_cjk == current_is_cjk:
+            current_text += char
+        else:
+            # Render accumulated text
+            used_font = cjk_font if current_is_cjk else font
+            draw.text((x, y), current_text, font=used_font, fill=fill)
+            bbox = used_font.getbbox(current_text)
+            x += bbox[2] - bbox[0]
+
+            # Start new segment
+            current_text = char
+            current_is_cjk = char_is_cjk
+
+    # Render remaining text
+    if current_text:
+        used_font = cjk_font if current_is_cjk else font
+        draw.text((x, y), current_text, font=used_font, fill=fill)
+
+
+def get_text_width_with_cjk(text, font, cjk_font):
+    """
+    Calculate text width accounting for mixed CJK/non-CJK fonts.
+
+    Args:
+        text: Text string to measure
+        font: Regular font for non-CJK characters
+        cjk_font: Galmuri font for CJK characters
+
+    Returns:
+        Total width in pixels
+    """
+    if not text:
+        return 0
+
+    total_width = 0
+    current_text = ""
+    current_is_cjk = None
+
+    for char in text:
+        char_is_cjk = is_cjk(char)
+
+        if current_is_cjk is None:
+            current_is_cjk = char_is_cjk
+            current_text = char
+        elif char_is_cjk == current_is_cjk:
+            current_text += char
+        else:
+            used_font = cjk_font if current_is_cjk else font
+            bbox = used_font.getbbox(current_text)
+            total_width += bbox[2] - bbox[0]
+
+            current_text = char
+            current_is_cjk = char_is_cjk
+
+    if current_text:
+        used_font = cjk_font if current_is_cjk else font
+        bbox = used_font.getbbox(current_text)
+        total_width += bbox[2] - bbox[0]
+
+    return total_width
 
 
 # Use asset manager for icons (backward compatible)

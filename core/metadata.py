@@ -4,9 +4,6 @@ Audio file metadata extraction using Mutagen.
 Supports:
 - FLAC: album, artist, title, track/disc numbers, year
 - MP3: ID3 tags (TALB, TPE1/2, TIT2, TRCK, TPOS, TDRC/TYER)
-
-Optional text romanization for Korean/Japanese characters
-using korean_romanizer and pykakasi libraries.
 """
 import os
 from pathlib import Path
@@ -16,23 +13,10 @@ from mutagen import File
 from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
 
-try:
-    from korean_romanizer.romanizer import Romanizer
-    import pykakasi
-    HAS_ROMANIZER = True
-    kks = pykakasi.kakasi()
-except ImportError:
-    HAS_ROMANIZER = False
 
 def sanitize_text(text):
     if not text: return ""
-    if HAS_ROMANIZER:
-        try:
-            text = Romanizer(text).romanize()
-            text = ''.join([item['hepburn'] for item in kks.convert(text)])
-        except (ValueError, KeyError, AttributeError):
-            pass
-    return text.encode('ascii', 'ignore').decode().strip()
+    return text.strip()
 
 def format_track_name(file_path):
     name = file_path.stem

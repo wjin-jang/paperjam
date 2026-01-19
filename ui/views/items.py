@@ -12,6 +12,7 @@ from PIL import Image, ImageDraw, ImageOps
 import config as cfg
 from core.metadata import sanitize_text
 from core.i18n import t
+from ui.graphics import draw_text_with_cjk, get_text_width_with_cjk
 
 
 @dataclass
@@ -232,12 +233,12 @@ class Item:
 
     def _draw_aligned_text(self, draw, text, x, y, w, h, align, fill):
         font = cfg.FONT_MAIN
-        bbox = draw.textbbox((0, 0), text, font=font)
-        text_w = bbox[2] - bbox[0]
+        cjk_font = cfg.FONT_CJK_MAIN
+        text_w = get_text_width_with_cjk(text, font, cjk_font)
         if align == 'center': text_x = x + (w - text_w) // 2
         elif align == 'right': text_x = x + w - text_w - 5
         else: text_x = x + 5
-        draw.text((text_x, y + 1), text, font=font, fill=fill)
+        draw_text_with_cjk(draw, (text_x, y + 1), text, font, cjk_font, fill=fill)
 
     def _draw_icon_content(self, canvas, icon, x, y, w, h, invert):
         if invert: icon = ImageOps.invert(icon.convert('L')).convert('1')
@@ -252,12 +253,12 @@ class Item:
         for i, line in enumerate(self.lines):
             line_y = y + (i * cfg.ROW_HEIGHT)
             if isinstance(line, list): self._render_plain_columns(draw, line, x, line_y, w, fg=fg, column_widths=column_widths)
-            else: draw.text((x + 5, line_y + 1), sanitize_text(str(line)), font=cfg.FONT_MAIN, fill=fg)
+            else: draw_text_with_cjk(draw, (x + 5, line_y + 1), sanitize_text(str(line)), cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=fg)
 
     def _render_plain_columns(self, draw, columns, x, y, w, fg=cfg.BLACK, column_widths=None):
         if not columns: return
         col0_text = sanitize_text(str(columns[0])) if self.sanitize else str(columns[0])
-        draw.text((x + 5, y + 1), col0_text, font=cfg.FONT_MAIN, fill=fg)
+        draw_text_with_cjk(draw, (x + 5, y + 1), col0_text, cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=fg)
         if len(columns) > 1:
             right_widths = column_widths if column_widths else self._calc_column_widths(columns, w)
             col_x = x + max(20, w - sum(right_widths))
@@ -297,8 +298,10 @@ class Item:
             padding_x = self.padding[0] if self.padding else 5
             padding_y = self.padding[1] if self.padding else 3
             fg = cfg.WHITE if invert else cfg.BLACK
+            font = self.font or cfg.FONT_MAIN
+            cjk_font = cfg.FONT_CJK_HEADER if font == cfg.FONT_HEADER else cfg.FONT_CJK_MAIN
             for i, line in enumerate(lines):
-                draw.text((x + padding_x, y + (i * cfg.ROW_HEIGHT) + padding_y), line, font=self.font or cfg.FONT_MAIN, fill=fg)
+                draw_text_with_cjk(draw, (x + padding_x, y + (i * cfg.ROW_HEIGHT) + padding_y), line, font, cjk_font, fill=fg)
 
     def _draw_container(self, draw, x, y, w, h, invert=False):
         bg = cfg.BLACK if invert else cfg.WHITE
@@ -307,16 +310,17 @@ class Item:
     def _draw_text_box(self, draw, canvas, text, x, y, w, h, invert=False, center=False, font=None, padding=None):
         if h < 1 or w < 1: return
         font = font or (self.font if self.font else cfg.FONT_MAIN)
+        cjk_font = cfg.FONT_CJK_HEADER if font == cfg.FONT_HEADER else cfg.FONT_CJK_MAIN
         padding = padding or (self.padding if self.padding else (5, 3))
         padding_x, padding_y = padding
         bg = cfg.BLACK if invert else cfg.WHITE
         fg = cfg.WHITE if invert else cfg.BLACK
         draw.rectangle((x, y, x + w, y + h), fill=bg, outline=cfg.BLACK)
         if center:
-            bbox = draw.textbbox((0, 0), text, font=font)
-            draw_x = x + (w - (bbox[2] - bbox[0])) // 2 + 1
+            text_w = get_text_width_with_cjk(text, font, cjk_font)
+            draw_x = x + (w - text_w) // 2 + 1
         else: draw_x = x + padding_x
-        draw.text((draw_x, y + padding_y), text, font=font, fill=fg)
+        draw_text_with_cjk(draw, (draw_x, y + padding_y), text, font, cjk_font, fill=fg)
 
     def _calculate_widths(self, total_w: int, count: int) -> List[int]:
         if not self.columns: return []

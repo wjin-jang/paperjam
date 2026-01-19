@@ -130,20 +130,24 @@ BATTERY_SHUTDOWN_THRESHOLD = 12
 # --- Fonts ---
 def load_fonts():
     base_path = Path(__file__).parent / "assets"
-    
+
     def get_font(name, size):
         path = base_path / name
         return ImageFont.truetype(str(path), size) if path.exists() else ImageFont.load_default()
 
     main = get_font(_config.get("font_main", "BMmini.ttf"), 9)
     header = get_font(_config.get("font_header", "Nintendo-DS-BIOS.ttf"), 12)
-    
+
+    # CJK fonts (Galmuri)
+    cjk_main = get_font("Galmuri7.ttf", 7)
+    cjk_header = get_font("Galmuri9.ttf", 9)
+
     icons_path = base_path / _config.get("font_icons", "Icons.ttf")
     icons = ImageFont.truetype(str(icons_path), 6) if icons_path.exists() else None
-    
-    return main, header, icons
 
-FONT_MAIN, FONT_HEADER, FONT_ICONS = load_fonts()
+    return main, header, icons, cjk_main, cjk_header
+
+FONT_MAIN, FONT_HEADER, FONT_ICONS, FONT_CJK_MAIN, FONT_CJK_HEADER = load_fonts()
 
 # --- Status Icons ---
 STATUS_ICONS = {

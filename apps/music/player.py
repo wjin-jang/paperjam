@@ -311,6 +311,7 @@ class MusicPlayerApp(AppBase):
 
         if self.state.screensaver_image:
             self.state.screensaver_image = self.state.playing_cover_l or self.state.playing_cover_s
+            self.state.needs_refresh = True
 
         if play:
             self.lib.add_recent(Path(path))

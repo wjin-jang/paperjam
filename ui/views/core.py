@@ -10,7 +10,7 @@ from typing import List, Optional, TYPE_CHECKING
 from PIL import Image, ImageDraw
 
 import config as cfg
-from ui.graphics import create_dithered_strip
+from ui.graphics import create_dithered_strip, draw_text_with_cjk
 
 if TYPE_CHECKING:
     from ui.views.items import Item
@@ -379,10 +379,10 @@ class Panel:
                 (self.x, self.y, self.x + self.width, self.y + cfg.ROW_HEIGHT),
                 fill=cfg.BLACK
             )
-            draw.text(
-                (self.x + 5, self.y),
+            draw_text_with_cjk(
+                draw, (self.x + 5, self.y),
                 self.header,
-                font=cfg.FONT_HEADER, fill=cfg.WHITE
+                cfg.FONT_HEADER, cfg.FONT_CJK_HEADER, fill=cfg.WHITE
             )
 
         # Render menu content
