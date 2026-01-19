@@ -92,11 +92,11 @@ class SettingsApp(AppBase):
     def _refresh_main_menu(self):
         """Rebuild main menu items with current locale."""
         items = [
-            Item(text=t('settings.categories.audio'), id="AUDIO"),
-            Item(text=t('settings.categories.library'), id="LIBRARY"),
-            Item(text=t('settings.categories.network'), id="NETWORK"),
-            Item(text=t('settings.categories.system'), id="SYSTEM"),
-            Item(text=t('settings.categories.display'), id="DISPLAY")
+            Item(text=t('settings.menu.audio'), id="AUDIO"),
+            Item(text=t('settings.menu.library'), id="LIBRARY"),
+            Item(text=t('settings.menu.network'), id="NETWORK"),
+            Item(text=t('settings.menu.system'), id="SYSTEM"),
+            Item(text=t('settings.menu.display'), id="DISPLAY")
         ]
         self.main_menu.set_items(items, reset_index=False)
 

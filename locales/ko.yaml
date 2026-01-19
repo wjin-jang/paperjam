@@ -83,6 +83,12 @@ settings:
     network: "네트워크"
     system: "시스템"
     display: "디스플레이"
+  menu:
+    audio: "오디오"
+    library: "라이브러리"
+    network: "네트워크"
+    system: "시스템"
+    display: "디스플레이"
 
   audio:
     volume: "볼륨"
