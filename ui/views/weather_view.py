@@ -240,7 +240,7 @@ def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
         text_bbox = cfg.FONT_MAIN.getbbox(val_text)
         text_w = text_bbox[2]
         text_h = text_bbox[3]
-        text_x = 0
+        text_x = bar_x1
         text_y = 0
 
         # Create text image
