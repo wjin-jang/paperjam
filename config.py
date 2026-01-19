@@ -146,7 +146,7 @@ def load_fonts():
         return ImageFont.truetype(str(path), size, layout_engine=ImageFont.Layout.BASIC)
 
     main = get_font(_config.get("font_main", "BMmini.ttf"), 10)
-    header = get_font(_config.get("font_header", "Nintendo-DS-BIOS.ttf"), 13)
+    header = get_font(_config.get("font_header", "Nintendo-DS-BIOS.ttf"), 12)
 
     # CJK fonts (Galmuri)
     cjk_main = get_font("Galmuri7.ttf", 8)

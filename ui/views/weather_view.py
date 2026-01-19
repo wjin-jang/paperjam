@@ -131,7 +131,7 @@ def render_current_section(weather: WeatherData, width: int, height: int,
         (t('weather.wind'), f"{int(wind)}"),
     ]
     for i, (label, value) in enumerate(stats):
-        row_y = i * cfg.ROW_HEIGHT + 3
+        row_y = i * cfg.ROW_HEIGHT
         draw.text((stats_x, row_y), f"{label} {value}", font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
     # Vertical divider
