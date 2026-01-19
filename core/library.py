@@ -44,11 +44,13 @@ class LibraryManager:
         self.fav_tracks = set()
         self.fav_albums = set()
         self.fav_artists = set()
+        self._favs_dirty = False  # Track if favorites need saving
 
         self.is_scanning = False
         self._lock = threading.Lock()
         self._scan_lock = threading.Lock()  # Separate lock for scan progress
         self._all_tracks_cache = None
+        self._track_count_cache = None
         self._on_scan_complete = None  # Callback for scan completion
 
         # Scan progress tracking (protected by _scan_lock)
@@ -182,6 +184,7 @@ class LibraryManager:
             self.artists = dict(sorted(temp_artists.items(), key=lambda x: x[0].lower()))
             self.albums = dict(sorted(temp_albums.items(), key=lambda x: x[0].lower()))
             self._all_tracks_cache = None
+            self._track_count_cache = None
             self._save_cache()
 
         with self._scan_lock:
@@ -365,17 +368,23 @@ class LibraryManager:
     def toggle_fav_track(self, path_str):
         if path_str in self.fav_tracks: self.fav_tracks.remove(path_str)
         else: self.fav_tracks.add(path_str)
-        self._save_favs()
+        self._favs_dirty = True
 
     def toggle_fav_album(self, album_name):
         if album_name in self.fav_albums: self.fav_albums.remove(album_name)
         else: self.fav_albums.add(album_name)
-        self._save_favs()
+        self._favs_dirty = True
 
     def toggle_fav_artist(self, artist_name):
         if artist_name in self.fav_artists: self.fav_artists.remove(artist_name)
         else: self.fav_artists.add(artist_name)
-        self._save_favs()
+        self._favs_dirty = True
+
+    def flush_favs(self):
+        """Save favorites if dirty. Call periodically or on shutdown."""
+        if self._favs_dirty:
+            self._save_favs()
+            self._favs_dirty = False
 
     def _save_favs(self):
         try:
@@ -410,10 +419,12 @@ class LibraryManager:
         return tracks
 
     def get_total_tracks(self):
-        count = 0
-        for tracks in self.artists.values():
-            count += len(tracks)
-        return count
+        if self._track_count_cache is None:
+            count = 0
+            for tracks in self.artists.values():
+                count += len(tracks)
+            self._track_count_cache = count
+        return self._track_count_cache
 
     @staticmethod
     def get_total_duration(tracks) -> int:

@@ -58,6 +58,11 @@ class MainApp:
         self._max_partial_refreshes = 120  # Max partials before forced full refresh
         self._display_sleeping = False  # Track display sleep state for screensaver
 
+        # Status cache (avoid checking system status every frame)
+        self._status_cache = (None, None, None)  # (audio, wifi, bluetooth)
+        self._status_cache_time = 0
+        self._status_cache_interval = 5  # Seconds between status checks
+
         # Setup Global Callbacks
         self.sys.on_shutdown_request = self._handle_shutdown_request
         self.settings_app.categories['SYSTEM'].set_screen_clear_callback(self._perform_screen_clear_shutdown)
@@ -258,6 +263,9 @@ class MainApp:
                 if self.current_app != self.music_app:
                     self.music_app.update()
 
+                # Periodic flush of dirty data
+                self.music_app.lib.flush_favs()
+
                 time.sleep(0.05)
 
         except KeyboardInterrupt:
@@ -265,6 +273,7 @@ class MainApp:
         except Exception as e:
             logger.critical(f"Critical Error: {e}", exc_info=True)
         finally:
+            self.music_app.lib.flush_favs()  # Save any pending favorites
             self.sys.sleep_display()
 
     def launch_app(self, app_id):
@@ -490,12 +499,16 @@ class MainApp:
     def _display(self, img, full_refresh=False, skip_battery=False, skip_status=False):
         # Apply Overlays
         if not skip_status:
-            img = self.renderer.overlays.draw_status_icons(
-                img,
-                self.sys.check_audio_device(),
-                self.sys.check_wifi(),
-                self.sys.check_bluetooth()
-            )
+            # Use cached status values (refresh every few seconds)
+            now = time.time()
+            if now - self._status_cache_time > self._status_cache_interval:
+                self._status_cache = (
+                    self.sys.check_audio_device(),
+                    self.sys.check_wifi(),
+                    self.sys.check_bluetooth()
+                )
+                self._status_cache_time = now
+            img = self.renderer.overlays.draw_status_icons(img, *self._status_cache)
         if not skip_battery:
             img = self.renderer.overlays.draw_battery(img)
 

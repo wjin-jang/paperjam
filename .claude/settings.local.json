@@ -13,7 +13,8 @@
       "Bash(findstr:*)",
       "Bash(findstr /R \"t\\(''\")",
       "Bash(cd:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(python -m py_compile:*)"
     ]
   }
 }

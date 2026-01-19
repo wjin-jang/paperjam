@@ -1,4 +1,4 @@
-# paperjam
+# PaperJam
 
 E-ink music player for Raspberry Pi Zero 2 W.
 
@@ -6,87 +6,61 @@ E-ink music player for Raspberry Pi Zero 2 W.
 
 - Raspberry Pi Zero 2 W
 - Waveshare 2.13" e-Paper display (V4)
-- SugarPi 3 battery module
+- PiSugar 3 battery module
 
 ## Features
 
-### Music Player
-- Browse by Artists, Albums, Tracks, or Files
-- Favorite Artists and Albums with quick access
-- User playlists with add/remove functionality
-- Recently played tracks history
-- Shuffle and loop modes (off, all, one)
-- Album art display with dithered rendering
-- Screensaver with random album art
-- Endless playback mode - automatically plays random albums
+- **Music Player** - Browse by artist, album, track, or file. Favorites, playlists, shuffle, loop, and endless playback modes.
+- **Library** - Auto-scanning with metadata extraction. Supports MP3, FLAC, WAV, M4A.
+- **Audio** - VLC engine with PulseAudio. Bluetooth and wired audio output.
+- **Display** - 1-bit e-paper with partial refresh. Album art, status icons, screensaver.
+- **Input** - Keyboard, IR remote, and media keys. Long-press for context menus.
 
-### Library Management
-- Automatic library scanning and caching
-- Support for MP3, FLAC, WAV, M4A formats
-- Track metadata extraction (title, artist, album, year, track number, disc number)
-- Multi-disc album support with disc headings
-- Alphabetical artist organization with quick-jump headings
+## Quick Start
 
-### Audio
-- VLC-based audio engine with PulseAudio support
-- Audio output device switching (cycles through available devices)
-- Volume control with on-screen display
-- Bluetooth audio device pairing and management
+```bash
+# Install (fresh Raspberry Pi)
+curl -fsSL https://raw.githubusercontent.com/wjin-jang/paperjam/main/install.sh | bash
 
-### Connectivity
-- WiFi status display and network switching
-- Bluetooth device scanning, pairing, and management
-- Status icons for connected devices (headphones, WiFi, Bluetooth)
+# Or run manually
+cd ~/paperjam
+source venv/bin/activate
+python main.py
+```
 
-### Display
-- 1-bit monochrome e-paper display
-- Partial refresh for smooth navigation
-- Color inversion option
-- Configurable screensaver timeout
-- Battery level indicator with charging status
-- Low battery auto-shutdown protection
+## Service
 
-### Settings
-- Audio output selection
-- Endless playback toggle
-- Volume control
-- Library rescan
-- Recent tracks limit
-- Color inversion
-- Screensaver timeout
-- WiFi toggle
-- Bluetooth toggle
-- CPU power mode (normal/powersave)
-- Long press duration
-- Screen clear shutdown (for screen removal)
-- System restart
-
-### Input
-- Multi-device support (keyboard, remote, media keys)
-- Long press detection for context menus
-- Debounced input handling
+```bash
+systemctl --user start paperjam     # Start
+systemctl --user stop paperjam      # Stop
+systemctl --user status paperjam    # Status
+```
 
 ## Logs
 
-Application logs are stored at:
-```
-~/.cache/paperjam/paperjam.log
-```
-
-To view logs in real-time:
 ```bash
 tail -f ~/.cache/paperjam/paperjam.log
 ```
 
-## Installation
+## Update
 
-See [INSTALL.md](INSTALL.md) for complete setup instructions including:
-- System configuration (I2C, SPI, Bluetooth)
-- User permissions
-- PulseAudio setup
-- Virtual environment setup
-- Auto-start on boot
+```bash
+cd ~/paperjam && ./update.sh
+```
 
-## Version
+## Configuration
 
-1.0
+Config file: `~/.config/paperjam/config.json`
+
+```json
+{
+    "music_path": "/home/pi/Music",
+    "screensaver_timeout": 60,
+    "invert_colors": false
+}
+```
+
+## Documentation
+
+- [Installation Guide](INSTALL.md)
+- [Architecture](ARCHITECTURE.md)
