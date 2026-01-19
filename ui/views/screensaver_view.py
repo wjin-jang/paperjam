@@ -40,7 +40,7 @@ class ScreensaverRenderer:
         panel_w = img_w + 1
         panel_h = img_h + 1
 
-        x = cfg.SCREEN_WIDTH - panel_w - 104
+        x = cfg.SCREEN_WIDTH - panel_w - 108
         y = (cfg.SCREEN_HEIGHT - panel_h) // 2
 
         # Create panel
@@ -82,9 +82,9 @@ class ScreensaverRenderer:
 
         # Add items for status, title, artist, album
         info_menu.items = [
-            Item(columns=[title,status_icon], font=cfg.FONT_HEADER, padding=(2, 0), selectable=False, sanitize=False),
-            Item(text=artist, selectable=False),
+            Item(columns=[title,f"{status_icon}"], font=cfg.FONT_HEADER, padding=(2, 0), selectable=False, sanitize=False),
             Item(text=album, selectable=False),
+            Item(text=artist, selectable=False),
         ]
 
         info_panel.render(self.canvas)
