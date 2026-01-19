@@ -260,7 +260,7 @@ class Item:
             right_widths = column_widths if column_widths else self._calc_column_widths(columns, w)
             col_x = x + max(20, w - sum(right_widths))
             for i, col in enumerate(columns[1:]):
-                col_w = right_widths[i] if i < len(right_widths) else 50
+                col_w = right_widths[i] if i < len(right_widths) else 12
                 col_text = sanitize_text(str(col)) if self.sanitize else str(col)
                 self._draw_aligned_text(draw, col_text, col_x, y, col_w, cfg.ROW_HEIGHT, 'center', fg)
                 col_x += col_w
@@ -273,7 +273,7 @@ class Item:
         self._draw_text_box(draw, canvas, col0_text, x, y, left_w, cfg.ROW_HEIGHT, invert=invert)
         col_x = x + left_w
         for i, col in enumerate(self.columns[1:]):
-            col_w = right_widths[i] if i < len(right_widths) else 50
+            col_w = right_widths[i] if i < len(right_widths) else 12
             col_text = sanitize_text(str(col)) if self.sanitize else str(col)
             self._draw_text_box(draw, canvas, col_text, col_x, y, col_w, cfg.ROW_HEIGHT, center=True, invert=invert)
             col_x += col_w
@@ -370,7 +370,7 @@ def calc_menu_column_widths(items, total_width):
     if not items:
         return {}
 
-    default_col_width = 32
+    default_col_width = 12
     group_threshold = 32  # Group widths within this difference
 
     # Collect all column widths per item
