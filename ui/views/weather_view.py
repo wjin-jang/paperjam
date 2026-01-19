@@ -117,22 +117,22 @@ def render_current_section(weather: WeatherData, width: int, height: int,
     temp_text = f"{int(temp)}°"
     draw.text((20, 0), temp_text, font=cfg.FONT_HEADER, fill=cfg.BLACK)
 
-    cond_text = SHORT_CONDITIONS.get(condition_name, '???')
-    draw.text((20, 14), cond_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+    cond_text = SHORT_CONDITIONS.get(condition_name, '???').upper()
+    draw.text((20, 14), cond_text, font=cfg.FONT_HEADER, fill=cfg.BLACK)
 
     # Vertical divider
     draw.line((col_w, 0, col_w, height - 1), fill=cfg.BLACK)
 
-    # Column 2: Stats
-    stats_x = col_w + 4
+    # Column 2: Stats (using row heights)
+    stats_x = col_w + 5
     stats = [
         (t('weather.precip'), f"{precip}%"),
         (t('weather.humidity'), f"{humid}%"),
         (t('weather.wind'), f"{int(wind)}"),
     ]
     for i, (label, value) in enumerate(stats):
-        y = i * 8
-        draw.text((stats_x, y), f"{label} {value}", font=cfg.FONT_MAIN, fill=cfg.BLACK)
+        row_y = i * cfg.ROW_HEIGHT + 3
+        draw.text((stats_x, row_y), f"{label} {value}", font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
     # Vertical divider
     draw.line((col_w * 2, 0, col_w * 2, height - 1), fill=cfg.BLACK)
@@ -141,10 +141,10 @@ def render_current_section(weather: WeatherData, width: int, height: int,
     day_x = col_w * 2
     day_col_w = col_w
 
-    # Get day labels
+    # Get day labels (full day names)
     day_labels = [t('weather.today'), t('weather.tomorrow')]
     if len(weather.daily) > 2:
-        day_labels.append(weather.daily[2].day_name)
+        day_labels.append(weather.daily[2].day_name_full)
     else:
         day_labels.append("???")
 
@@ -163,12 +163,14 @@ def render_current_section(weather: WeatherData, width: int, height: int,
 
 
 def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
-                     value_fn, format_fn, is_percentage: bool = False,
+                     value_fn, format_fn, label: str = None,
+                     is_percentage: bool = False,
                      scroll_offset: int = 0, visible_hours: int = 8,
                      min_range: float = 10.0) -> Image.Image:
     """Render bar chart as an image.
 
     Args:
+        label: Label to draw in top left corner (e.g., "TEMPERATURE")
         min_range: Minimum range for scaling (prevents over-exaggeration of small differences)
     """
     img = Image.new('1', (width, height), cfg.WHITE)
@@ -182,8 +184,8 @@ def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
         return img
 
     bar_w = width // visible_hours
-    bar_area_h = height - 16  # Space for value at top (8) and time at bottom (8)
-    bar_area_y = 8  # Bar area starts after value row
+    bar_area_h = height - 8  # Only time at bottom (8)
+    bar_area_y = 0  # Bar area starts from top
 
     all_values = [value_fn(h) for h in hourly]
     values = [value_fn(h) for h in visible]
@@ -207,6 +209,7 @@ def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
 
     val_range = max_val - min_val if max_val != min_val else 1
 
+    # Draw all bars first
     for i, (h, val) in enumerate(zip(visible, values)):
         bx = i * bar_w
         center = bx + bar_w // 2
@@ -222,48 +225,39 @@ def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
         bar_x1 = bx + 2
         bar_x2 = bx + bar_w - 3
 
-        # Draw bar first
+        # Draw bar
         draw.rectangle((bar_x1, bar_y, bar_x2, bar_area_y + bar_area_h), fill=cfg.BLACK)
-
-        # Value text at top - draw with partial inversion
-        val_text = format_fn(val)
-        text_bbox = cfg.FONT_MAIN.getbbox(val_text)
-        text_w = text_bbox[2]
-        text_h = text_bbox[3]
-        text_x = center - text_w // 2
-        text_y = 0
-
-        # Check if text overlaps with bar
-        text_bottom = text_y + text_h
-        if text_bottom > bar_y:
-            # Draw text in two parts: above bar (black) and over bar (white/inverted)
-            # Create a small image for the text
-            text_img = Image.new('1', (text_w, text_h), cfg.WHITE)
-            text_draw = ImageDraw.Draw(text_img)
-            text_draw.text((0, 0), val_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
-
-            # Paste the non-overlapping part normally
-            if bar_y > text_y:
-                non_overlap_h = bar_y - text_y
-                non_overlap = text_img.crop((0, 0, text_w, non_overlap_h))
-                img.paste(non_overlap, (text_x, text_y))
-
-            # For overlapping part, invert
-            overlap_start = max(0, bar_y - text_y)
-            overlap_img = text_img.crop((0, overlap_start, text_w, text_h))
-            # Invert: where text is black, we want white on black background
-            for py in range(overlap_img.height):
-                for px in range(overlap_img.width):
-                    if overlap_img.getpixel((px, py)) == 0:  # Black text
-                        img.putpixel((text_x + px, text_y + overlap_start + py), cfg.WHITE)
-        else:
-            # No overlap, draw normally
-            draw.text((text_x, text_y), val_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
         # Time at bottom - use full format (12:00)
         hour_text = h.hour
         hour_w = cfg.FONT_MAIN.getbbox(hour_text)[2]
         draw.text((center - hour_w // 2, height - 8), hour_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+
+    # Draw label in top left corner with partial inversion
+    if label:
+        label_text = label.upper()
+        text_bbox = cfg.FONT_MAIN.getbbox(label_text)
+        text_w = text_bbox[2]
+        text_h = text_bbox[3]
+        text_x = 2
+        text_y = 0
+
+        # Create text image
+        text_img = Image.new('1', (text_w, text_h), cfg.WHITE)
+        text_draw = ImageDraw.Draw(text_img)
+        text_draw.text((0, 0), label_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+
+        # Draw each pixel, inverting where it overlaps with black (bar)
+        for py in range(text_h):
+            for px in range(text_w):
+                img_x = text_x + px
+                img_y = text_y + py
+                if img_x < width and img_y < height:
+                    text_pixel = text_img.getpixel((px, py))
+                    bg_pixel = img.getpixel((img_x, img_y))
+                    if text_pixel == 0:  # Text is black
+                        # Invert: white on black, black on white
+                        img.putpixel((img_x, img_y), cfg.WHITE if bg_pixel == 0 else cfg.BLACK)
 
     return img
 
@@ -283,22 +277,25 @@ def render_weekly(daily: List[DailyForecast], width: int, height: int) -> Image.
         dx = i * day_w
         center = dx + day_w // 2
 
-        # Small weather icon
+        # Row 1: Icon + Day name inline (FONT_MAIN)
         condition_name, _ = d.condition
         icon = load_icon(condition_name, small=True)
-        if icon:
-            ix = center - icon.width // 2
-            img.paste(icon, (ix, 0))
-
-        # Day name
-        day_name = d.day_name[:2]
+        day_name = d.day_name[:3].upper()
         name_w = cfg.FONT_MAIN.getbbox(day_name)[2]
-        draw.text((center - name_w // 2, 11), day_name, font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
-        # Temperature
+        # Calculate total width of icon + day name
+        icon_w = icon.width if icon else 0
+        total_w = icon_w + 2 + name_w  # 2px gap between icon and text
+        start_x = center - total_w // 2
+
+        if icon:
+            img.paste(icon, (start_x, 1))
+        draw.text((start_x + icon_w + 2, 1), day_name, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+
+        # Row 2: Temperature (FONT_HEADER)
         temp_text = f"{int(d.avg_temperature)}°"
-        temp_w = cfg.FONT_MAIN.getbbox(temp_text)[2]
-        draw.text((center - temp_w // 2, 19), temp_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+        temp_w = cfg.FONT_HEADER.getbbox(temp_text)[2]
+        draw.text((center - temp_w // 2, 12), temp_text, font=cfg.FONT_HEADER, fill=cfg.BLACK)
 
     return img
 
@@ -368,33 +365,31 @@ class WeatherViewRenderer:
         # Get hourly data for selected day
         hourly = self._get_hourly(weather.hourly, day_offset)
 
-        # Temperature section
-        items.append(Item(text=t('weather.temperature'), heading=True,
-                         id={'section': SECTION_TEMPERATURE}))
-
+        # Temperature chart (label drawn on chart)
         temp_chart = render_bar_chart(
             hourly, content_w, self.CHART_H,
             value_fn=lambda h: h.temperature,
             format_fn=lambda v: f"{int(v)}",
+            label=t('weather.temperature'),
             scroll_offset=chart_scroll,
             min_range=10.0  # Minimum 10 degree range
         )
-        temp_item = Item(image=temp_chart, show_image=True, selectable=False)
+        temp_item = Item(image=temp_chart, show_image=True, selectable=True,
+                        id={'section': SECTION_TEMPERATURE})
         temp_item.set_height(self.CHART_H)
         items.append(temp_item)
 
-        # Precipitation section
-        items.append(Item(text=t('weather.precipitation'), heading=True,
-                         id={'section': SECTION_PRECIPITATION}))
-
+        # Precipitation chart (label drawn on chart)
         precip_chart = render_bar_chart(
             hourly, content_w, self.CHART_H,
             value_fn=lambda h: h.precipitation_probability,
             format_fn=lambda v: f"{int(v)}",
+            label=t('weather.precipitation'),
             is_percentage=True,
             scroll_offset=chart_scroll
         )
-        precip_item = Item(image=precip_chart, show_image=True, selectable=False)
+        precip_item = Item(image=precip_chart, show_image=True, selectable=True,
+                          id={'section': SECTION_PRECIPITATION})
         precip_item.set_height(self.CHART_H)
         items.append(precip_item)
 
@@ -413,8 +408,8 @@ class WeatherViewRenderer:
         row_map = {
             SECTION_DAY: 0,
             SECTION_TEMPERATURE: 1,
-            SECTION_PRECIPITATION: 3,
-            SECTION_WEEKLY: 5,
+            SECTION_PRECIPITATION: 2,
+            SECTION_WEEKLY: 3,
         }
         menu.cursor.row = row_map.get(selected_section, 0)
         menu._ensure_visible()

@@ -106,6 +106,15 @@ class DailyForecast:
             return "???"
 
     @property
+    def day_name_full(self) -> str:
+        """Get full day name (e.g., 'Wednesday')."""
+        try:
+            dt = datetime.fromisoformat(self.date)
+            return dt.strftime("%A")
+        except (ValueError, TypeError):
+            return "???"
+
+    @property
     def avg_temperature(self) -> float:
         """Get average temperature."""
         return (self.temperature_max + self.temperature_min) / 2
