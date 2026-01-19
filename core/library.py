@@ -20,7 +20,7 @@ from pathlib import Path
 from dataclasses import dataclass
 import config as cfg
 from ui.graphics import get_cover
-from core.metadata import extract_track_info
+from core.metadata import extract_track_info, get_full_sort_key
 from config import setup_logger
 from core.i18n import t
 
@@ -187,8 +187,8 @@ class LibraryManager:
             tracks.sort(key=lambda x: (x.get('disc', 0), x.get('track', 0)))
 
         with self._lock:
-            self.artists = dict(sorted(temp_artists.items(), key=lambda x: x[0].lower()))
-            self.albums = dict(sorted(temp_albums.items(), key=lambda x: x[0].lower()))
+            self.artists = dict(sorted(temp_artists.items(), key=lambda x: get_full_sort_key(x[0])))
+            self.albums = dict(sorted(temp_albums.items(), key=lambda x: get_full_sort_key(x[0])))
             self._all_tracks_cache = None
             self._track_count_cache = None
             self._save_cache()

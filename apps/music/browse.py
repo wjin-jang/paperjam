@@ -7,7 +7,7 @@ from typing import List, Optional, Tuple
 
 import config as cfg
 from core.i18n import t
-from core.metadata import format_duration
+from core.metadata import format_duration, get_sort_key
 from ui.graphics import get_cover
 from core.metadata import extract_track_info
 from core.library import LibraryManager
@@ -55,12 +55,10 @@ class BrowseHandler:
 
         for k in data_dict.keys():
             if use_headings:
-                first_char = k[0].upper() if k else '#'
-                if not first_char.isalpha():
-                    first_char = '#'
-                if first_char != current_letter:
-                    current_letter = first_char
-                    items.append({'name': first_char, 'heading': True})
+                group_key = get_sort_key(k)
+                if group_key != current_letter:
+                    current_letter = group_key
+                    items.append({'name': group_key, 'heading': True})
             items.append({'name': k, 'id': {'kind': item_kind, 'mode': item_mode}})
         return items
 

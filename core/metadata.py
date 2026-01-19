@@ -165,3 +165,91 @@ def extract_track_info(file_path: Path) -> TrackInfo:
         year=meta[5] if meta[5] else "",
         duration=meta[6] if len(meta) > 6 else 0
     )
+
+
+# --- CJK Sorting ---
+
+# Korean Hangul initial consonants (Choseong)
+_HANGUL_INITIALS = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'
+
+# Language group order
+LANG_SYMBOL = 0
+LANG_LATIN = 1
+LANG_KOREAN = 2
+LANG_JAPANESE = 3
+LANG_CHINESE = 4
+LANG_OTHER = 5
+
+# Display labels for non-Latin language groups
+_LANG_LABELS = {
+    LANG_KOREAN: '가-힣',
+    LANG_JAPANESE: 'あ-ん',
+    LANG_CHINESE: '漢字',
+    LANG_OTHER: '기타',
+}
+
+
+def get_language_and_key(text: str) -> tuple:
+    """
+    Get (language_group, sort_key, display_key) for text.
+
+    For Latin: individual letter grouping (A, B, C...)
+    For non-Latin: grouped by language with internal sorting
+
+    Returns:
+        Tuple of (language_order, sort_key_for_ordering, display_key_for_heading)
+    """
+    if not text:
+        return (LANG_SYMBOL, '', '#')
+
+    char = text[0]
+    code = ord(char)
+
+    # ASCII letters (A-Z) - individual letter grouping
+    if char.isascii() and char.isalpha():
+        upper = char.upper()
+        return (LANG_LATIN, upper, upper)
+
+    # Korean Hangul syllables (AC00-D7AF)
+    if 0xAC00 <= code <= 0xD7AF:
+        initial_idx = (code - 0xAC00) // 588
+        # Sort by initial consonant within Korean group
+        base_order = 'ㄱㄱㄴㄷㄷㄹㅁㅂㅂㅅㅅㅇㅈㅈㅊㅋㅌㅍㅎ'
+        sort_key = base_order[initial_idx] + chr(initial_idx + 0x100)
+        return (LANG_KOREAN, sort_key, _LANG_LABELS[LANG_KOREAN])
+
+    # Korean Hangul Jamo
+    if 0x1100 <= code <= 0x1112 or 0x3131 <= code <= 0x314E:
+        return (LANG_KOREAN, char, _LANG_LABELS[LANG_KOREAN])
+
+    # Japanese Hiragana (3040-309F)
+    if 0x3041 <= code <= 0x3096:
+        row_idx = (code - 0x3041) // 5
+        return (LANG_JAPANESE, chr(row_idx + 0x100), _LANG_LABELS[LANG_JAPANESE])
+
+    # Japanese Katakana (30A0-30FF)
+    if 0x30A1 <= code <= 0x30F6:
+        row_idx = (code - 0x30A1) // 5
+        return (LANG_JAPANESE, chr(row_idx + 0x100), _LANG_LABELS[LANG_JAPANESE])
+
+    # CJK Unified Ideographs - sort by Unicode code point
+    if 0x4E00 <= code <= 0x9FFF:
+        return (LANG_CHINESE, char, _LANG_LABELS[LANG_CHINESE])
+
+    # Other alphabetic (Cyrillic, Greek, etc.)
+    if char.isalpha():
+        return (LANG_OTHER, char.lower(), _LANG_LABELS[LANG_OTHER])
+
+    # Symbols, numbers, etc.
+    return (LANG_SYMBOL, text[0], '#')
+
+
+def get_sort_key(text: str) -> str:
+    """Get display key for alphabetical heading."""
+    return get_language_and_key(text)[2]
+
+
+def get_full_sort_key(text: str) -> tuple:
+    """Get full sort key tuple for ordering: (language_group, sort_key, text)."""
+    lang, key, _ = get_language_and_key(text)
+    return (lang, key, text.lower())

@@ -200,7 +200,7 @@ def is_cjk(char):
     )
 
 
-def draw_text_with_cjk(draw, xy, text, font, cjk_font, fill=0):
+def draw_text_with_cjk(draw, xy, text, font, cjk_font, fill=0, cjk_y_offset=0):
     """
     Draw text using regular font for non-CJK and Galmuri font for CJK characters.
 
@@ -211,6 +211,7 @@ def draw_text_with_cjk(draw, xy, text, font, cjk_font, fill=0):
         font: Regular font for non-CJK characters
         cjk_font: Galmuri font for CJK characters
         fill: Color value (default 0 = black)
+        cjk_y_offset: Y offset for CJK font (default 0)
     """
     if not text:
         return
@@ -230,7 +231,8 @@ def draw_text_with_cjk(draw, xy, text, font, cjk_font, fill=0):
         else:
             # Render accumulated text
             used_font = cjk_font if current_is_cjk else font
-            draw.text((x, y), current_text, font=used_font, fill=fill)
+            text_y = y + cjk_y_offset if current_is_cjk else y
+            draw.text((x, text_y), current_text, font=used_font, fill=fill)
             bbox = used_font.getbbox(current_text)
             x += bbox[2] - bbox[0]
 
@@ -241,7 +243,8 @@ def draw_text_with_cjk(draw, xy, text, font, cjk_font, fill=0):
     # Render remaining text
     if current_text:
         used_font = cjk_font if current_is_cjk else font
-        draw.text((x, y), current_text, font=used_font, fill=fill)
+        text_y = y + cjk_y_offset if current_is_cjk else y
+        draw.text((x, text_y), current_text, font=used_font, fill=fill)
 
 
 def get_text_width_with_cjk(text, font, cjk_font):

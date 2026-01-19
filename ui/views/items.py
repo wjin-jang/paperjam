@@ -300,8 +300,9 @@ class Item:
             fg = cfg.WHITE if invert else cfg.BLACK
             font = self.font or cfg.FONT_MAIN
             cjk_font = cfg.FONT_CJK_HEADER if font == cfg.FONT_HEADER else cfg.FONT_CJK_MAIN
+            cjk_y_offset = 1 if font == cfg.FONT_HEADER else 0
             for i, line in enumerate(lines):
-                draw_text_with_cjk(draw, (x + padding_x, y + (i * cfg.ROW_HEIGHT) + padding_y), line, font, cjk_font, fill=fg)
+                draw_text_with_cjk(draw, (x + padding_x, y + (i * cfg.ROW_HEIGHT) + padding_y), line, font, cjk_font, fill=fg, cjk_y_offset=cjk_y_offset)
 
     def _draw_container(self, draw, x, y, w, h, invert=False):
         bg = cfg.BLACK if invert else cfg.WHITE
@@ -311,6 +312,7 @@ class Item:
         if h < 1 or w < 1: return
         font = font or (self.font if self.font else cfg.FONT_MAIN)
         cjk_font = cfg.FONT_CJK_HEADER if font == cfg.FONT_HEADER else cfg.FONT_CJK_MAIN
+        cjk_y_offset = 1 if font == cfg.FONT_HEADER else 0
         padding = padding or (self.padding if self.padding else (5, 3))
         padding_x, padding_y = padding
         bg = cfg.BLACK if invert else cfg.WHITE
@@ -320,7 +322,7 @@ class Item:
             text_w = get_text_width_with_cjk(text, font, cjk_font)
             draw_x = x + (w - text_w) // 2 + 1
         else: draw_x = x + padding_x
-        draw_text_with_cjk(draw, (draw_x, y + padding_y), text, font, cjk_font, fill=fg)
+        draw_text_with_cjk(draw, (draw_x, y + padding_y), text, font, cjk_font, fill=fg, cjk_y_offset=cjk_y_offset)
 
     def _calculate_widths(self, total_w: int, count: int) -> List[int]:
         if not self.columns: return []

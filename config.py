@@ -133,7 +133,10 @@ def load_fonts():
 
     def get_font(name, size):
         path = base_path / name
-        return ImageFont.truetype(str(path), size) if path.exists() else ImageFont.load_default()
+        if not path.exists():
+            return ImageFont.load_default()
+        # Use BASIC layout engine (no harfbuzz) for pixel fonts
+        return ImageFont.truetype(str(path), size, layout_engine=ImageFont.Layout.BASIC)
 
     main = get_font(_config.get("font_main", "BMmini.ttf"), 9)
     header = get_font(_config.get("font_header", "Nintendo-DS-BIOS.ttf"), 12)
@@ -143,7 +146,7 @@ def load_fonts():
     cjk_header = get_font("Galmuri9.ttf", 10)
 
     icons_path = base_path / _config.get("font_icons", "Icons.ttf")
-    icons = ImageFont.truetype(str(icons_path), 6) if icons_path.exists() else None
+    icons = ImageFont.truetype(str(icons_path), 6, layout_engine=ImageFont.Layout.BASIC) if icons_path.exists() else None
 
     return main, header, icons, cjk_main, cjk_header
 
