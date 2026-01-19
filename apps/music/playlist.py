@@ -32,7 +32,8 @@ class PlaylistManager:
         self.shuffle_active: bool = False
         self.loop_mode: int = 0  # 0=off, 1=all, 2=one
         self._on_track_change = on_track_change
-        
+        self._queue_dirty = False  # Track if queue needs saving
+
         # Load persisted queue on startup
         self.load_queue()
 
@@ -75,8 +76,40 @@ class PlaylistManager:
             self.queue_idx = 0
         else:
             self.queue_idx = real_idx
-            
+
         self.save_queue()
+
+    def build_queue_from_tracks(self, tracks: List[dict], shuffle: bool = False, start_idx: int = 0):
+        """
+        Build playback queue from a list of track dicts.
+
+        Args:
+            tracks: List of track dicts with 'path' key
+            shuffle: Whether to shuffle the queue
+            start_idx: Index to start playing from (before shuffle)
+
+        Returns:
+            Index of the first track to play in playlist_source
+        """
+        self.playlist_source = [str(t['path']) for t in tracks]
+        if not self.playlist_source:
+            return 0
+
+        self.shuffle_active = shuffle
+        self.queue = list(range(len(self.playlist_source)))
+
+        if shuffle:
+            random.shuffle(self.queue)
+            # Move start_idx to front
+            if start_idx in self.queue:
+                self.queue.remove(start_idx)
+            self.queue.insert(0, start_idx)
+            self.queue_idx = 0
+        else:
+            self.queue_idx = start_idx
+
+        self.save_queue()
+        return self.queue[self.queue_idx]
 
     def get_current_path(self) -> Optional[str]:
         """Get the current track path."""
@@ -119,15 +152,15 @@ class PlaylistManager:
     def next_track(self, auto_advance=False) -> Optional[str]:
         """
         Move to next track and return its path.
-        
+
         Args:
-            auto_advance: True if advancing automatically (track finished), 
+            auto_advance: True if advancing automatically (track finished),
                          False if user requested next.
         """
         # Priority 1: Manual Queue
         if self.manual_queue:
             path = self.manual_queue.popleft()
-            self.save_queue()
+            self._queue_dirty = True
             return path
 
         # Priority 2: Auto Queue
@@ -136,20 +169,16 @@ class PlaylistManager:
 
         next_idx = (self.queue_idx + 1) % len(self.queue)
         at_end = next_idx == 0
-        
+
         # Stop at end if Loop Off (Manual or Auto)
         if at_end and self.loop_mode == 0:
-            self.queue_idx = 0 # Reset or stay? Reset is fine.
+            self.queue_idx = 0
             return None
-            
+
         # Loop All (1) or One (2) -> Wrap to start (next_idx is 0)
-            
+
         self.queue_idx = next_idx
-        # Don't save on every auto-advance to avoid excessive writes, 
-        # but maybe we should to resume playback? 
-        # For now, let's only save if it's a significant change or periodically?
-        # Actually, saving current index is useful for resume.
-        self.save_queue()
+        self._queue_dirty = True
         return self.get_current_path()
 
 
@@ -160,7 +189,7 @@ class PlaylistManager:
 
         # User navigation overrides Loop One, so we always move back
         self.queue_idx = (self.queue_idx - 1) % len(self.queue)
-        self.save_queue()
+        self._queue_dirty = True
         return self.get_current_path()
 
     def load_track_covers(self, path: str):
@@ -206,8 +235,19 @@ class PlaylistManager:
     def has_queue(self) -> bool:
         """Check if there's an active queue."""
         return bool(self.queue and self.playlist_source)
-        
+
+    def flush_queue(self):
+        """Save queue if dirty. Call periodically or on shutdown."""
+        if self._queue_dirty:
+            self._do_save_queue()
+            self._queue_dirty = False
+
     def save_queue(self):
+        """Mark queue as needing save and save immediately for user actions."""
+        self._queue_dirty = True
+        self._do_save_queue()
+
+    def _do_save_queue(self):
         """Save current queue state to disk."""
         try:
             state = {

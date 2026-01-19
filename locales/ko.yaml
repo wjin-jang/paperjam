@@ -46,6 +46,7 @@ player:
     no_tracks: "(트랙 없음)"
     no_fav_artists: "(즐겨찾는 아티스트 없음)"
     no_fav_albums: "(즐겨찾는 앨범 없음)"
+    no_fav_tracks: "(즐겨찾는 트랙 없음)"
     unknown_album: "알 수 없는 앨범"
     unknown_artist: "알 수 없는 아티스트"
     unknown: "알 수 없음"

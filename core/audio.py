@@ -145,3 +145,21 @@ class AudioEngine:
             vlc.State.Error: 'error'
         }
         return state_map.get(state, 'unknown')
+
+    def cleanup(self):
+        """Release VLC resources. Call on shutdown."""
+        try:
+            if self.player:
+                self.player.stop()
+                self.player.release()
+                self.player = None
+            if self.instance:
+                self.instance.release()
+                self.instance = None
+            logger.info("Audio engine cleaned up")
+        except Exception as e:
+            logger.error(f"Error cleaning up audio engine: {e}")
+
+    def __del__(self):
+        """Destructor to ensure cleanup."""
+        self.cleanup()

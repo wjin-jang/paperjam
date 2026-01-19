@@ -46,6 +46,7 @@ player:
     no_tracks: "(No Tracks)"
     no_fav_artists: "(No Fav Artists)"
     no_fav_albums: "(No Fav Albums)"
+    no_fav_tracks: "(No Fav Tracks)"
     unknown_album: "Unknown Album"
     unknown_artist: "Unknown Artist"
     unknown: "Unknown"

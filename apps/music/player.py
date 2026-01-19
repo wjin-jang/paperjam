@@ -12,7 +12,7 @@ from ui.graphics import get_cover
 from core.metadata import extract_track_info
 from ui.renderer import UIRenderer
 from ui.menu import MenuController, find_next_heading
-from ui.views.items import Item
+from ui.views.items import Item, extract_item_props
 import config as cfg
 
 from apps.music.state import PlayerState
@@ -194,11 +194,12 @@ class MusicPlayerApp(AppBase):
         item = self.menu.get_selected_item()
         if not item: return
 
-        # Get item kind from id dict
-        item_kind = item.kind if isinstance(item, Item) else (item.get('id', {}).get('kind') if isinstance(item.get('id'), dict) else None)
-        is_heading = item.heading if isinstance(item, Item) else item.get('heading', False)
-        is_column_nav = item.column_nav if isinstance(item, Item) else item.get('column_nav', False)
-        is_selectable = item.selectable if isinstance(item, Item) else item.get('selectable', True)
+        # Extract item properties using utility function
+        props = extract_item_props(item)
+        item_kind = props['kind']
+        is_heading = props['heading']
+        is_column_nav = props['column_nav']
+        is_selectable = props['selectable']
 
         # Controls bar - handle button press
         if is_column_nav:
@@ -226,19 +227,18 @@ class MusicPlayerApp(AppBase):
 
         if item_kind in ['playlist', 'dir', 'artist', 'album']:
             self.history.append((self.mode, self.current_path, self.menu.selected_index))
-            new_mode = item.id.get('mode') if isinstance(item, Item) and isinstance(item.id, dict) else item.get('id', {}).get('mode')
+            new_mode = props['mode']
 
             # Show loading for potentially large lists
             if new_mode in ['PLAYLIST_VIEW', 'RECENTS', 'ARTIST_VIEW', 'ALBUM_VIEW', 'FAV_TRACKS_VIEW', 'TRACKS_VIEW', 'ARTISTS_ROOT', 'ALBUMS_ROOT']:
                 self._show_loading(t('general.loading'))
 
             self.mode = new_mode
-            self.current_path = (item.id.get('path') or item.text) if isinstance(item, Item) and isinstance(item.id, dict) else (item.get('id', {}).get('path') or item.get('name'))
+            self.current_path = props['path'] or props['text']
             self.refresh_list(reset_selection=True)
             self._hide_loading()
         elif item_kind == 'file':
-            tpath = item.id.get('path') if isinstance(item, Item) and isinstance(item.id, dict) else item.get('id', {}).get('path')
-            self._play_from_list(tpath)
+            self._play_from_list(props['path'])
 
     def nav_back(self):
         if self._wake_from_screensaver():
@@ -267,8 +267,9 @@ class MusicPlayerApp(AppBase):
         item = self.menu.get_selected_item()
         if not item: return
 
-        item_kind = item.kind if isinstance(item, Item) else (item.get('id', {}).get('kind') if isinstance(item.get('id'), dict) else None)
-        is_heading = item.heading if isinstance(item, Item) else item.get('heading', False)
+        props = extract_item_props(item)
+        item_kind = props['kind']
+        is_heading = props['heading']
 
         # Allow context menu for artists, albums, files, playlists, and headings (album headings in artist view)
         if item_kind in ['file', 'playlist', 'artist', 'album'] or is_heading:
@@ -341,8 +342,8 @@ class MusicPlayerApp(AppBase):
         # Navigate controls bar buttons with next/prev when on controls item
         if from_user and not self.state.screensaver_image:
             item = self.menu.get_selected_item()
-            is_column_nav = item.column_nav if isinstance(item, Item) else item.get('column_nav', False) if item else False
-            if item and is_column_nav:
+            props = extract_item_props(item)
+            if props['column_nav']:
                 self.state.controls_index = min(cfg.CONTROLS_BUTTON_COUNT - 1, self.state.controls_index + 1)
                 return
 
@@ -376,8 +377,8 @@ class MusicPlayerApp(AppBase):
         # Navigate controls bar buttons with next/prev when on controls item
         if not self.state.screensaver_image:
             item = self.menu.get_selected_item()
-            is_column_nav = item.column_nav if isinstance(item, Item) else item.get('column_nav', False) if item else False
-            if item and is_column_nav:
+            props = extract_item_props(item)
+            if props['column_nav']:
                 self.state.controls_index = max(0, self.state.controls_index - 1)
                 return
 
@@ -445,7 +446,7 @@ class MusicPlayerApp(AppBase):
             shuffle = self.state.shuffle_active
             album, tracks, track_count, duration, cover = self.browse.get_all_tracks(shuffle=shuffle)
             self.state.album = album
-            items = tracks if tracks else [Item(text='(No Tracks)', selectable=False)]
+            items = tracks if tracks else [Item(text=t('player.browse.no_tracks'), selectable=False)]
             if tracks:
                 self.state.browsing_cover_s = cover
             self.state.artist = track_count
@@ -455,7 +456,7 @@ class MusicPlayerApp(AppBase):
         elif self.mode == 'FAV_TRACKS_VIEW':
             album, tracks, track_count, duration, cover = self.browse.get_fav_tracks()
             self.state.album = album
-            items = tracks if tracks else [Item(text='(No Favourites)', selectable=False)]
+            items = tracks if tracks else [Item(text=t('player.browse.no_fav_tracks'), selectable=False)]
             if tracks:
                 self.state.browsing_cover_s = cover
             self.state.artist = track_count
@@ -567,15 +568,9 @@ class MusicPlayerApp(AppBase):
         if not tracks:
             return
 
-        # Build playlist from album tracks
-        self.playlist.playlist_source = [str(t['path']) for t in tracks]
-        self.playlist.queue = list(range(len(self.playlist.playlist_source)))
-        if self.state.shuffle_active:
-            random.shuffle(self.playlist.queue)
-        self.playlist.queue_idx = 0
-
-        # Load and play first track
-        self._load_track(self.playlist.queue[0])
+        # Build playlist from album tracks using helper
+        first_idx = self.playlist.build_queue_from_tracks(tracks, shuffle=self.state.shuffle_active)
+        self._load_track(first_idx)
         self.state.set_status_message('player.status.playing')
 
     def _play_random_album(self):
@@ -589,15 +584,9 @@ class MusicPlayerApp(AppBase):
         if not tracks:
             return
 
-        # Build playlist from album tracks
-        self.playlist.playlist_source = [str(t['path']) for t in tracks]
-        self.playlist.queue = list(range(len(self.playlist.playlist_source)))
-        if self.state.shuffle_active:
-            random.shuffle(self.playlist.queue)
-        self.playlist.queue_idx = 0
-
-        # Load and play first track (screensaver will be updated by _play_media)
-        self._load_track(self.playlist.queue[0])
+        # Build playlist from album tracks using helper
+        first_idx = self.playlist.build_queue_from_tracks(tracks, shuffle=self.state.shuffle_active)
+        self._load_track(first_idx)
         self.state.set_status_message('player.status.endless')
 
     def _play_from_list(self, path):

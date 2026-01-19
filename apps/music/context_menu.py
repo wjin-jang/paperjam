@@ -80,13 +80,21 @@ class ContextMenuHandler:
 
     def _get_options_for_item(self, item: Any) -> List[str]:
         """Get context menu options based on item kind."""
-        from ui.views.items import Item
-        # Get item kind from id dict
-        ikind = item.kind if isinstance(item, Item) else (item.get('id', {}).get('kind') if isinstance(item.get('id'), dict) else None)
-        is_heading = item.heading if isinstance(item, Item) else item.get('heading', False)
-        iartist = item.id.get('artist') if isinstance(item, Item) and isinstance(item.id, dict) else item.get('artist')
-        ialbum = item.id.get('album') if isinstance(item, Item) and isinstance(item.id, dict) else item.get('album')
-        iname = item.text if isinstance(item, Item) else item.get('name')
+        from ui.views.items import Item, extract_item_props
+
+        # Use utility function for unified property extraction
+        props = extract_item_props(item)
+        ikind = props['kind']
+        is_heading = props['heading']
+        iname = props['text']
+
+        # Get artist/album from item id dict (not in standard props)
+        if isinstance(item, Item) and isinstance(item.id, dict):
+            iartist = item.id.get('artist')
+            ialbum = item.id.get('album')
+        else:
+            iartist = item.get('artist') if isinstance(item, dict) else None
+            ialbum = item.get('album') if isinstance(item, dict) else None
 
         # Queue view has special options for queue management
         if self._in_queue_view and ikind == 'file':
@@ -171,19 +179,27 @@ class ContextMenuHandler:
         Returns:
             Navigation info dict if navigation required, None otherwise
         """
-        from ui.views.items import Item
+        from ui.views.items import Item, extract_item_props
         item = self.menu.get_selected_item()
         if not item: return None
 
         opt = item.id if isinstance(item, Item) else item['action']
         target = self.target_item
 
-        tkind = target.kind if isinstance(target, Item) else (target.get('id', {}).get('kind') if isinstance(target.get('id'), dict) else None)
-        is_heading = target.heading if isinstance(target, Item) else target.get('heading', False)
-        tpath = target.id.get('path') if isinstance(target, Item) and isinstance(target.id, dict) else (target.get('id', {}).get('path') if isinstance(target.get('id'), dict) else None)
-        tname = target.text if isinstance(target, Item) else target.get('name')
-        tartist = target.id.get('artist') if isinstance(target, Item) and isinstance(target.id, dict) else target.get('artist')
-        talbum = target.id.get('album') if isinstance(target, Item) and isinstance(target.id, dict) else target.get('album')
+        # Use utility function for unified property extraction
+        props = extract_item_props(target)
+        tkind = props['kind']
+        is_heading = props['heading']
+        tpath = props['path']
+        tname = props['text']
+
+        # Get artist/album from target item id dict
+        if isinstance(target, Item) and isinstance(target.id, dict):
+            tartist = target.id.get('artist')
+            talbum = target.id.get('album')
+        else:
+            tartist = target.get('artist') if isinstance(target, dict) else None
+            talbum = target.get('album') if isinstance(target, dict) else None
 
         if self.layer == 0:
             if opt == t('player.context.cancel'):

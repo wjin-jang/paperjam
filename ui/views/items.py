@@ -24,6 +24,58 @@ class Column:
     active: bool = False  # For toggle states (e.g., shuffle on)
 
 
+def extract_item_props(item) -> dict:
+    """
+    Extract properties from an Item or legacy dict in a unified way.
+
+    This eliminates repeated isinstance checks throughout the codebase.
+
+    Args:
+        item: An Item instance or a legacy dict
+
+    Returns:
+        Dict with keys: kind, path, mode, heading, column_nav, selectable, text
+    """
+    if item is None:
+        return {
+            'kind': None, 'path': None, 'mode': None,
+            'heading': False, 'column_nav': False, 'selectable': True, 'text': None
+        }
+
+    if isinstance(item, Item):
+        item_id = item.id if isinstance(item.id, dict) else {}
+        return {
+            'kind': item_id.get('kind'),
+            'path': item_id.get('path'),
+            'mode': item_id.get('mode'),
+            'heading': item.heading,
+            'column_nav': item.column_nav,
+            'selectable': item.selectable,
+            'text': item.text
+        }
+
+    # Legacy dict format
+    item_id = item.get('id', {})
+    if isinstance(item_id, dict):
+        return {
+            'kind': item_id.get('kind'),
+            'path': item_id.get('path'),
+            'mode': item_id.get('mode'),
+            'heading': item.get('heading', False),
+            'column_nav': item.get('column_nav', False),
+            'selectable': item.get('selectable', True),
+            'text': item.get('name') or item.get('text')
+        }
+
+    return {
+        'kind': None, 'path': None, 'mode': None,
+        'heading': item.get('heading', False),
+        'column_nav': item.get('column_nav', False),
+        'selectable': item.get('selectable', True),
+        'text': item.get('name') or item.get('text')
+    }
+
+
 class Item:
     """Unified renderable item for menus."""
 

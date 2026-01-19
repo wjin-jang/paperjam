@@ -11,6 +11,7 @@ import io
 import os
 import hashlib
 import logging
+import time
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -20,13 +21,71 @@ from mutagen import File
 from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
 
-from config import SCREEN_WIDTH, SCREEN_HEIGHT, BLACK, FONT_CJK_MAIN, FONT_CJK_HEADER
+from config import (
+    SCREEN_WIDTH, SCREEN_HEIGHT, BLACK, FONT_CJK_MAIN, FONT_CJK_HEADER,
+    COVER_SIZE_SMALL, COVER_SIZE_LARGE, COVER_CACHE_MAX_SIZE_MB, COVER_CACHE_MAX_AGE_DAYS
+)
 
 logger = logging.getLogger(__name__)
 
 # Cover art cache directory
 _COVER_CACHE_DIR = Path.home() / ".cache" / "paperjam" / "covers"
 _COVER_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+# Track last eviction time to avoid checking too frequently
+_last_cache_eviction = 0
+_CACHE_EVICTION_INTERVAL = 3600  # Check at most once per hour
+
+
+def _evict_cache_if_needed():
+    """
+    Evict old cache entries if cache size exceeds limit.
+    Uses LRU-style eviction based on file access time.
+    """
+    global _last_cache_eviction
+
+    now = time.time()
+    if now - _last_cache_eviction < _CACHE_EVICTION_INTERVAL:
+        return
+
+    _last_cache_eviction = now
+
+    try:
+        cache_files = list(_COVER_CACHE_DIR.glob("*.png"))
+        if not cache_files:
+            return
+
+        # Calculate total cache size
+        total_size = sum(f.stat().st_size for f in cache_files)
+        max_size_bytes = COVER_CACHE_MAX_SIZE_MB * 1024 * 1024
+
+        if total_size <= max_size_bytes:
+            return
+
+        # Sort by access time (oldest first)
+        cache_files.sort(key=lambda f: f.stat().st_atime)
+
+        # Also mark files older than max age for eviction
+        max_age_seconds = COVER_CACHE_MAX_AGE_DAYS * 24 * 3600
+        cutoff_time = now - max_age_seconds
+
+        # Delete files until we're under the limit
+        for cache_file in cache_files:
+            if total_size <= max_size_bytes * 0.8:  # Target 80% capacity
+                break
+            try:
+                file_stat = cache_file.stat()
+                # Delete if over size limit or too old
+                if total_size > max_size_bytes or file_stat.st_atime < cutoff_time:
+                    file_size = file_stat.st_size
+                    cache_file.unlink()
+                    total_size -= file_size
+                    logger.debug(f"Evicted cache file: {cache_file.name}")
+            except OSError:
+                continue
+
+    except Exception as e:
+        logger.debug(f"Cache eviction error: {e}")
 
 
 def get_bayer_matrix():
@@ -139,17 +198,24 @@ def get_cover(file_path: Path) -> Tuple[Optional[Image.Image], Optional[Image.Im
     if not os.path.exists(file_path):
         return (None, None)
 
-    # Check disk cache first
+    # Periodically evict old cache entries
+    _evict_cache_if_needed()
+
+    # Check disk cache first for both sizes
     cache_key = _get_cache_key(file_path)
     cached_small = _load_cached_cover(cache_key, "small")
     cached_large = _load_cached_cover(cache_key, "large")
 
+    # Return early if both are cached (most common case)
     if cached_small is not None and cached_large is not None:
         return (cached_small, cached_large)
 
-    # Extract cover from audio file
-    cover_bytes = None
+    # Determine which sizes need processing
+    need_small = cached_small is None
+    need_large = cached_large is None
 
+    # Extract cover from audio file only if we need to process something
+    cover_bytes = None
     try:
         audio = File(file_path)
         if isinstance(audio, FLAC):
@@ -164,20 +230,23 @@ def get_cover(file_path: Path) -> Tuple[Optional[Image.Image], Optional[Image.Im
     except Exception:
         pass
 
-    final_small = None
-    final_large = None
+    final_small = cached_small
+    final_large = cached_large
 
     if cover_bytes:
         try:
             img_obj = Image.open(io.BytesIO(cover_bytes))
-            final_small = dither_image(img_obj.copy(), target_size=(83, 83))
-            final_large = dither_image(img_obj.copy(), target_size=(113, 113))
 
-            # Cache the processed images
-            if final_small:
-                _save_cached_cover(cache_key, "small", final_small)
-            if final_large:
-                _save_cached_cover(cache_key, "large", final_large)
+            # Only process the sizes we need
+            if need_small:
+                final_small = dither_image(img_obj.copy(), target_size=COVER_SIZE_SMALL)
+                if final_small:
+                    _save_cached_cover(cache_key, "small", final_small)
+
+            if need_large:
+                final_large = dither_image(img_obj.copy(), target_size=COVER_SIZE_LARGE)
+                if final_large:
+                    _save_cached_cover(cache_key, "large", final_large)
         except Exception:
             pass
 

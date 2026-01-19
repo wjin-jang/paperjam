@@ -2,6 +2,7 @@
 Player state management for the music player application.
 """
 import time
+import threading
 from dataclasses import dataclass, field
 from typing import List, Optional, Set, Any
 
@@ -11,7 +12,12 @@ from core.i18n import t
 
 @dataclass
 class PlayerState:
-    """State container for the music player."""
+    """
+    State container for the music player.
+
+    Thread-safe for playback state fields that may be accessed from
+    input handler or system manager threads.
+    """
     items: List[dict] = field(default_factory=list)
     pinned_items: List[dict] = field(default_factory=list)
     scrollable_items: List[dict] = field(default_factory=list)
@@ -20,10 +26,10 @@ class PlayerState:
     album: str = field(default_factory=lambda: t('player.browse.library'))
     artist: str = ""
     year: str = ""
-    is_playing: bool = False
+    _is_playing: bool = False
     shuffle_active: bool = False
     loop_mode: int = 0
-    playing_path: Optional[str] = None
+    _playing_path: Optional[str] = None
     playing_title: Optional[str] = None
     playing_artist: Optional[str] = None
     playing_album: Optional[str] = None
@@ -36,7 +42,7 @@ class PlayerState:
     screensaver_album: Optional[str] = None
 
     # Flags
-    needs_refresh: bool = False
+    _needs_refresh: bool = False
     fav_albums: Optional[Set[str]] = None
     fav_artists: Optional[Set[str]] = None
     browse_mode: str = 'ROOT'
@@ -57,6 +63,40 @@ class PlayerState:
 
     # Loading overlay
     loading_message: Optional[str] = None
+
+    # Thread lock for playback state
+    _lock: threading.Lock = field(default_factory=threading.Lock)
+
+    # Thread-safe properties for frequently accessed state
+    @property
+    def is_playing(self) -> bool:
+        with self._lock:
+            return self._is_playing
+
+    @is_playing.setter
+    def is_playing(self, value: bool):
+        with self._lock:
+            self._is_playing = value
+
+    @property
+    def playing_path(self) -> Optional[str]:
+        with self._lock:
+            return self._playing_path
+
+    @playing_path.setter
+    def playing_path(self, value: Optional[str]):
+        with self._lock:
+            self._playing_path = value
+
+    @property
+    def needs_refresh(self) -> bool:
+        with self._lock:
+            return self._needs_refresh
+
+    @needs_refresh.setter
+    def needs_refresh(self, value: bool):
+        with self._lock:
+            self._needs_refresh = value
 
     def reset_context_menu(self):
         """Reset context menu state."""

@@ -678,7 +678,7 @@ class SettingsApp(AppBase):
                 sel_idx = 2  # Connect button selected
 
             items = [
-                Item(text="L/R=char ENTER=add BACK=del", selectable=False),
+                Item(text=t('settings.network.password_hint'), selectable=False),
                 Item(text=display_password, selectable=True, id='INPUT'),
                 Item(text=t('settings.network.confirm_connect'), id='CONNECT'),
             ]

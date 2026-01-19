@@ -28,7 +28,7 @@ class ScreensaverRenderer:
                 100, cfg.ROW_HEIGHT
             )
             menu = panel.create_menu()
-            menu.items = [Item(text="IDLE", selectable=False)]
+            menu.items = [Item(text=t('player.status.idle'), selectable=False)]
             panel.render(self.canvas)
             return self.canvas
 
@@ -93,8 +93,8 @@ class ScreensaverRenderer:
         """Render shutdown screen."""
         self.clear()
 
-        # Draw "POWER OFF" text
-        text = "POWER OFF"
+        # Draw power off text
+        text = t('general.power_off')
         w, h = 48, cfg.ROW_HEIGHT
         x = (cfg.SCREEN_WIDTH - w) - 4
         

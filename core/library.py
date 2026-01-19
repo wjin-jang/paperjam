@@ -45,6 +45,7 @@ class LibraryManager:
         self.fav_albums = set()
         self.fav_artists = set()
         self._favs_dirty = False  # Track if favorites need saving
+        self._recents_dirty = False  # Track if recents need saving
 
         self.is_scanning = False
         self._lock = threading.Lock()
@@ -347,11 +348,25 @@ class LibraryManager:
         self.recents.insert(0, path)
         if len(self.recents) > cfg.RECENTS_LIMIT:
             self.recents.pop()
+        self._recents_dirty = True
+
+    def flush_recents(self):
+        """Save recents if dirty. Call periodically or on shutdown."""
+        if self._recents_dirty:
+            self._save_recents()
+            self._recents_dirty = False
+
+    def _save_recents(self):
         try:
             with open(cfg.RECENTS_FILE, 'w') as f:
                 json.dump([str(p) for p in self.recents], f)
         except OSError as e:
             logger.error(f"Error saving recents: {e}")
+
+    def flush_all(self):
+        """Flush all dirty state to disk. Call on shutdown."""
+        self.flush_recents()
+        self.flush_favs()
 
     def load_favs(self):
         if cfg.FAVS_FILE.exists():

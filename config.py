@@ -119,6 +119,12 @@ CONTROLS_BUTTON_COUNT = 4  # Number of buttons in controls bar (back, shuffle, l
 ALPHABETICAL_HEADING_THRESHOLD = 24  # Min items before showing alphabetical headings
 QUEUE_VIEW_MAX_ITEMS = 20  # Max items to show in queue view
 
+# --- Cover Art ---
+COVER_SIZE_SMALL = (83, 83)
+COVER_SIZE_LARGE = (113, 113)
+COVER_CACHE_MAX_SIZE_MB = 100  # Max cache size before eviction
+COVER_CACHE_MAX_AGE_DAYS = 30  # Max age before cache entry is eligible for eviction
+
 # --- Behavior ---
 SCREENSAVER_OPTIONS = [10, 30, 60, 300, 1800, 0] 
 LONG_PRESS_OPTIONS = [0.3, 0.5, 0.8, 1.0, 1.5, 2.0]
@@ -195,7 +201,8 @@ def _get_version_date():
             ["git", "log", "-1", "--format=%cd", "--date=format:%Y-%m-%d %H:%M"],
             cwd=dir_path,
             encoding='utf-8',
-            stderr=subprocess.DEVNULL
+            stderr=subprocess.DEVNULL,
+            timeout=5
         ).strip()
     except Exception:
         return "2026-01-15"
