@@ -29,8 +29,8 @@ class WeatherApp(AppBase):
         " -'.,0123456789"
     )
 
-    # Maximum days to show (limited by API data)
-    MAX_DAYS = 7
+    # Maximum days to show (Today, Tomorrow, day after)
+    MAX_DAYS = 3
 
     # Chart scroll limits
     MAX_CHART_SCROLL = 16  # 24 hours - 8 visible
