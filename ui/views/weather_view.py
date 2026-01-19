@@ -137,9 +137,9 @@ def render_current_section(weather: WeatherData, width: int, height: int,
     # Vertical divider
     draw.line((col_w * 2, 0, col_w * 2, height - 1), fill=cfg.BLACK)
 
-    # Column 3: Day selector (full day names, invert selected)
-    day_x = col_w * 2 + 2
-    day_col_w = col_w - 4
+    # Column 3: Day selector (full day names as rows with borders)
+    day_x = col_w * 2
+    day_col_w = col_w
 
     # Get day labels
     day_labels = [t('weather.today'), t('weather.tomorrow')]
@@ -149,14 +149,15 @@ def render_current_section(weather: WeatherData, width: int, height: int,
         day_labels.append("???")
 
     for i, label in enumerate(day_labels):
-        y = i * 8
+        row_y = i * cfg.ROW_HEIGHT
+        is_selected = (i == day_offset)
 
-        if i == day_offset:
-            # Selected day - invert the row
-            draw.rectangle((day_x, y, day_x + day_col_w, y + 8), fill=cfg.BLACK)
-            draw.text((day_x + 2, y), label, font=cfg.FONT_MAIN, fill=cfg.WHITE)
-        else:
-            draw.text((day_x + 2, y), label, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+        # Draw row with border
+        bg = cfg.BLACK if is_selected else cfg.WHITE
+        fg = cfg.WHITE if is_selected else cfg.BLACK
+        draw.rectangle((day_x, row_y, day_x + day_col_w, row_y + cfg.ROW_HEIGHT),
+                      fill=bg, outline=cfg.BLACK)
+        draw.text((day_x + 5, row_y + 3), label, font=cfg.FONT_MAIN, fill=fg)
 
     return img
 
@@ -181,7 +182,8 @@ def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
         return img
 
     bar_w = width // visible_hours
-    bar_area_h = height - 16
+    bar_area_h = height - 16  # Space for value at top (8) and time at bottom (8)
+    bar_area_y = 8  # Bar area starts after value row
 
     all_values = [value_fn(h) for h in hourly]
     values = [value_fn(h) for h in visible]
@@ -209,23 +211,57 @@ def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
         bx = i * bar_w
         center = bx + bar_w // 2
 
-        # Value at top
-        val_text = format_fn(val)
-        text_w = cfg.FONT_MAIN.getbbox(val_text)[2]
-        draw.text((center - text_w // 2, 0), val_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
-
-        # Bar - clamp normalized value to 0-1
+        # Calculate bar dimensions
         if is_percentage:
             normalized = val / 100
         else:
             normalized = max(0, min(1, (val - min_val) / val_range))
 
         bar_h = max(1, int(normalized * bar_area_h))
-        bar_y = 8 + bar_area_h - bar_h
-        draw.rectangle((bx + 2, bar_y, bx + bar_w - 3, 8 + bar_area_h), fill=cfg.BLACK)
+        bar_y = bar_area_y + bar_area_h - bar_h
+        bar_x1 = bx + 2
+        bar_x2 = bx + bar_w - 3
 
-        # Hour at bottom
-        hour_text = h.hour[:2]
+        # Draw bar first
+        draw.rectangle((bar_x1, bar_y, bar_x2, bar_area_y + bar_area_h), fill=cfg.BLACK)
+
+        # Value text at top - draw with partial inversion
+        val_text = format_fn(val)
+        text_bbox = cfg.FONT_MAIN.getbbox(val_text)
+        text_w = text_bbox[2]
+        text_h = text_bbox[3]
+        text_x = center - text_w // 2
+        text_y = 0
+
+        # Check if text overlaps with bar
+        text_bottom = text_y + text_h
+        if text_bottom > bar_y:
+            # Draw text in two parts: above bar (black) and over bar (white/inverted)
+            # Create a small image for the text
+            text_img = Image.new('1', (text_w, text_h), cfg.WHITE)
+            text_draw = ImageDraw.Draw(text_img)
+            text_draw.text((0, 0), val_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+
+            # Paste the non-overlapping part normally
+            if bar_y > text_y:
+                non_overlap_h = bar_y - text_y
+                non_overlap = text_img.crop((0, 0, text_w, non_overlap_h))
+                img.paste(non_overlap, (text_x, text_y))
+
+            # For overlapping part, invert
+            overlap_start = max(0, bar_y - text_y)
+            overlap_img = text_img.crop((0, overlap_start, text_w, text_h))
+            # Invert: where text is black, we want white on black background
+            for py in range(overlap_img.height):
+                for px in range(overlap_img.width):
+                    if overlap_img.getpixel((px, py)) == 0:  # Black text
+                        img.putpixel((text_x + px, text_y + overlap_start + py), cfg.WHITE)
+        else:
+            # No overlap, draw normally
+            draw.text((text_x, text_y), val_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+
+        # Time at bottom - use full format (12:00)
+        hour_text = h.hour
         hour_w = cfg.FONT_MAIN.getbbox(hour_text)[2]
         draw.text((center - hour_w // 2, height - 8), hour_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
@@ -275,7 +311,7 @@ class WeatherViewRenderer:
     PANEL_W = cfg.SCREEN_WIDTH - 16
     PANEL_H = cfg.SCREEN_HEIGHT - 16
 
-    CURRENT_H = 26
+    CURRENT_H = cfg.ROW_HEIGHT * 3
     CHART_H = 28
     WEEKLY_H = 28
 

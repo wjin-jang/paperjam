@@ -138,8 +138,8 @@ class WeatherApp(AppBase):
     def _nav_action(self):
         """Action on current selection."""
         if self.selected_section == SECTION_DAY:
-            # Confirm day selection - just stay on current day
-            pass
+            # Confirm day selection - move to temperature section
+            self.selected_section = SECTION_TEMPERATURE
 
     def _open_setup(self):
         self.view = 'SETUP'
