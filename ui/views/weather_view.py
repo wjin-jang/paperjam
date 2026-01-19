@@ -1,29 +1,8 @@
 """
-Weather view renderer for the e-ink display.
+Weather view renderer using Panel/Menu/Item system.
 
-Layout with day selection rows and scrollable charts:
-┌─────────────────────────────────────────┐
-│ [Location Name - Header]               ▐│
-├─────────────────────────────────────────┤
-│ Today      22° Clear   Precip 30%      ▐│ <- Day row (selected = active day)
-│ Tomorrow   18° Rain    Precip 80%      ▐│
-│ Wednesday  20° Cloudy  Precip 20%      ▐│
-├─────────────────────────────────────────┤
-│ TEMPERATURE                            ▐│ <- Section row (L/R scrolls chart)
-│  22  24  26  28  26  24  22  20        │
-│  ██  ████████████████  ██  ██          │
-│  09  10  11  12  13  14  15  16        │
-├─────────────────────────────────────────┤
-│ PRECIPITATION                          ▐│
-│   0  20  40  60  40  20  10   0        │
-│      ██  ████████████  ██              │
-│  09  10  11  12  13  14  15  16        │
-├─────────────────────────────────────────┤
-│ THIS WEEK                              ▐│
-│  MO  TU  WE  TH  FR  SA  SU            │
-│   ○   ●   ○   ○   ○   ●   ○            │
-│  15  12  18  20  22  14  16            │
-└─────────────────────────────────────────┘
+Uses the standard UI components for consistent rendering.
+Bar charts and weather conditions are rendered as images.
 """
 from datetime import datetime
 from pathlib import Path
@@ -33,56 +12,33 @@ from typing import List, Optional
 import config as cfg
 from core.i18n import t
 from core.weather import WeatherData, HourlyForecast, DailyForecast
-from ui.graphics import draw_text_with_cjk, get_text_width_with_cjk
-from ui.views.core import Panel
+from ui.views.core import Panel, Menu
+from ui.views.items import Item
 
 # Weather icons directory
 WEATHER_ICONS_DIR = Path(__file__).parent.parent.parent / "assets" / "weather"
 
-# Short condition names for display
+# Short condition names
 SHORT_CONDITIONS = {
-    'clear': 'Clear',
-    'mostly_clear': 'Clear',
-    'partly_cloudy': 'Cloudy',
-    'overcast': 'Cloudy',
-    'fog': 'Fog',
-    'drizzle': 'Drizzle',
-    'rain': 'Rain',
-    'freezing_drizzle': 'F.Rain',
-    'freezing_rain': 'F.Rain',
-    'heavy_rain': 'H.Rain',
-    'rain_showers': 'Showers',
-    'heavy_showers': 'Showers',
-    'snow': 'Snow',
-    'heavy_snow': 'H.Snow',
-    'snow_grains': 'Snow',
-    'snow_showers': 'Snow',
-    'thunderstorm': 'Storm',
-    'thunderstorm_hail': 'Storm',
-    'unknown': '???',
+    'clear': 'Clear', 'mostly_clear': 'Clear', 'partly_cloudy': 'Cloudy',
+    'overcast': 'Cloudy', 'fog': 'Fog', 'drizzle': 'Drizzle', 'rain': 'Rain',
+    'freezing_drizzle': 'F.Rain', 'freezing_rain': 'F.Rain', 'heavy_rain': 'H.Rain',
+    'rain_showers': 'Showers', 'heavy_showers': 'Showers', 'snow': 'Snow',
+    'heavy_snow': 'H.Snow', 'snow_grains': 'Snow', 'snow_showers': 'Snow',
+    'thunderstorm': 'Storm', 'thunderstorm_hail': 'Storm', 'unknown': '???',
 }
 
-# Map condition names to icon files
+# Map conditions to icon files
 CONDITION_ICONS = {
-    'clear': 'clear.png',
-    'mostly_clear': 'clear.png',
-    'partly_cloudy': 'partly_cloudy.png',
-    'overcast': 'cloudy.png',
-    'fog': 'fog.png',
-    'drizzle': 'drizzle.png',
-    'rain': 'rain.png',
-    'freezing_drizzle': 'rain.png',
-    'freezing_rain': 'rain.png',
-    'heavy_rain': 'heavy_rain.png',
-    'rain_showers': 'rain.png',
-    'heavy_showers': 'heavy_rain.png',
-    'snow': 'snow.png',
-    'heavy_snow': 'snow.png',
-    'snow_grains': 'snow.png',
-    'snow_showers': 'snow.png',
-    'thunderstorm': 'thunderstorm.png',
-    'thunderstorm_hail': 'thunderstorm.png',
-    'unknown': 'unknown.png',
+    'clear': 'clear.png', 'mostly_clear': 'clear.png',
+    'partly_cloudy': 'partly_cloudy.png', 'overcast': 'cloudy.png',
+    'fog': 'fog.png', 'drizzle': 'drizzle.png', 'rain': 'rain.png',
+    'freezing_drizzle': 'rain.png', 'freezing_rain': 'rain.png',
+    'heavy_rain': 'heavy_rain.png', 'rain_showers': 'rain.png',
+    'heavy_showers': 'heavy_rain.png', 'snow': 'snow.png',
+    'heavy_snow': 'snow.png', 'snow_grains': 'snow.png',
+    'snow_showers': 'snow.png', 'thunderstorm': 'thunderstorm.png',
+    'thunderstorm_hail': 'thunderstorm.png', 'unknown': 'unknown.png',
 }
 
 # Navigation sections
@@ -96,48 +52,151 @@ SECTION_COUNT = 6
 
 
 def load_weather_icon(condition: str) -> Optional[Image.Image]:
-    """Load a weather icon for the given condition."""
+    """Load weather icon for condition."""
     icon_file = CONDITION_ICONS.get(condition, 'unknown.png')
     icon_path = WEATHER_ICONS_DIR / icon_file
     if icon_path.exists():
         try:
-            img = Image.open(icon_path).convert('1')
-            return img
+            return Image.open(icon_path).convert('1')
         except Exception:
             pass
     return None
 
 
-class WeatherViewRenderer:
-    """Renderer for weather display with navigation support."""
+def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
+                     value_fn, format_fn, is_percentage: bool = False,
+                     scroll_offset: int = 0, visible_hours: int = 8) -> Image.Image:
+    """Render bar chart as an image."""
+    img = Image.new('1', (width, height), cfg.WHITE)
+    draw = ImageDraw.Draw(img)
 
-    # Layout constants
+    if not hourly:
+        return img
+
+    visible = hourly[scroll_offset:scroll_offset + visible_hours]
+    if not visible:
+        return img
+
+    bar_w = width // visible_hours
+    bar_area_h = height - 16  # Leave room for value and hour labels
+
+    # Get values and range
+    all_values = [value_fn(h) for h in hourly]
+    values = [value_fn(h) for h in visible]
+
+    if is_percentage:
+        min_val, max_val = 0, 100
+    else:
+        min_val = min(all_values) if all_values else 0
+        max_val = max(all_values) if all_values else 1
+
+    val_range = max_val - min_val if max_val != min_val else 1
+
+    for i, (h, val) in enumerate(zip(visible, values)):
+        bx = i * bar_w
+        center = bx + bar_w // 2
+
+        # Value text at top
+        val_text = format_fn(val)
+        text_w = cfg.FONT_MAIN.getbbox(val_text)[2]
+        draw.text((center - text_w // 2, 0), val_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+
+        # Bar
+        if is_percentage:
+            normalized = val / 100
+        else:
+            normalized = (val - min_val) / val_range
+
+        bar_h = max(1, int(normalized * bar_area_h))
+        bar_y = 8 + bar_area_h - bar_h
+        draw.rectangle((bx + 2, bar_y, bx + bar_w - 3, 8 + bar_area_h), fill=cfg.BLACK)
+
+        # Hour label at bottom
+        hour_text = h.hour[:2]
+        hour_w = cfg.FONT_MAIN.getbbox(hour_text)[2]
+        draw.text((center - hour_w // 2, height - 8), hour_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+
+    return img
+
+
+def render_weekly_forecast(daily: List[DailyForecast], width: int, height: int) -> Image.Image:
+    """Render weekly forecast as an image."""
+    img = Image.new('1', (width, height), cfg.WHITE)
+    draw = ImageDraw.Draw(img)
+
+    if not daily:
+        return img
+
+    days = daily[:7]
+    day_w = width // len(days)
+
+    for i, d in enumerate(days):
+        dx = i * day_w
+        center = dx + day_w // 2
+
+        # Day name
+        day_name = d.day_name[:2]
+        name_w = cfg.FONT_MAIN.getbbox(day_name)[2]
+        draw.text((center - name_w // 2, 0), day_name, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+
+        # Weather icon or indicator
+        condition_name, _ = d.condition
+        icon = load_weather_icon(condition_name)
+        if icon:
+            ix = center - icon.width // 2
+            img.paste(icon, (ix, 9))
+        else:
+            indicator = "●" if condition_name in ['rain', 'snow', 'thunderstorm', 'heavy_rain', 'drizzle'] else "○"
+            ind_w = cfg.FONT_MAIN.getbbox(indicator)[2]
+            draw.text((center - ind_w // 2, 10), indicator, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+
+        # Temperature
+        avg_temp = f"{int(d.avg_temperature)}°"
+        temp_w = cfg.FONT_MAIN.getbbox(avg_temp)[2]
+        draw.text((center - temp_w // 2, height - 8), avg_temp, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+
+    return img
+
+
+def render_condition_image(condition: str, width: int, height: int) -> Image.Image:
+    """Render condition with icon as an image."""
+    img = Image.new('1', (width, height), cfg.WHITE)
+    draw = ImageDraw.Draw(img)
+
+    icon = load_weather_icon(condition)
+    cond_text = SHORT_CONDITIONS.get(condition, '???')
+
+    if icon:
+        # Center icon and text
+        icon_x = (width - icon.width - len(cond_text) * 6 - 4) // 2
+        img.paste(icon, (icon_x, (height - icon.height) // 2))
+        text_x = icon_x + icon.width + 4
+    else:
+        text_x = 4
+
+    text_y = (height - 8) // 2
+    draw.text((text_x, text_y), cond_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+
+    return img
+
+
+class WeatherViewRenderer:
+    """Renderer for weather display using Panel/Menu/Item."""
+
     PANEL_X = 8
     PANEL_Y = 8
     PANEL_W = cfg.SCREEN_WIDTH - 16
     PANEL_H = cfg.SCREEN_HEIGHT - 16
 
-    # Row heights
-    HEADER_H = cfg.ROW_HEIGHT
-    DAY_ROW_H = 10
-    SECTION_ROW_H = 10
-    CHART_H = 18
-    WEEKLY_H = 24
+    CHART_H = 32  # Height for bar chart images
+    WEEKLY_H = 34  # Height for weekly image
 
-    # Bar chart settings
     CHART_HOURS = 8
     TOTAL_HOURS = 24
 
-    # Scrollbar
-    SCROLLBAR_W = 4
-
     def __init__(self):
         self.canvas = Image.new('1', (cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), cfg.WHITE)
-        self.draw = ImageDraw.Draw(self.canvas)
         self._icon_cache = {}
-
-    def clear(self):
-        self.draw.rectangle((0, 0, cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), fill=cfg.WHITE)
 
     def _get_icon(self, condition: str) -> Optional[Image.Image]:
         if condition not in self._icon_cache:
@@ -148,132 +207,99 @@ class WeatherViewRenderer:
                selected_section: int = 0, day_offset: int = 0,
                chart_scroll: int = 0, updating: bool = False,
                error: Optional[str] = None) -> Image.Image:
-        """Render the weather view."""
-        self.clear()
+        """Render weather view using Panel/Menu/Item."""
+        self.canvas = Image.new('1', (cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), cfg.WHITE)
 
         header = title if title else t('menu.weather')
         if updating:
             header = f"{header}..."
 
         panel = Panel(self.PANEL_X, self.PANEL_Y, self.PANEL_W, self.PANEL_H, header=header)
-        self._draw_panel_frame(panel)
+        menu = panel.create_menu()
 
         if error and not weather:
-            self._draw_error(panel, error)
+            menu.set_items([
+                Item(text=t('weather.error'), selectable=False),
+                Item(text=error, selectable=False),
+            ])
+            panel.render(self.canvas)
             return self.canvas
 
         if not weather or not weather.current:
-            self._draw_no_data(panel)
+            menu.set_items([
+                Item(text=t('weather.no_data'), selectable=False),
+                Item(text=t('weather.setup_location'), selectable=False),
+            ])
+            panel.render(self.canvas)
             return self.canvas
 
-        content_y = self.PANEL_Y + self.HEADER_H + 1
-        content_x = self.PANEL_X + 1
-        content_w = self.PANEL_W - 2 - self.SCROLLBAR_W
+        # Build items list
+        items = []
+
+        # Content width for images
+        content_w = panel.content_width - 2
 
         # Day selection rows
         for i in range(3):
-            selected = (selected_section == i)
-            active = (day_offset == i)
-            self._draw_day_row(weather, i, content_x, content_y, content_w, selected, active)
-            content_y += self.DAY_ROW_H
-
-        # Divider
-        self.draw.line((content_x, content_y, content_x + content_w - 1, content_y), fill=cfg.BLACK)
-        content_y += 1
+            day_item = self._create_day_item(weather, i, day_offset, content_w)
+            items.append(day_item)
 
         # Get hourly data for selected day
-        hourly = self._get_hourly_from_current(weather.hourly, day_offset)
+        hourly = self._get_hourly(weather.hourly, day_offset)
 
         # Temperature section
-        self._draw_row(t('weather.temperature'), content_x, content_y, content_w,
-                      selected=(selected_section == SECTION_TEMPERATURE))
-        content_y += self.SECTION_ROW_H
-        self._draw_bar_chart(hourly, content_y, content_x, content_w,
-                            value_fn=lambda h: h.temperature,
-                            format_fn=lambda v: f"{int(v)}",
-                            scroll_offset=chart_scroll)
-        content_y += self.CHART_H
+        items.append(Item(text=t('weather.temperature'), heading=True,
+                         id={'section': SECTION_TEMPERATURE}))
 
-        # Divider
-        self.draw.line((content_x, content_y, content_x + content_w - 1, content_y), fill=cfg.BLACK)
-        content_y += 1
+        temp_chart = render_bar_chart(
+            hourly, content_w, self.CHART_H,
+            value_fn=lambda h: h.temperature,
+            format_fn=lambda v: f"{int(v)}",
+            scroll_offset=chart_scroll,
+            visible_hours=self.CHART_HOURS
+        )
+        temp_item = Item(image=temp_chart, show_image=True, selectable=False)
+        temp_item.set_height(self.CHART_H)
+        items.append(temp_item)
 
         # Precipitation section
-        self._draw_row(t('weather.precipitation'), content_x, content_y, content_w,
-                      selected=(selected_section == SECTION_PRECIPITATION))
-        content_y += self.SECTION_ROW_H
-        self._draw_bar_chart(hourly, content_y, content_x, content_w,
-                            value_fn=lambda h: h.precipitation_probability,
-                            format_fn=lambda v: f"{int(v)}",
-                            is_percentage=True,
-                            scroll_offset=chart_scroll)
-        content_y += self.CHART_H
+        items.append(Item(text=t('weather.precipitation'), heading=True,
+                         id={'section': SECTION_PRECIPITATION}))
 
-        # Divider
-        self.draw.line((content_x, content_y, content_x + content_w - 1, content_y), fill=cfg.BLACK)
-        content_y += 1
+        precip_chart = render_bar_chart(
+            hourly, content_w, self.CHART_H,
+            value_fn=lambda h: h.precipitation_probability,
+            format_fn=lambda v: f"{int(v)}",
+            is_percentage=True,
+            scroll_offset=chart_scroll,
+            visible_hours=self.CHART_HOURS
+        )
+        precip_item = Item(image=precip_chart, show_image=True, selectable=False)
+        precip_item.set_height(self.CHART_H)
+        items.append(precip_item)
 
         # This Week section
-        self._draw_row(t('weather.this_week'), content_x, content_y, content_w,
-                      selected=(selected_section == SECTION_WEEKLY))
-        content_y += self.SECTION_ROW_H
-        self._draw_weekly_content(weather.daily, content_y, content_x, content_w)
+        items.append(Item(text=t('weather.this_week'), heading=True,
+                         id={'section': SECTION_WEEKLY}))
 
-        # Scrollbar
-        scrollbar_x = self.PANEL_X + self.PANEL_W - self.SCROLLBAR_W - 1
-        scrollbar_y = self.PANEL_Y + self.HEADER_H + 1
-        scrollbar_h = self.PANEL_H - self.HEADER_H - 2
-        self._draw_scrollbar(scrollbar_x, scrollbar_y, self.SCROLLBAR_W, scrollbar_h,
-                            selected_section, SECTION_COUNT, 1)
+        weekly_img = render_weekly_forecast(weather.daily, content_w, self.WEEKLY_H)
+        weekly_item = Item(image=weekly_img, show_image=True, selectable=False)
+        weekly_item.set_height(self.WEEKLY_H)
+        items.append(weekly_item)
 
+        menu.set_items(items)
+
+        # Set cursor position based on selected_section
+        cursor_row = self._section_to_row(selected_section)
+        menu.cursor.row = cursor_row
+        menu._ensure_visible()
+
+        panel.render(self.canvas)
         return self.canvas
 
-    def _get_hourly_from_current(self, hourly: List[HourlyForecast], day_offset: int) -> List[HourlyForecast]:
-        if not hourly:
-            return []
-
-        now = datetime.now()
-        if day_offset == 0:
-            start_idx = now.hour
-        else:
-            start_idx = day_offset * 24
-
-        return hourly[start_idx:start_idx + self.TOTAL_HOURS]
-
-    def _draw_panel_frame(self, panel: Panel):
-        self.draw.rectangle(
-            (panel.x + 1, panel.y + 1, panel.x + panel.width + 1, panel.y + panel.height + 1),
-            outline=cfg.BLACK
-        )
-        self.draw.rectangle(
-            (panel.x, panel.y, panel.x + panel.width, panel.y + panel.height),
-            fill=cfg.WHITE, outline=cfg.BLACK
-        )
-        if panel.header:
-            self.draw.rectangle(
-                (panel.x, panel.y, panel.x + panel.width, panel.y + cfg.ROW_HEIGHT),
-                fill=cfg.BLACK
-            )
-            draw_text_with_cjk(
-                self.draw, (panel.x + 4, panel.y),
-                panel.header,
-                cfg.FONT_HEADER, cfg.FONT_CJK_HEADER, fill=cfg.WHITE, cjk_y_offset=1
-            )
-
-    def _draw_row(self, label: str, x: int, y: int, w: int, selected: bool = False):
-        """Draw a standard menu row."""
-        if selected:
-            self.draw.rectangle((x, y, x + w - 1, y + self.SECTION_ROW_H - 1), fill=cfg.BLACK)
-            draw_text_with_cjk(self.draw, (x + 2, y + 1), label,
-                              cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.WHITE)
-        else:
-            draw_text_with_cjk(self.draw, (x + 2, y + 1), label,
-                              cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK)
-
-    def _draw_day_row(self, weather: WeatherData, day_idx: int, x: int, y: int, w: int,
-                     selected: bool, active: bool):
-        """Draw a day selection row with weather summary."""
-        # Get day label
+    def _create_day_item(self, weather: WeatherData, day_idx: int,
+                        active_day: int, width: int) -> Item:
+        """Create a day selection item with icon."""
         if day_idx == 0:
             day_label = t('weather.today')
             temp = weather.current.temperature
@@ -289,171 +315,82 @@ class WeatherViewRenderer:
             condition_name, _ = day.condition
             precip = day.precipitation_probability
         else:
-            return
+            return Item(text="???", selectable=True)
 
+        # Get weather icon
+        icon = self._get_icon(condition_name)
         cond_text = SHORT_CONDITIONS.get(condition_name, '???')
 
-        # Build row text
-        row_text = f"{day_label:<10} {int(temp):>3}° {cond_text:<7} {precip:>3}%"
+        # Format: "Today    22° Clear  30%"
+        prefix = ">" if day_idx == active_day else " "
+        text = f"{prefix}{day_label:<9} {int(temp):>3}° {cond_text:<7} {precip:>3}%"
 
-        # Draw with selection/active indicator
-        if selected:
-            self.draw.rectangle((x, y, x + w - 1, y + self.DAY_ROW_H - 1), fill=cfg.BLACK)
-            draw_text_with_cjk(self.draw, (x + 2, y + 1), row_text,
-                              cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.WHITE)
-        else:
-            # Show bullet for active day
-            prefix = ">" if active else " "
-            draw_text_with_cjk(self.draw, (x + 2, y + 1), prefix + row_text,
-                              cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK)
+        return Item(
+            text=text,
+            icon=icon,
+            selectable=True,
+            id={'day': day_idx}
+        )
 
-    def _draw_bar_chart(self, hourly: List[HourlyForecast], y: int, x: int, w: int,
-                        value_fn, format_fn, is_percentage: bool = False,
-                        scroll_offset: int = 0):
-        """Draw bar chart with values and hours."""
+    def _get_hourly(self, hourly: List[HourlyForecast], day_offset: int) -> List[HourlyForecast]:
         if not hourly:
-            return
+            return []
 
-        visible_hours = hourly[scroll_offset:scroll_offset + self.CHART_HOURS]
-        if not visible_hours:
-            return
-
-        bar_w = w // self.CHART_HOURS
-        bar_area_h = 8
-
-        all_values = [value_fn(h) for h in hourly]
-        values = [value_fn(h) for h in visible_hours]
-
-        if is_percentage:
-            min_val, max_val = 0, 100
+        now = datetime.now()
+        if day_offset == 0:
+            start_idx = now.hour
         else:
-            min_val = min(all_values) if all_values else 0
-            max_val = max(all_values) if all_values else 1
+            start_idx = day_offset * 24
 
-        val_range = max_val - min_val if max_val != min_val else 1
+        return hourly[start_idx:start_idx + self.TOTAL_HOURS]
 
-        for i, (h, val) in enumerate(zip(visible_hours, values)):
-            bx = x + i * bar_w
-            center = bx + bar_w // 2
-
-            # Value
-            val_text = format_fn(val)
-            text_w = cfg.FONT_MAIN.getbbox(val_text)[2]
-            self.draw.text((center - text_w // 2, y), val_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
-
-            # Bar
-            if is_percentage:
-                normalized = val / 100
-            else:
-                normalized = (val - min_val) / val_range
-
-            bar_h = max(1, int(normalized * bar_area_h))
-            bar_y = y + 8 + bar_area_h - bar_h
-
-            self.draw.rectangle((bx + 2, bar_y, bx + bar_w - 3, y + 8 + bar_area_h), fill=cfg.BLACK)
-
-            # Hour
-            hour_text = h.hour[:2]
-            hour_w = cfg.FONT_MAIN.getbbox(hour_text)[2]
-            self.draw.text((center - hour_w // 2, y + 9 + bar_area_h), hour_text,
-                          font=cfg.FONT_MAIN, fill=cfg.BLACK)
-
-    def _draw_weekly_content(self, daily: List[DailyForecast], y: int, x: int, w: int):
-        if not daily:
-            return
-
-        days = daily[:7]
-        day_w = w // len(days)
-
-        for i, d in enumerate(days):
-            dx = x + i * day_w
-            center = dx + day_w // 2
-
-            # Day name
-            day_name = d.day_name[:2]
-            name_w = cfg.FONT_MAIN.getbbox(day_name)[2]
-            self.draw.text((center - name_w // 2, y), day_name, font=cfg.FONT_MAIN, fill=cfg.BLACK)
-
-            # Condition
-            condition_name, _ = d.condition
-            indicator = "●" if condition_name in ['rain', 'snow', 'thunderstorm', 'heavy_rain', 'drizzle'] else "○"
-            ind_w = cfg.FONT_MAIN.getbbox(indicator)[2]
-            self.draw.text((center - ind_w // 2, y + 8), indicator, font=cfg.FONT_MAIN, fill=cfg.BLACK)
-
-            # Temp
-            avg_temp = f"{int(d.avg_temperature)}°"
-            temp_w = cfg.FONT_MAIN.getbbox(avg_temp)[2]
-            self.draw.text((center - temp_w // 2, y + 16), avg_temp, font=cfg.FONT_MAIN, fill=cfg.BLACK)
-
-    def _draw_scrollbar(self, x: int, y: int, w: int, h: int,
-                        position: int, total: int, visible: int):
-        self.draw.rectangle((x, y, x + w - 1, y + h - 1), outline=cfg.BLACK)
-
-        if total <= visible:
-            thumb_h = h - 2
-            thumb_y = y + 1
-        else:
-            thumb_h = max(8, (visible / total) * (h - 2))
-            max_pos = total - visible
-            thumb_y = y + 1 + (position / max(1, max_pos)) * (h - 2 - thumb_h)
-
-        self.draw.rectangle((x + 1, int(thumb_y), x + w - 2, int(thumb_y + thumb_h)), fill=cfg.BLACK)
-
-    def _draw_error(self, panel: Panel, error: str):
-        y = panel.y + panel.height // 2 - 10
-        draw_text_with_cjk(self.draw, (panel.x + 8, y), t('weather.error'),
-                          cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK)
-        draw_text_with_cjk(self.draw, (panel.x + 8, y + 12), error,
-                          cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK)
-
-    def _draw_no_data(self, panel: Panel):
-        y = panel.y + panel.height // 2 - 10
-        draw_text_with_cjk(self.draw, (panel.x + 8, y), t('weather.no_data'),
-                          cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK)
-        draw_text_with_cjk(self.draw, (panel.x + 8, y + 12), t('weather.setup_location'),
-                          cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK)
+    def _section_to_row(self, section: int) -> int:
+        """Map section index to menu row."""
+        # Rows: 0=Today, 1=Tomorrow, 2=Weekday, 3=TEMP header, 4=temp chart,
+        #       5=PRECIP header, 6=precip chart, 7=WEEK header, 8=week chart
+        if section <= SECTION_WEEKDAY:
+            return section
+        elif section == SECTION_TEMPERATURE:
+            return 3
+        elif section == SECTION_PRECIPITATION:
+            return 5
+        elif section == SECTION_WEEKLY:
+            return 7
+        return 0
 
     def render_location_setup(self, results: List[dict], selected_idx: int,
                                search_query: str, is_searching: bool) -> Image.Image:
-        self.clear()
+        """Render location setup screen using Panel/Menu/Item."""
+        self.canvas = Image.new('1', (cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), cfg.WHITE)
 
         panel = Panel(self.PANEL_X, self.PANEL_Y, self.PANEL_W, self.PANEL_H,
                       header=t('weather.setup_title'))
-        self._draw_panel_frame(panel)
+        menu = panel.create_menu()
 
-        content_y = self.PANEL_Y + cfg.ROW_HEIGHT + 2
-        content_x = self.PANEL_X + 4
+        items = []
 
-        search_display = f"{t('weather.search')}: {search_query}"
-        draw_text_with_cjk(self.draw, (content_x, content_y), search_display,
-                          cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK)
-        content_y += 12
+        # Search input
+        items.append(Item(
+            text=f"{t('weather.search')}: {search_query}",
+            selectable=False
+        ))
 
         if is_searching:
-            draw_text_with_cjk(self.draw, (content_x, content_y), t('weather.searching'),
-                              cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK)
+            items.append(Item(text=t('weather.searching'), selectable=False))
         elif results:
-            for i, r in enumerate(results[:4]):
-                item_y = content_y + i * 12
+            for r in results[:4]:
                 loc_text = f"{r['name']}, {r.get('country', '')}"
-
-                if i == selected_idx:
-                    self.draw.rectangle(
-                        (self.PANEL_X + 1, item_y - 1,
-                         self.PANEL_X + self.PANEL_W - 1, item_y + 10),
-                        fill=cfg.BLACK
-                    )
-                    draw_text_with_cjk(self.draw, (content_x, item_y), loc_text,
-                                      cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.WHITE)
-                else:
-                    draw_text_with_cjk(self.draw, (content_x, item_y), loc_text,
-                                      cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK)
+                items.append(Item(text=loc_text, selectable=True, id={'result': r}))
         elif search_query and len(search_query) >= 2:
-            draw_text_with_cjk(self.draw, (content_x, content_y), t('weather.no_results'),
-                              cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK)
+            items.append(Item(text=t('weather.no_results'), selectable=False))
 
-        inst_y = self.PANEL_Y + self.PANEL_H - 12
-        draw_text_with_cjk(self.draw, (content_x, inst_y), t('weather.setup_hint'),
-                          cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK)
+        # Instructions
+        items.append(Item(text=t('weather.setup_hint'), selectable=False))
 
+        menu.set_items(items)
+
+        if results:
+            menu.cursor.row = 1 + selected_idx  # Skip search input row
+
+        panel.render(self.canvas)
         return self.canvas

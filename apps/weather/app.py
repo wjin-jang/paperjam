@@ -24,29 +24,26 @@ import config as cfg
 class WeatherApp(AppBase):
     """Weather application displaying forecasts."""
 
-    # Character set for location search input
     CHAR_SET = (
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "abcdefghijklmnopqrstuvwxyz"
         " -'.,0123456789"
     )
 
-    # Chart scroll limits
-    MAX_CHART_SCROLL = 16  # 24 hours - 8 visible
+    MAX_CHART_SCROLL = 16
 
     def __init__(self):
         super().__init__(name=t('menu.weather'))
         self.weather = WeatherManager()
         self.renderer = WeatherViewRenderer()
 
-        # View state
-        self.view = 'MAIN'  # MAIN, SETUP
+        self.view = 'MAIN'
         self.last_update_check = 0
         self.update_check_interval = 60
 
         # Navigation state
         self.selected_section = SECTION_TODAY
-        self.day_offset = 0  # 0=Today, 1=Tomorrow, 2=Weekday
+        self.day_offset = 0
         self.chart_scroll = 0
 
         # Setup state
@@ -57,9 +54,7 @@ class WeatherApp(AppBase):
         self.char_index = 0
 
     def on_enter(self):
-        """Called when app becomes active."""
         super().on_enter()
-
         self.selected_section = SECTION_TODAY
         self.day_offset = 0
         self.chart_scroll = 0
@@ -74,7 +69,6 @@ class WeatherApp(AppBase):
                 self.weather.update_async()
 
     def get_callbacks(self) -> Dict[str, Callable]:
-        """Return input callbacks based on current view."""
         if self.view == 'SETUP':
             return {
                 'up': self._setup_char_up,
@@ -97,30 +91,40 @@ class WeatherApp(AppBase):
         }
 
     def _nav_up(self):
-        """Navigate up through sections."""
-        if self.selected_section > 0:
-            self.selected_section -= 1
+        """Move to previous selectable section."""
+        # Find previous selectable section
+        new_section = self.selected_section - 1
+        while new_section >= 0:
+            if new_section in (SECTION_TODAY, SECTION_TOMORROW, SECTION_WEEKDAY,
+                              SECTION_TEMPERATURE, SECTION_PRECIPITATION, SECTION_WEEKLY):
+                self.selected_section = new_section
+                return
+            new_section -= 1
 
     def _nav_down(self):
-        """Navigate down through sections."""
-        if self.selected_section < SECTION_COUNT - 1:
-            self.selected_section += 1
+        """Move to next selectable section."""
+        new_section = self.selected_section + 1
+        while new_section < SECTION_COUNT:
+            if new_section in (SECTION_TODAY, SECTION_TOMORROW, SECTION_WEEKDAY,
+                              SECTION_TEMPERATURE, SECTION_PRECIPITATION, SECTION_WEEKLY):
+                self.selected_section = new_section
+                return
+            new_section += 1
 
     def _nav_left(self):
-        """Navigate left - scroll chart when on chart sections."""
+        """Scroll chart left when on chart sections."""
         if self.selected_section in (SECTION_TEMPERATURE, SECTION_PRECIPITATION):
             if self.chart_scroll > 0:
                 self.chart_scroll -= 1
 
     def _nav_right(self):
-        """Navigate right - scroll chart when on chart sections."""
+        """Scroll chart right when on chart sections."""
         if self.selected_section in (SECTION_TEMPERATURE, SECTION_PRECIPITATION):
             if self.chart_scroll < self.MAX_CHART_SCROLL:
                 self.chart_scroll += 1
 
     def _nav_action(self):
-        """Action on current selection."""
-        # Day selection rows - select the day
+        """Select day or refresh."""
         if self.selected_section == SECTION_TODAY:
             self.day_offset = 0
             self.chart_scroll = 0
@@ -132,7 +136,6 @@ class WeatherApp(AppBase):
             self.chart_scroll = 0
 
     def _open_setup(self):
-        """Open location setup."""
         self.view = 'SETUP'
         self.search_query = ""
         self.search_results = []
@@ -140,10 +143,9 @@ class WeatherApp(AppBase):
         self.char_index = 0
 
     def _exit(self):
-        """Exit the app."""
         self.running = False
 
-    # --- Setup view callbacks ---
+    # Setup view callbacks
 
     def _setup_char_up(self):
         if self.search_results:
@@ -169,7 +171,6 @@ class WeatherApp(AppBase):
                 result['latitude'],
                 result['longitude']
             )
-
             self.weather.update_async()
 
             self.view = 'MAIN'
@@ -200,17 +201,14 @@ class WeatherApp(AppBase):
                 self.running = False
 
     def update(self) -> bool:
-        """Update app state."""
         now = time.time()
         if now - self.last_update_check > self.update_check_interval:
             self.last_update_check = now
             if self.weather.needs_update() and not self.weather.is_updating:
                 self.weather.update_async()
-
         return self.running
 
     def get_frame(self) -> Image.Image:
-        """Render current frame."""
         if self.view == 'SETUP':
             return self.renderer.render_location_setup(
                 self.search_results,
