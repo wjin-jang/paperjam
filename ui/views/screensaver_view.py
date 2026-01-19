@@ -95,12 +95,12 @@ class ScreensaverRenderer:
 
         # Draw "POWER OFF" text
         text = "POWER OFF"
-        w, h = 64, cfg.ROW_HEIGHT
-        x = (cfg.SCREEN_WIDTH - w) - 8
+        w, h = 48, cfg.ROW_HEIGHT
+        x = (cfg.SCREEN_WIDTH - w) - 4
         
         # If image provided, put text at bottom, image above
         if image:
-            y_text = cfg.SCREEN_HEIGHT - h - 8
+            y_text = cfg.SCREEN_HEIGHT - h - 4
             # Image panel
             img_w, img_h = image.size
             img_x = (cfg.SCREEN_WIDTH - img_w - 2) // 2
