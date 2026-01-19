@@ -149,8 +149,8 @@ def load_fonts():
     header = get_font(_config.get("font_header", "Nintendo-DS-BIOS.ttf"), 13)
 
     # CJK fonts (Galmuri)
-    cjk_main = get_font("Galmuri7.ttf", 8)
-    cjk_header = get_font("Galmuri9.ttf", 10)
+    cjk_main = get_font("Galmuri7.ttf", 9)
+    cjk_header = get_font("Galmuri9.ttf", 11)
 
     icons_path = base_path / _config.get("font_icons", "Icons.ttf")
     icons = ImageFont.truetype(str(icons_path), 6, layout_engine=ImageFont.Layout.BASIC) if icons_path.exists() else None
@@ -169,7 +169,7 @@ def _init_font_padding():
         FONT_MAIN: (5, 1),
         FONT_HEADER: (2, -1),
         FONT_CJK_MAIN: (5, 3),
-        FONT_CJK_HEADER: (2, 1),
+        FONT_CJK_HEADER: (2, 0),
     }
 
 _init_font_padding()
