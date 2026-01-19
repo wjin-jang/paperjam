@@ -584,6 +584,47 @@ class NetworkCategory(SettingsCategory):
             logger.error(f"Failed to connect to WiFi: {e}")
             return False
 
+    def disconnect_wifi(self) -> bool:
+        """Disconnect from current WiFi network."""
+        try:
+            subprocess.run(
+                ["sudo", "wpa_cli", "-i", "wlan0", "disconnect"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+            logger.info("Disconnected from WiFi")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to disconnect WiFi: {e}")
+            return False
+
+    def forget_wifi_network(self, network_id: str) -> bool:
+        """Remove a saved WiFi network.
+
+        Args:
+            network_id: The wpa_supplicant network ID to remove
+
+        Returns:
+            True if successfully removed
+        """
+        try:
+            # Remove the network
+            subprocess.run(
+                ["sudo", "wpa_cli", "-i", "wlan0", "remove_network", network_id],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+
+            # Save configuration
+            subprocess.run(
+                ["sudo", "wpa_cli", "-i", "wlan0", "save_config"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+
+            logger.info(f"Removed WiFi network {network_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to remove WiFi network: {e}")
+            return False
+
     def scan_wifi_networks(self) -> List[dict]:
         """Scan for available WiFi networks.
 

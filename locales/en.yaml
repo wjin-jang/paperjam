@@ -123,6 +123,12 @@ settings:
     signal_strong: "+++"
     signal_medium: "++"
     signal_weak: "+"
+    scan_new: "[ Scan New Network ]"
+    disconnect: "Disconnect"
+    forget: "Forget Network"
+    disconnecting: "Disconnecting..."
+    forgetting: "Removing..."
+    removed: "Removed"
 
   display:
     invert_colors: "Invert Colors"

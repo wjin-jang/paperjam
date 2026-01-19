@@ -66,7 +66,8 @@ class SettingsApp(AppBase):
         self.wifi_menu = MenuController([])
         self.wifi_status = t('settings.network.select_network')
         self.wifi_scan_menu = MenuController([])  # For scanned networks
-        self.wifi_selected_network = None  # Network being connected to
+        self.wifi_network_menu = MenuController([])  # For network options (disconnect/forget)
+        self.wifi_selected_network = None  # Network being connected to or managed
         self.wifi_password_mode = 'input'  # 'input' for char entry, 'connect' for button
 
         # Popup state
@@ -150,6 +151,8 @@ class SettingsApp(AppBase):
             self.wifi_menu.move_selection(-1)
         elif self.view == 'WIFI_SCAN':
             self.wifi_scan_menu.move_selection(-1)
+        elif self.view == 'WIFI_NETWORK_MENU':
+            self.wifi_network_menu.move_selection(-1)
 
     def nav_down(self):
         if self.view == 'VOLUME':
@@ -177,6 +180,8 @@ class SettingsApp(AppBase):
             self.wifi_menu.move_selection(1)
         elif self.view == 'WIFI_SCAN':
             self.wifi_scan_menu.move_selection(1)
+        elif self.view == 'WIFI_NETWORK_MENU':
+            self.wifi_network_menu.move_selection(1)
 
     def nav_left(self):
         if self.view == 'VOLUME':
@@ -232,21 +237,15 @@ class SettingsApp(AppBase):
             
         elif self.view == 'WIFI_NETWORKS':
             item = self.wifi_menu.get_selected_item()
-            if item and item.id: # id stores network dict
-                network = item.id
-                self.wifi_status = t('settings.network.connecting')
-                net_cat = self.categories['NETWORK']
+            if not item:
+                return
 
-                if net_cat.connect_to_wifi(network['id']):
-                    # Wait briefly for connection to establish
-                    time.sleep(2)
-                    self.wifi_status = t('settings.network.connected')
-                else:
-                    self.wifi_status = t('settings.network.failed')
-
-                # Refresh network list and parent category
-                net_cat.wifi_networks = net_cat.get_known_wifi_networks()
-                net_cat.refresh()  # Refresh parent menu to show new connection
+            if item.id == 'SCAN_NEW':
+                # Go to scan view
+                self._enter_wifi_scan()
+            elif item.id:  # id stores network dict
+                # Open network menu for connect/disconnect/forget
+                self._enter_wifi_network_menu(item.id)
 
         elif self.view == 'WIFI_SCAN':
             item = self.wifi_scan_menu.get_selected_item()
@@ -288,6 +287,9 @@ class SettingsApp(AppBase):
                 # Input mode - add current character to password
                 self.categories['NETWORK'].confirm_char()
 
+        elif self.view == 'WIFI_NETWORK_MENU':
+            self._handle_wifi_network_action()
+
     def nav_back(self):
         if self.view == 'VOLUME':
             self.view = 'SUBMENU'
@@ -309,6 +311,8 @@ class SettingsApp(AppBase):
             self.wifi_status = t('settings.network.select_network')
             self.categories['NETWORK'].refresh()
             self._update_submenu_items(self.categories['NETWORK'])
+        elif self.view == 'WIFI_NETWORK_MENU':
+            self._enter_wifi_networks()
         elif self.view == 'WIFI_PASSWORD':
             net_cat = self.categories['NETWORK']
             if net_cat.password_chars:
@@ -373,17 +377,75 @@ class SettingsApp(AppBase):
         self.wifi_status = t('settings.network.select_network')
 
         net_cat = self.categories['NETWORK']
+        net_cat.wifi_networks = net_cat.get_known_wifi_networks()
+
         display_items = []
-        if not net_cat.wifi_networks:
-             display_items.append(Item(text=t('settings.network.no_networks'), selectable=False))
-        else:
-            for net in net_cat.wifi_networks:
-                prefix = "C" if net['current'] else " "
-                display_items.append(Item(
-                    text=f"{prefix} {net['ssid']}",
-                    id=net
-                ))
+        for net in net_cat.wifi_networks:
+            prefix = "C" if net['current'] else " "
+            display_items.append(Item(
+                text=f"{prefix} {net['ssid']}",
+                id=net
+            ))
+
+        # Add scan option at the end
+        display_items.append(Item(text=t('settings.network.scan_new'), id='SCAN_NEW'))
         self.wifi_menu.set_items(display_items)
+
+    def _enter_wifi_network_menu(self, network):
+        """Enter network options menu (connect/disconnect/forget)."""
+        self.wifi_selected_network = network
+        is_current = network.get('current', False)
+
+        options = []
+        if is_current:
+            options = [
+                (t('settings.network.disconnect'), 'DISCONNECT'),
+                (t('settings.network.forget'), 'FORGET'),
+                (t('general.cancel'), 'CANCEL')
+            ]
+        else:
+            options = [
+                (t('settings.bluetooth.connect'), 'CONNECT'),
+                (t('settings.network.forget'), 'FORGET'),
+                (t('general.cancel'), 'CANCEL')
+            ]
+
+        items = [Item(text=opt[0], id=opt[1]) for opt in options]
+        self.wifi_network_menu.set_items(items)
+
+        self.view = 'WIFI_NETWORK_MENU'
+        self.wifi_status = network['ssid'][:14]
+
+    def _handle_wifi_network_action(self):
+        """Handle action in WiFi network menu."""
+        item = self.wifi_network_menu.get_selected_item()
+        if not item or not self.wifi_selected_network:
+            self._enter_wifi_networks()
+            return
+
+        action = item.id
+        network = self.wifi_selected_network
+        net_cat = self.categories['NETWORK']
+
+        if action == 'CONNECT':
+            self.wifi_status = t('settings.network.connecting')
+            if net_cat.connect_to_wifi(network['id']):
+                self.wifi_status = t('settings.network.connected')
+            else:
+                self.wifi_status = t('settings.network.failed')
+            self._enter_wifi_networks()
+        elif action == 'DISCONNECT':
+            self.wifi_status = t('settings.network.disconnecting')
+            net_cat.disconnect_wifi()
+            self.wifi_status = t('settings.network.disconnected')
+            self._enter_wifi_networks()
+        elif action == 'FORGET':
+            self.wifi_status = t('settings.network.forgetting')
+            net_cat.forget_wifi_network(network['id'])
+            self.wifi_status = t('settings.network.removed')
+            self._enter_wifi_networks()
+        elif action == 'CANCEL':
+            self._enter_wifi_networks()
 
     def _enter_wifi_scan(self):
         """Enter WiFi scanning view."""
@@ -594,6 +656,11 @@ class SettingsApp(AppBase):
         elif self.view == 'WIFI_SCAN':
             frame, scroll = self.renderer.render_menu(t('settings.network.title', status=self.wifi_status), **self.wifi_scan_menu.get_render_args())
             self.wifi_scan_menu.scroll_offset = scroll
+            return frame
+
+        elif self.view == 'WIFI_NETWORK_MENU':
+            frame, scroll = self.renderer.render_menu(t('settings.network.title', status=self.wifi_status), **self.wifi_network_menu.get_render_args())
+            self.wifi_network_menu.scroll_offset = scroll
             return frame
 
         elif self.view == 'WIFI_PASSWORD':
