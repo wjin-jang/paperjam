@@ -67,6 +67,7 @@ class SettingsApp(AppBase):
         self.wifi_status = t('settings.network.select_network')
         self.wifi_scan_menu = MenuController([])  # For scanned networks
         self.wifi_selected_network = None  # Network being connected to
+        self.wifi_password_mode = 'input'  # 'input' for char entry, 'connect' for button
 
         # Popup state
         self.popup_msg = ""
@@ -129,8 +130,12 @@ class SettingsApp(AppBase):
             return
 
         if self.view == 'WIFI_PASSWORD':
-            # Cycle to previous character
-            self.categories['NETWORK'].prev_char()
+            if self.wifi_password_mode == 'connect':
+                # Move back to character input
+                self.wifi_password_mode = 'input'
+            else:
+                # Cycle to previous character
+                self.categories['NETWORK'].prev_char()
             return
 
         if self.view == 'MAIN':
@@ -152,8 +157,12 @@ class SettingsApp(AppBase):
             return
 
         if self.view == 'WIFI_PASSWORD':
-            # Cycle to next character
-            self.categories['NETWORK'].next_char()
+            if self.wifi_password_mode == 'input':
+                # Move to connect button
+                self.wifi_password_mode = 'connect'
+            else:
+                # Already on connect, cycle next char (wrap to input)
+                self.wifi_password_mode = 'input'
             return
 
         if self.view == 'MAIN':
@@ -173,15 +182,17 @@ class SettingsApp(AppBase):
         if self.view == 'VOLUME':
             self._audio_category.set_volume(-5)
         elif self.view == 'WIFI_PASSWORD':
-            # Delete last character
-            self.categories['NETWORK'].delete_char()
+            if self.wifi_password_mode == 'input':
+                # Cycle to previous character
+                self.categories['NETWORK'].prev_char()
 
     def nav_right(self):
         if self.view == 'VOLUME':
             self._audio_category.set_volume(5)
         elif self.view == 'WIFI_PASSWORD':
-            # Confirm password and try to connect
-            self._confirm_wifi_password()
+            if self.wifi_password_mode == 'input':
+                # Cycle to next character
+                self.categories['NETWORK'].next_char()
 
     def nav_enter(self):
         if self.view == 'VOLUME':
@@ -270,8 +281,12 @@ class SettingsApp(AppBase):
                     net_cat.refresh()
 
         elif self.view == 'WIFI_PASSWORD':
-            # Enter key adds current character to password
-            self.categories['NETWORK'].confirm_char()
+            if self.wifi_password_mode == 'connect':
+                # Connect button selected - try to connect
+                self._confirm_wifi_password()
+            else:
+                # Input mode - add current character to password
+                self.categories['NETWORK'].confirm_char()
 
     def nav_back(self):
         if self.view == 'VOLUME':
@@ -295,8 +310,14 @@ class SettingsApp(AppBase):
             self.categories['NETWORK'].refresh()
             self._update_submenu_items(self.categories['NETWORK'])
         elif self.view == 'WIFI_PASSWORD':
-            # Cancel password entry, go back to scan results
-            self.categories['NETWORK'].reset_password_entry()
+            net_cat = self.categories['NETWORK']
+            if net_cat.password_chars:
+                # Delete last character
+                net_cat.delete_char()
+                return True
+            # No characters left - cancel and go back to scan results
+            net_cat.reset_password_entry()
+            self.wifi_password_mode = 'input'
             self._enter_wifi_scan()
         elif self.view == 'SUBMENU':
             self.view = 'MAIN'
@@ -401,6 +422,7 @@ class SettingsApp(AppBase):
     def _enter_wifi_password(self, ssid: str):
         """Enter password entry view for a WiFi network."""
         self.view = 'WIFI_PASSWORD'
+        self.wifi_password_mode = 'input'  # Start in character input mode
         self.wifi_status = ssid[:12]  # Truncate for title
 
         net_cat = self.categories['NETWORK']
@@ -580,18 +602,23 @@ class SettingsApp(AppBase):
             password = net_cat.get_current_password()
 
             # Show password entry UI
-            # Display: current password + blinking cursor with current char
-            display_password = password + "[" + current_char + "]"
+            # Display: current password + cursor with current char
+            if self.wifi_password_mode == 'input':
+                display_password = password + "[" + current_char + "]"
+                sel_idx = 1  # Password input line selected
+            else:
+                display_password = password + "_"
+                sel_idx = 2  # Connect button selected
 
             items = [
-                Item(text=t('settings.network.password_hint'), selectable=False),
-                Item(text=display_password, selectable=False),
+                Item(text="L/R=char ENTER=add BACK=del", selectable=False),
+                Item(text=display_password, selectable=True, id='INPUT'),
                 Item(text=t('settings.network.confirm_connect'), id='CONNECT'),
             ]
 
             frame, _ = self.renderer.render_menu(
                 t('settings.network.password_title', ssid=self.wifi_status),
-                items, 2, 0  # Select the Connect button
+                items, sel_idx, 0
             )
             return frame
 
