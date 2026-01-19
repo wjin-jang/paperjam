@@ -22,25 +22,28 @@ class AudioEngine:
         # Try audio outputs in order of preference
         self.instance = None
 
+        # Common VLC options for headless audio playback
+        base_opts = ['--no-video', '--no-xlib']
+
         # Try PulseAudio first
         if self._check_pulseaudio():
             try:
-                self.instance = vlc.Instance('--aout=pulse')
+                self.instance = vlc.Instance(*base_opts, '--aout=pulse')
                 logger.info("Audio: PulseAudio selected")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"PulseAudio init failed: {e}")
 
         # Try ALSA if PulseAudio failed
         if self.instance is None:
             try:
-                self.instance = vlc.Instance('--aout=alsa')
+                self.instance = vlc.Instance(*base_opts, '--aout=alsa')
                 logger.info("Audio: ALSA selected")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"ALSA init failed: {e}")
 
         # Fall back to default
         if self.instance is None:
-            self.instance = vlc.Instance()
+            self.instance = vlc.Instance(*base_opts)
             logger.info("Audio: Default output selected")
 
         self.player = self.instance.media_player_new()
@@ -61,13 +64,24 @@ class AudioEngine:
             return False
 
     def play(self, path):
+        import time
         self.current_media_path = path
         logger.info(f"Playing: {path}")
         media = self.instance.media_new(str(path))
+        if media is None:
+            logger.error(f"Failed to create media for: {path}")
+            return
         self.player.set_media(media)
         self.player.audio_set_volume(100)  # Ensure volume is set before play
         result = self.player.play()
-        logger.info(f"Play result: {result}, state: {self.get_state()}")
+        # Wait briefly for VLC to start
+        time.sleep(0.1)
+        state = self.get_state()
+        logger.info(f"Play result: {result}, state: {state}")
+        if state == 'error':
+            logger.error(f"VLC error playing: {path}")
+        elif state == 'stopped':
+            logger.warning(f"VLC stopped immediately - possible codec/file issue: {path}")
 
     def toggle_pause(self):
         if self.player.is_playing():
