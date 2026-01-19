@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw
 
 import config as cfg
 from ui.graphics import create_dithered_strip, draw_text_with_cjk
+from ui.views.items import get_font_padding, get_cjk_y_offset
 
 if TYPE_CHECKING:
     from ui.views.items import Item
@@ -379,10 +380,12 @@ class Panel:
                 (self.x, self.y, self.x + self.width, self.y + cfg.ROW_HEIGHT),
                 fill=cfg.BLACK
             )
+            header_pad = get_font_padding(cfg.FONT_HEADER)
+            cjk_y_off = get_cjk_y_offset(cfg.FONT_HEADER)
             draw_text_with_cjk(
-                draw, (self.x + 5, self.y - 2),
+                draw, (self.x + header_pad[0], self.y + header_pad[1]),
                 self.header,
-                cfg.FONT_HEADER, cfg.FONT_CJK_HEADER, fill=cfg.WHITE, cjk_y_offset=1
+                cfg.FONT_HEADER, cfg.FONT_CJK_HEADER, fill=cfg.WHITE, cjk_y_offset=cjk_y_off
             )
 
         # Render menu content

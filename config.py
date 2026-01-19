@@ -169,7 +169,7 @@ def _init_font_padding():
         FONT_MAIN: (5, 1),
         FONT_HEADER: (2, -1),
         FONT_CJK_MAIN: (5, 3),
-        FONT_CJK_HEADER: (2, 0),
+        FONT_CJK_HEADER: (2, 1),
     }
 
 _init_font_padding()

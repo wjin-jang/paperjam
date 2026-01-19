@@ -26,6 +26,28 @@ def get_font_padding(font) -> tuple:
     return cfg.FONT_PADDING.get(font, (5, 0))
 
 
+def get_cjk_y_offset(font) -> int:
+    """Get the Y offset for CJK characters relative to the main font.
+
+    Args:
+        font: The main font being used
+
+    Returns:
+        Y offset in pixels for CJK characters
+    """
+    # Determine which CJK font pairs with this font
+    if font == cfg.FONT_HEADER:
+        cjk_font = cfg.FONT_CJK_HEADER
+    else:
+        cjk_font = cfg.FONT_CJK_MAIN
+
+    main_pad = get_font_padding(font)
+    cjk_pad = get_font_padding(cjk_font)
+
+    # CJK y offset is the difference in Y padding
+    return cjk_pad[1] - main_pad[1]
+
+
 # Default character sets for text input
 CHARSET_PASSWORD = (
     list('abcdefghijklmnopqrstuvwxyz') +
@@ -498,14 +520,14 @@ class Item:
             fg = cfg.WHITE if invert else cfg.BLACK
             font = self.font or cfg.FONT_MAIN
             cjk_font = cfg.FONT_CJK_HEADER if font == cfg.FONT_HEADER else cfg.FONT_CJK_MAIN
-            cjk_y_offset = 1 if font == cfg.FONT_HEADER else 0
             # Get font padding, then add custom padding on top
             font_pad = get_font_padding(font)
             custom_pad = self.padding or (0, 0)
             padding_x = font_pad[0] + custom_pad[0]
             padding_y = font_pad[1] + custom_pad[1]
+            cjk_y_off = get_cjk_y_offset(font)
             for i, line in enumerate(lines):
-                draw_text_with_cjk(draw, (x + padding_x, y + (i * cfg.ROW_HEIGHT) + padding_y), line, font, cjk_font, fill=fg, cjk_y_offset=cjk_y_offset)
+                draw_text_with_cjk(draw, (x + padding_x, y + (i * cfg.ROW_HEIGHT) + padding_y), line, font, cjk_font, fill=fg, cjk_y_offset=cjk_y_off)
 
     def _draw_container(self, draw, x, y, w, h, invert=False):
         bg = cfg.BLACK if invert else cfg.WHITE
@@ -515,12 +537,12 @@ class Item:
         if h < 1 or w < 1: return
         font = font or (self.font if self.font else cfg.FONT_MAIN)
         cjk_font = cfg.FONT_CJK_HEADER if font == cfg.FONT_HEADER else cfg.FONT_CJK_MAIN
-        cjk_y_offset = 1 if font == cfg.FONT_HEADER else 0
         # Get font padding, then add custom padding on top
         font_pad = get_font_padding(font)
         custom_pad = padding or (self.padding if self.padding else (0, 0))
         padding_x = font_pad[0] + custom_pad[0]
         padding_y = font_pad[1] + custom_pad[1]
+        cjk_y_off = get_cjk_y_offset(font)
         bg = cfg.BLACK if invert else cfg.WHITE
         fg = cfg.WHITE if invert else cfg.BLACK
         draw.rectangle((x, y, x + w, y + h), fill=bg, outline=cfg.BLACK)
@@ -528,7 +550,7 @@ class Item:
             text_w = get_text_width_with_cjk(text, font, cjk_font)
             draw_x = x + (w - text_w) // 2 + 1
         else: draw_x = x + padding_x
-        draw_text_with_cjk(draw, (draw_x, y + padding_y), text, font, cjk_font, fill=fg, cjk_y_offset=cjk_y_offset)
+        draw_text_with_cjk(draw, (draw_x, y + padding_y), text, font, cjk_font, fill=fg, cjk_y_offset=cjk_y_off)
 
     def _calculate_widths(self, total_w: int, count: int) -> List[int]:
         if not self.columns: return []
