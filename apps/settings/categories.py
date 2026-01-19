@@ -343,14 +343,29 @@ class NetworkCategory(SettingsCategory):
     # WiFi connection timeout in seconds
     WIFI_TIMEOUT = 15
 
+    # Character set for password entry (a-z, A-Z, 0-9, common symbols)
+    PASSWORD_CHARS = (
+        list('abcdefghijklmnopqrstuvwxyz') +
+        list('ABCDEFGHIJKLMNOPQRSTUVWXYZ') +
+        list('0123456789') +
+        list('!@#$%^&*()-_=+[]{}|;:,.<>?/~` ')
+    )
+
     def __init__(self, settings_manager):
         super().__init__(t('settings.categories.network'), settings_manager)
         from core.bluetooth import BluetoothManager
         self.bt = BluetoothManager()
         self.wifi_view_callback = None
-        self.wifi_networks = []
+        self.wifi_networks = []  # Known/saved networks
+        self.scanned_networks = []  # Available networks from scan
         self.wifi_idx = 0
         self._wifi_on_demand = True  # Enable WiFi on-demand by default
+        self._is_scanning_wifi = False
+
+        # Password entry state
+        self.password_chars = []  # List of characters entered
+        self.password_char_idx = 0  # Current character in PASSWORD_CHARS
+        self.password_target_ssid = ""  # SSID we're entering password for
 
     def set_wifi_view_callback(self, callback):
         """Set callback to enter WiFi view."""
@@ -569,6 +584,235 @@ class NetworkCategory(SettingsCategory):
             logger.error(f"Failed to connect to WiFi: {e}")
             return False
 
+    def scan_wifi_networks(self) -> List[dict]:
+        """Scan for available WiFi networks.
+
+        Returns list of networks with ssid, signal, security info.
+        """
+        # Enable WiFi if not enabled
+        if not self._is_wifi_enabled():
+            if not self.enable_wifi():
+                logger.error("Failed to enable WiFi for scanning")
+                return []
+
+        networks = []
+        try:
+            # Trigger a scan
+            subprocess.run(
+                ["sudo", "wpa_cli", "-i", "wlan0", "scan"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+
+            # Wait for scan to complete
+            import time
+            time.sleep(3)
+
+            # Get scan results
+            result = subprocess.check_output(
+                ["sudo", "wpa_cli", "-i", "wlan0", "scan_results"],
+                text=True, stderr=subprocess.DEVNULL, timeout=5
+            )
+
+            # Parse results (skip header line)
+            # Format: bssid / frequency / signal level / flags / ssid
+            lines = result.strip().split('\n')[1:]
+            seen_ssids = set()
+
+            for line in lines:
+                parts = line.split('\t')
+                if len(parts) >= 5:
+                    ssid = parts[4].strip()
+                    if not ssid or ssid in seen_ssids:
+                        continue
+                    seen_ssids.add(ssid)
+
+                    signal = int(parts[2]) if parts[2].lstrip('-').isdigit() else -100
+                    flags = parts[3]
+                    is_secured = 'WPA' in flags or 'WEP' in flags
+
+                    # Check if this network is already known
+                    is_known = any(n['ssid'] == ssid for n in self.get_known_wifi_networks())
+
+                    networks.append({
+                        'ssid': ssid,
+                        'signal': signal,
+                        'secured': is_secured,
+                        'known': is_known,
+                        'flags': flags
+                    })
+
+            # Sort by signal strength (strongest first)
+            networks.sort(key=lambda x: x['signal'], reverse=True)
+
+        except Exception as e:
+            logger.error(f"Failed to scan WiFi networks: {e}")
+
+        self.scanned_networks = networks
+        return networks
+
+    def add_wifi_network(self, ssid: str, password: str) -> bool:
+        """Add a new WiFi network with password.
+
+        Returns True if successfully added and connected.
+        """
+        # Enable WiFi if not enabled
+        if not self._is_wifi_enabled():
+            if not self.enable_wifi():
+                logger.error("Failed to enable WiFi for adding network")
+                return False
+
+        try:
+            # Add new network and get its ID
+            result = subprocess.check_output(
+                ["sudo", "wpa_cli", "-i", "wlan0", "add_network"],
+                text=True, stderr=subprocess.DEVNULL, timeout=5
+            )
+            network_id = result.strip()
+
+            # Set SSID
+            subprocess.run(
+                ["sudo", "wpa_cli", "-i", "wlan0", "set_network", network_id, "ssid", f'"{ssid}"'],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+
+            # Set password (PSK)
+            subprocess.run(
+                ["sudo", "wpa_cli", "-i", "wlan0", "set_network", network_id, "psk", f'"{password}"'],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+
+            # Enable the network
+            subprocess.run(
+                ["sudo", "wpa_cli", "-i", "wlan0", "enable_network", network_id],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+
+            # Select and connect to network
+            subprocess.run(
+                ["sudo", "wpa_cli", "-i", "wlan0", "select_network", network_id],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+
+            # Save configuration
+            subprocess.run(
+                ["sudo", "wpa_cli", "-i", "wlan0", "save_config"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+
+            # Wait for connection
+            import time
+            start = time.time()
+            while time.time() - start < self.WIFI_TIMEOUT:
+                if self._is_wifi_connected():
+                    logger.info(f"Connected to new WiFi network: {ssid}")
+                    return True
+                time.sleep(1)
+
+            logger.warning(f"WiFi connection timeout for new network: {ssid}")
+            return False
+
+        except Exception as e:
+            logger.error(f"Failed to add WiFi network: {e}")
+            return False
+
+    def add_open_wifi_network(self, ssid: str) -> bool:
+        """Add an open (no password) WiFi network.
+
+        Returns True if successfully added and connected.
+        """
+        # Enable WiFi if not enabled
+        if not self._is_wifi_enabled():
+            if not self.enable_wifi():
+                logger.error("Failed to enable WiFi for adding network")
+                return False
+
+        try:
+            # Add new network and get its ID
+            result = subprocess.check_output(
+                ["sudo", "wpa_cli", "-i", "wlan0", "add_network"],
+                text=True, stderr=subprocess.DEVNULL, timeout=5
+            )
+            network_id = result.strip()
+
+            # Set SSID
+            subprocess.run(
+                ["sudo", "wpa_cli", "-i", "wlan0", "set_network", network_id, "ssid", f'"{ssid}"'],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+
+            # Set key management to NONE for open networks
+            subprocess.run(
+                ["sudo", "wpa_cli", "-i", "wlan0", "set_network", network_id, "key_mgmt", "NONE"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+
+            # Enable the network
+            subprocess.run(
+                ["sudo", "wpa_cli", "-i", "wlan0", "enable_network", network_id],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+
+            # Select and connect to network
+            subprocess.run(
+                ["sudo", "wpa_cli", "-i", "wlan0", "select_network", network_id],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+
+            # Save configuration
+            subprocess.run(
+                ["sudo", "wpa_cli", "-i", "wlan0", "save_config"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+            )
+
+            # Wait for connection
+            import time
+            start = time.time()
+            while time.time() - start < self.WIFI_TIMEOUT:
+                if self._is_wifi_connected():
+                    logger.info(f"Connected to open WiFi network: {ssid}")
+                    return True
+                time.sleep(1)
+
+            logger.warning(f"WiFi connection timeout for open network: {ssid}")
+            return False
+
+        except Exception as e:
+            logger.error(f"Failed to add open WiFi network: {e}")
+            return False
+
+    # Password entry helpers
+    def reset_password_entry(self, ssid: str = ""):
+        """Reset password entry state."""
+        self.password_chars = []
+        self.password_char_idx = 0
+        self.password_target_ssid = ssid
+
+    def get_current_password(self) -> str:
+        """Get the currently entered password."""
+        return ''.join(self.password_chars)
+
+    def get_current_char(self) -> str:
+        """Get the currently selected character."""
+        return self.PASSWORD_CHARS[self.password_char_idx]
+
+    def next_char(self):
+        """Move to next character in the character set."""
+        self.password_char_idx = (self.password_char_idx + 1) % len(self.PASSWORD_CHARS)
+
+    def prev_char(self):
+        """Move to previous character in the character set."""
+        self.password_char_idx = (self.password_char_idx - 1) % len(self.PASSWORD_CHARS)
+
+    def confirm_char(self):
+        """Add current character to password."""
+        self.password_chars.append(self.PASSWORD_CHARS[self.password_char_idx])
+        self.password_char_idx = 0  # Reset to 'a'
+
+    def delete_char(self):
+        """Delete last character from password."""
+        if self.password_chars:
+            self.password_chars.pop()
+
     def build_menu(self) -> List[Item]:
         wifi_info = self._get_wifi_info()
         bt_info = self._get_bt_status()
@@ -579,6 +823,7 @@ class NetworkCategory(SettingsCategory):
             Item(columns=[t('settings.network.bluetooth'), bt_info], selectable=False),
             Item(columns=[t('settings.network.toggle_wifi'), wifi_state], selectable=True),
             Item(text=t('settings.network.wifi_networks')),
+            Item(text=t('settings.network.scan_wifi')),
             Item(columns=[t('settings.network.toggle_bt'), bt_state], selectable=True)
         ]
 
@@ -593,6 +838,8 @@ class NetworkCategory(SettingsCategory):
             self.wifi_networks = self.get_known_wifi_networks()
             self.wifi_idx = 0
             return 'WIFI_NETWORKS'
+        elif t('settings.network.scan_wifi') in item_text:
+            return 'WIFI_SCAN'
         elif t('settings.network.toggle_bt') in item_text:
             self._toggle_bt()
             self.refresh()

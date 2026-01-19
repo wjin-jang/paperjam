@@ -65,6 +65,8 @@ class SettingsApp(AppBase):
         # WiFi state
         self.wifi_menu = MenuController([])
         self.wifi_status = t('settings.network.select_network')
+        self.wifi_scan_menu = MenuController([])  # For scanned networks
+        self.wifi_selected_network = None  # Network being connected to
 
         # Popup state
         self.popup_msg = ""
@@ -125,7 +127,12 @@ class SettingsApp(AppBase):
         if self.view == 'VOLUME':
             self._audio_category.set_volume(5)
             return
-            
+
+        if self.view == 'WIFI_PASSWORD':
+            # Cycle to previous character
+            self.categories['NETWORK'].prev_char()
+            return
+
         if self.view == 'MAIN':
             self.main_menu.move_selection(-1)
         elif self.view == 'SUBMENU':
@@ -136,12 +143,19 @@ class SettingsApp(AppBase):
             self.bt_device_menu.move_selection(-1)
         elif self.view == 'WIFI_NETWORKS':
             self.wifi_menu.move_selection(-1)
+        elif self.view == 'WIFI_SCAN':
+            self.wifi_scan_menu.move_selection(-1)
 
     def nav_down(self):
         if self.view == 'VOLUME':
             self._audio_category.set_volume(-5)
             return
-            
+
+        if self.view == 'WIFI_PASSWORD':
+            # Cycle to next character
+            self.categories['NETWORK'].next_char()
+            return
+
         if self.view == 'MAIN':
             self.main_menu.move_selection(1)
         elif self.view == 'SUBMENU':
@@ -152,14 +166,22 @@ class SettingsApp(AppBase):
             self.bt_device_menu.move_selection(1)
         elif self.view == 'WIFI_NETWORKS':
             self.wifi_menu.move_selection(1)
+        elif self.view == 'WIFI_SCAN':
+            self.wifi_scan_menu.move_selection(1)
 
     def nav_left(self):
         if self.view == 'VOLUME':
             self._audio_category.set_volume(-5)
+        elif self.view == 'WIFI_PASSWORD':
+            # Delete last character
+            self.categories['NETWORK'].delete_char()
 
     def nav_right(self):
         if self.view == 'VOLUME':
             self._audio_category.set_volume(5)
+        elif self.view == 'WIFI_PASSWORD':
+            # Confirm password and try to connect
+            self._confirm_wifi_password()
 
     def nav_enter(self):
         if self.view == 'VOLUME':
@@ -203,17 +225,53 @@ class SettingsApp(AppBase):
                 network = item.id
                 self.wifi_status = t('settings.network.connecting')
                 net_cat = self.categories['NETWORK']
-                
+
                 if net_cat.connect_to_wifi(network['id']):
                     # Wait briefly for connection to establish
                     time.sleep(2)
                     self.wifi_status = t('settings.network.connected')
                 else:
                     self.wifi_status = t('settings.network.failed')
-                    
+
                 # Refresh network list and parent category
                 net_cat.wifi_networks = net_cat.get_known_wifi_networks()
                 net_cat.refresh()  # Refresh parent menu to show new connection
+
+        elif self.view == 'WIFI_SCAN':
+            item = self.wifi_scan_menu.get_selected_item()
+            if item and item.id:  # id stores scanned network dict
+                network = item.id
+                self.wifi_selected_network = network
+                net_cat = self.categories['NETWORK']
+
+                if network.get('known'):
+                    # Already known network - just connect
+                    self.wifi_status = t('settings.network.connecting')
+                    # Find the network ID from known networks
+                    known = net_cat.get_known_wifi_networks()
+                    for kn in known:
+                        if kn['ssid'] == network['ssid']:
+                            if net_cat.connect_to_wifi(kn['id']):
+                                self.wifi_status = t('settings.network.connected')
+                            else:
+                                self.wifi_status = t('settings.network.failed')
+                            break
+                    net_cat.refresh()
+                elif network.get('secured'):
+                    # Secured network - need password
+                    self._enter_wifi_password(network['ssid'])
+                else:
+                    # Open network - connect directly
+                    self.wifi_status = t('settings.network.connecting')
+                    if net_cat.add_open_wifi_network(network['ssid']):
+                        self.wifi_status = t('settings.network.connected')
+                    else:
+                        self.wifi_status = t('settings.network.failed')
+                    net_cat.refresh()
+
+        elif self.view == 'WIFI_PASSWORD':
+            # Enter key adds current character to password
+            self.categories['NETWORK'].confirm_char()
 
     def nav_back(self):
         if self.view == 'VOLUME':
@@ -231,6 +289,15 @@ class SettingsApp(AppBase):
             # Refresh network category to show updated connection status
             self.categories['NETWORK'].refresh()
             self._update_submenu_items(self.categories['NETWORK'])
+        elif self.view == 'WIFI_SCAN':
+            self.view = 'SUBMENU'
+            self.wifi_status = t('settings.network.select_network')
+            self.categories['NETWORK'].refresh()
+            self._update_submenu_items(self.categories['NETWORK'])
+        elif self.view == 'WIFI_PASSWORD':
+            # Cancel password entry, go back to scan results
+            self.categories['NETWORK'].reset_password_entry()
+            self._enter_wifi_scan()
         elif self.view == 'SUBMENU':
             self.view = 'MAIN'
         elif self.view == 'MAIN':
@@ -273,6 +340,8 @@ class SettingsApp(AppBase):
             self._enter_bt_saved_view()
         elif result == 'WIFI_NETWORKS':
             self._enter_wifi_networks()
+        elif result == 'WIFI_SCAN':
+            self._enter_wifi_scan()
 
         # Sync settings to config
         self.settings.sync_to_config()
@@ -294,6 +363,71 @@ class SettingsApp(AppBase):
                     id=net
                 ))
         self.wifi_menu.set_items(display_items)
+
+    def _enter_wifi_scan(self):
+        """Enter WiFi scanning view."""
+        self.view = 'WIFI_SCAN'
+        self.wifi_status = t('settings.network.scanning_wifi')
+
+        net_cat = self.categories['NETWORK']
+        # Trigger scan and get results
+        networks = net_cat.scan_wifi_networks()
+
+        display_items = []
+        if not networks:
+            display_items.append(Item(text=t('settings.network.no_networks'), selectable=False))
+        else:
+            for net in networks:
+                # Build display text with signal indicator and security status
+                signal = net.get('signal', -100)
+                if signal > -50:
+                    sig_str = t('settings.network.signal_strong')
+                elif signal > -70:
+                    sig_str = t('settings.network.signal_medium')
+                else:
+                    sig_str = t('settings.network.signal_weak')
+
+                known_mark = t('settings.network.known_network') if net.get('known') else " "
+                sec_mark = "L" if net.get('secured') else "O"  # L=locked, O=open
+
+                display_items.append(Item(
+                    text=f"{known_mark}{sec_mark} {net['ssid']} {sig_str}",
+                    id=net
+                ))
+
+        self.wifi_status = t('settings.network.select_network')
+        self.wifi_scan_menu.set_items(display_items)
+
+    def _enter_wifi_password(self, ssid: str):
+        """Enter password entry view for a WiFi network."""
+        self.view = 'WIFI_PASSWORD'
+        self.wifi_status = ssid[:12]  # Truncate for title
+
+        net_cat = self.categories['NETWORK']
+        net_cat.reset_password_entry(ssid)
+
+    def _confirm_wifi_password(self):
+        """Confirm password and try to connect to WiFi network."""
+        net_cat = self.categories['NETWORK']
+        password = net_cat.get_current_password()
+        ssid = net_cat.password_target_ssid
+
+        if not password:
+            return  # No password entered yet
+
+        self.wifi_status = t('settings.network.connecting')
+
+        if net_cat.add_wifi_network(ssid, password):
+            self.wifi_status = t('settings.network.connected')
+            net_cat.reset_password_entry()
+            # Go back to submenu
+            self.view = 'SUBMENU'
+            net_cat.refresh()
+            self._update_submenu_items(net_cat)
+        else:
+            self.wifi_status = t('settings.network.failed')
+            # Stay in password view to retry
+            net_cat.password_chars = []  # Clear password for retry
 
     def _enter_bt_saved_view(self):
         self.view = 'BT_SAVED'
@@ -434,6 +568,32 @@ class SettingsApp(AppBase):
             frame, scroll = self.renderer.render_menu(t('settings.network.title', status=self.wifi_status), **self.wifi_menu.get_render_args())
             self.wifi_menu.scroll_offset = scroll
             return frame
-            
+
+        elif self.view == 'WIFI_SCAN':
+            frame, scroll = self.renderer.render_menu(t('settings.network.title', status=self.wifi_status), **self.wifi_scan_menu.get_render_args())
+            self.wifi_scan_menu.scroll_offset = scroll
+            return frame
+
+        elif self.view == 'WIFI_PASSWORD':
+            net_cat = self.categories['NETWORK']
+            current_char = net_cat.get_current_char()
+            password = net_cat.get_current_password()
+
+            # Show password entry UI
+            # Display: current password + blinking cursor with current char
+            display_password = password + "[" + current_char + "]"
+
+            items = [
+                Item(text=t('settings.network.password_hint'), selectable=False),
+                Item(text=display_password, selectable=False),
+                Item(text=t('settings.network.confirm_connect'), id='CONNECT'),
+            ]
+
+            frame, _ = self.renderer.render_menu(
+                t('settings.network.password_title', ssid=self.wifi_status),
+                items, 2, 0  # Select the Connect button
+            )
+            return frame
+
         frame, _ = self.renderer.render_menu(t('general.error'), [Item(text=t('general.unknown_view'), selectable=False)], 0, 0)
         return frame
