@@ -40,6 +40,10 @@ if [ "$STASHED" = "1" ]; then
 fi
 
 # Restart service if running
+# Set up environment for user services (needed when running via SSH/script)
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+
 if systemctl --user is-active --quiet paperjam 2>/dev/null; then
     echo "Restarting user service..."
     systemctl --user restart paperjam
