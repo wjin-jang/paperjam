@@ -66,6 +66,18 @@ E-ink music player for Raspberry Pi Zero 2 W.
 - Long press detection for context menus
 - Debounced input handling
 
+## Logs
+
+Application logs are stored at:
+```
+~/.cache/paperjam/paperjam.log
+```
+
+To view logs in real-time:
+```bash
+tail -f ~/.cache/paperjam/paperjam.log
+```
+
 ## Installation
 
 See [INSTALL.md](INSTALL.md) for complete setup instructions including:

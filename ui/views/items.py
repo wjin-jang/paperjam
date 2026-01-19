@@ -252,6 +252,92 @@ class Item:
             if isinstance(line, list): self._render_plain_columns(draw, line, x, line_y, w, fg=fg, column_widths=column_widths)
             else: draw.text((x + 5, line_y + 1), sanitize_text(str(line)), font=cfg.FONT_MAIN, fill=fg)
 
+    def _render_plain_columns(self, draw, columns, x, y, w, fg=cfg.BLACK, column_widths=None):
+        if not columns: return
+        draw.text((x + 5, y + 1), sanitize_text(str(columns[0])), font=cfg.FONT_MAIN, fill=fg)
+        if len(columns) > 1:
+            right_widths = column_widths if column_widths else self._calc_column_widths(columns, w)
+            col_x = x + max(20, w - sum(right_widths))
+            for i, col in enumerate(columns[1:]):
+                col_w = right_widths[i] if i < len(right_widths) else 50
+                self._draw_aligned_text(draw, str(col), col_x, y, col_w, cfg.ROW_HEIGHT, 'center', fg)
+                col_x += col_w
+
+    def _render_info_columns(self, draw, canvas, x, y, w, invert=False, column_widths=None):
+        if not self.columns: return
+        right_widths = column_widths if column_widths else self._calc_column_widths(self.columns, w)
+        left_w = max(20, w - sum(right_widths)) if right_widths else w
+        self._draw_text_box(draw, canvas, sanitize_text(str(self.columns[0])), x, y, left_w, cfg.ROW_HEIGHT, invert=invert)
+        col_x = x + left_w
+        for i, col in enumerate(self.columns[1:]):
+            col_w = right_widths[i] if i < len(right_widths) else 50
+            self._draw_text_box(draw, canvas, sanitize_text(str(col)), col_x, y, col_w, cfg.ROW_HEIGHT, center=True, invert=invert)
+            col_x += col_w
+
+    def _render_wrapped_text(self, draw, canvas, x, y, w, invert=False):
+        if w != self._last_width:
+            self._wrapped_lines = self._wrap_text(sanitize_text(self.text), w)
+            self._last_width = w
+        lines = self._wrapped_lines
+        if len(lines) == 1:
+            self._draw_text_box(draw, canvas, lines[0], x, y, w, cfg.ROW_HEIGHT, invert=invert)
+        else:
+            total_h = len(lines) * cfg.ROW_HEIGHT
+            self._draw_container(draw, x, y, w, total_h, invert=invert)
+            padding_x = self.padding[0] if self.padding else 5
+            padding_y = self.padding[1] if self.padding else 3
+            fg = cfg.WHITE if invert else cfg.BLACK
+            for i, line in enumerate(lines):
+                draw.text((x + padding_x, y + (i * cfg.ROW_HEIGHT) + padding_y), line, font=self.font or cfg.FONT_MAIN, fill=fg)
+
+    def _draw_container(self, draw, x, y, w, h, invert=False):
+        bg = cfg.BLACK if invert else cfg.WHITE
+        draw.rectangle((x, y, x + w, y + h), fill=bg, outline=cfg.BLACK)
+
+    def _draw_text_box(self, draw, canvas, text, x, y, w, h, invert=False, center=False, font=None, padding=None):
+        if h < 1 or w < 1: return
+        font = font or (self.font if self.font else cfg.FONT_MAIN)
+        padding = padding or (self.padding if self.padding else (5, 3))
+        padding_x, padding_y = padding
+        bg = cfg.BLACK if invert else cfg.WHITE
+        fg = cfg.WHITE if invert else cfg.BLACK
+        draw.rectangle((x, y, x + w, y + h), fill=bg, outline=cfg.BLACK)
+        if center:
+            bbox = draw.textbbox((0, 0), text, font=font)
+            draw_x = x + (w - (bbox[2] - bbox[0])) // 2 + 1
+        else: draw_x = x + padding_x
+        draw.text((draw_x, y + padding_y), text, font=font, fill=fg)
+
+    def _calculate_widths(self, total_w: int, count: int) -> List[int]:
+        if not self.columns: return []
+        widths, fixed_total, auto_count = [], 0, 0
+        for col in self.columns:
+            if isinstance(col, Column) and col.width is not None:
+                widths.append(col.width); fixed_total += col.width
+            else: widths.append(None); auto_count += 1
+        if auto_count > 0:
+            auto_width = (total_w - fixed_total) // auto_count
+            widths = [w if w is not None else auto_width for w in widths]
+        return widths
+
+    def _wrap_text(self, text: str, width: int) -> List[str]:
+        font = self.font if self.font else cfg.FONT_MAIN
+        padding_x = self.padding[0] if self.padding else 5
+        max_text_width = width - (padding_x * 2)
+        temp = Image.new('1', (1, 1))
+        temp_draw = ImageDraw.Draw(temp)
+        words = text.split()
+        if not words: return [text]
+        lines, current_line = [], []
+        for word in words:
+            test_line = ' '.join(current_line + [word])
+            if temp_draw.textbbox((0, 0), test_line, font=font)[2] <= max_text_width: current_line.append(word)
+            else:
+                if current_line: lines.append(' '.join(current_line))
+                current_line = [word]
+        if current_line: lines.append(' '.join(current_line))
+        return lines
+
     def _calc_column_widths(self, columns, total_width):
         """Calculate column widths for a single item (fallback)."""
         return calc_menu_column_widths([self], total_width)
@@ -309,89 +395,3 @@ def calc_menu_column_widths(items, total_width):
         right_widths = [max(10, int(cw * scale)) for cw in right_widths]
 
     return right_widths
-
-    def _render_plain_columns(self, draw, columns, x, y, w, fg=cfg.BLACK, column_widths=None):
-        if not columns: return
-        draw.text((x + 5, y + 1), sanitize_text(str(columns[0])), font=cfg.FONT_MAIN, fill=fg)
-        if len(columns) > 1:
-            right_widths = column_widths if column_widths else self._calc_column_widths(columns, w)
-            col_x = x + max(20, w - sum(right_widths))
-            for i, col in enumerate(columns[1:]):
-                col_w = right_widths[i] if i < len(right_widths) else 50
-                self._draw_aligned_text(draw, str(col), col_x, y, col_w, cfg.ROW_HEIGHT, 'center', fg)
-                col_x += col_w
-
-    def _render_info_columns(self, draw, canvas, x, y, w, invert=False, column_widths=None):
-        if not self.columns: return
-        right_widths = column_widths if column_widths else self._calc_column_widths(self.columns, w)
-        left_w = max(20, w - sum(right_widths)) if right_widths else w
-        self._draw_text_box(draw, canvas, sanitize_text(str(self.columns[0])), x, y, left_w, cfg.ROW_HEIGHT, invert=invert)
-        col_x = x + left_w
-        for i, col in enumerate(self.columns[1:]):
-            col_w = right_widths[i] if i < len(right_widths) else 50
-            self._draw_text_box(draw, canvas, sanitize_text(str(col)), col_x, y, col_w, cfg.ROW_HEIGHT, center=True, invert=invert)
-            col_x += col_w
-
-    def _render_wrapped_text(self, draw, canvas, x, y, w, invert=False):
-        if w != self._last_width:
-            self._wrapped_lines = self._wrap_text(sanitize_text(self.text), w)
-            self._last_width = w
-        lines = self._wrapped_lines
-        if len(lines) == 1:
-            self._draw_text_box(draw, canvas, lines[0], x, y, w, cfg.ROW_HEIGHT, invert=invert)
-        else:
-            total_h = len(lines) * cfg.ROW_HEIGHT
-            self._draw_container(draw, x, y, w, total_h, invert=invert)
-            padding_x = self.padding[0] if self.padding else 5
-            padding_y = self.padding[1] if self.padding else 3
-            fg = cfg.WHITE if invert else cfg.BLACK
-            for i, line in enumerate(lines):
-                draw.text((x + padding_x, y + (i * cfg.ROW_HEIGHT) + padding_y), line, font=self.font or cfg.FONT_MAIN, fill=fg)
-
-    def _draw_container(self, draw, x, y, w, h, invert=False):
-        bg = cfg.BLACK if invert else cfg.WHITE
-        draw.rectangle((x, y, x + w , y + h ), fill=bg, outline=cfg.BLACK)
-
-    def _draw_text_box(self, draw, canvas, text, x, y, w, h, invert=False, center=False, font=None, padding=None):
-        if h < 1 or w < 1: return
-        font = font or (self.font if self.font else cfg.FONT_MAIN)
-        padding = padding or (self.padding if self.padding else (5, 3))
-        padding_x, padding_y = padding
-        bg = cfg.BLACK if invert else cfg.WHITE
-        fg = cfg.WHITE if invert else cfg.BLACK
-        draw.rectangle((x, y, x + w , y + h ), fill=bg, outline=cfg.BLACK)
-        if center:
-            bbox = draw.textbbox((0, 0), text, font=font)
-            draw_x = x + (w - (bbox[2] - bbox[0])) // 2 + 1
-        else: draw_x = x + padding_x
-        draw.text((draw_x, y + padding_y), text, font=font, fill=fg)
-
-    def _calculate_widths(self, total_w: int, count: int) -> List[int]:
-        if not self.columns: return []
-        widths, fixed_total, auto_count = [], 0, 0
-        for col in self.columns:
-            if isinstance(col, Column) and col.width is not None:
-                widths.append(col.width); fixed_total += col.width
-            else: widths.append(None); auto_count += 1
-        if auto_count > 0:
-            auto_width = (total_w - fixed_total) // auto_count
-            widths = [w if w is not None else auto_width for w in widths]
-        return widths
-
-    def _wrap_text(self, text: str, width: int) -> List[str]:
-        font = self.font if self.font else cfg.FONT_MAIN
-        padding_x = self.padding[0] if self.padding else 5
-        max_text_width = width - (padding_x * 2)
-        temp = Image.new('1', (1, 1))
-        temp_draw = ImageDraw.Draw(temp)
-        words = text.split()
-        if not words: return [text]
-        lines, current_line = [], []
-        for word in words:
-            test_line = ' '.join(current_line + [word])
-            if temp_draw.textbbox((0, 0), test_line, font=font)[2] <= max_text_width: current_line.append(word)
-            else:
-                if current_line: lines.append(' '.join(current_line))
-                current_line = [word]
-        if current_line: lines.append(' '.join(current_line))
-        return lines
