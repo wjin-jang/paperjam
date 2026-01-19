@@ -13,8 +13,10 @@ from apps.base import AppBase
 from core.i18n import t
 from core.weather import WeatherManager
 from ui.views.weather_view import (
-    WeatherViewRenderer, SECTION_CURRENT, SECTION_TEMPERATURE,
-    SECTION_PRECIPITATION, SECTION_WEEKLY, SECTION_COUNT
+    WeatherViewRenderer,
+    SECTION_TODAY, SECTION_TOMORROW, SECTION_WEEKDAY,
+    SECTION_TEMPERATURE, SECTION_PRECIPITATION, SECTION_WEEKLY,
+    SECTION_COUNT
 )
 import config as cfg
 
@@ -29,9 +31,6 @@ class WeatherApp(AppBase):
         " -'.,0123456789"
     )
 
-    # Maximum days to show (Today, Tomorrow, day after)
-    MAX_DAYS = 3
-
     # Chart scroll limits
     MAX_CHART_SCROLL = 16  # 24 hours - 8 visible
 
@@ -43,37 +42,34 @@ class WeatherApp(AppBase):
         # View state
         self.view = 'MAIN'  # MAIN, SETUP
         self.last_update_check = 0
-        self.update_check_interval = 60  # Check every minute
+        self.update_check_interval = 60
 
         # Navigation state
-        self.selected_section = SECTION_CURRENT
-        self.day_offset = 0  # 0=Today, 1=Tomorrow, etc.
-        self.chart_scroll = 0  # Scroll offset for bar charts
+        self.selected_section = SECTION_TODAY
+        self.day_offset = 0  # 0=Today, 1=Tomorrow, 2=Weekday
+        self.chart_scroll = 0
 
         # Setup state
         self.search_query = ""
         self.search_results: List[dict] = []
         self.selected_result_idx = 0
         self.is_searching = False
-        self.char_index = 0  # Current character in CHAR_SET
+        self.char_index = 0
 
     def on_enter(self):
         """Called when app becomes active."""
         super().on_enter()
 
-        # Reset navigation state
-        self.selected_section = SECTION_CURRENT
+        self.selected_section = SECTION_TODAY
         self.day_offset = 0
         self.chart_scroll = 0
 
-        # Check if location is configured
         if not self.weather.is_configured:
             self.view = 'SETUP'
             self.search_query = ""
             self.search_results = []
         else:
             self.view = 'MAIN'
-            # Trigger update if data is stale
             if self.weather.needs_update():
                 self.weather.update_async()
 
@@ -90,7 +86,6 @@ class WeatherApp(AppBase):
                 'prev': self._setup_char_down,
             }
 
-        # Main view callbacks
         return {
             'up': self._nav_up,
             'down': self._nav_down,
@@ -105,51 +100,36 @@ class WeatherApp(AppBase):
         """Navigate up through sections."""
         if self.selected_section > 0:
             self.selected_section -= 1
-            # Reset chart scroll when changing sections
-            self.chart_scroll = 0
 
     def _nav_down(self):
         """Navigate down through sections."""
         if self.selected_section < SECTION_COUNT - 1:
             self.selected_section += 1
-            # Reset chart scroll when changing sections
-            self.chart_scroll = 0
 
     def _nav_left(self):
-        """Navigate left - scroll chart or change day."""
+        """Navigate left - scroll chart when on chart sections."""
         if self.selected_section in (SECTION_TEMPERATURE, SECTION_PRECIPITATION):
-            # Scroll chart left
             if self.chart_scroll > 0:
                 self.chart_scroll -= 1
-        elif self.selected_section == SECTION_CURRENT:
-            # Change day (previous)
-            if self.day_offset > 0:
-                self.day_offset -= 1
-                self.chart_scroll = 0
 
     def _nav_right(self):
-        """Navigate right - scroll chart or change day."""
+        """Navigate right - scroll chart when on chart sections."""
         if self.selected_section in (SECTION_TEMPERATURE, SECTION_PRECIPITATION):
-            # Scroll chart right
             if self.chart_scroll < self.MAX_CHART_SCROLL:
                 self.chart_scroll += 1
-        elif self.selected_section == SECTION_CURRENT:
-            # Change day (next)
-            if self.day_offset < self.MAX_DAYS - 1:
-                self.day_offset += 1
-                self.chart_scroll = 0
 
     def _nav_action(self):
         """Action on current selection."""
-        if self.selected_section == SECTION_CURRENT:
-            # Refresh weather data
-            if not self.weather.is_updating:
-                self.weather.update_async()
-
-    def _refresh(self):
-        """Manually refresh weather data."""
-        if not self.weather.is_updating:
-            self.weather.update_async()
+        # Day selection rows - select the day
+        if self.selected_section == SECTION_TODAY:
+            self.day_offset = 0
+            self.chart_scroll = 0
+        elif self.selected_section == SECTION_TOMORROW:
+            self.day_offset = 1
+            self.chart_scroll = 0
+        elif self.selected_section == SECTION_WEEKDAY:
+            self.day_offset = 2
+            self.chart_scroll = 0
 
     def _open_setup(self):
         """Open location setup."""
@@ -166,27 +146,19 @@ class WeatherApp(AppBase):
     # --- Setup view callbacks ---
 
     def _setup_char_up(self):
-        """Cycle to previous character or move selection up."""
         if self.search_results:
-            # Navigate results
             self.selected_result_idx = max(0, self.selected_result_idx - 1)
         else:
-            # Cycle character
             self.char_index = (self.char_index - 1) % len(self.CHAR_SET)
 
     def _setup_char_down(self):
-        """Cycle to next character or move selection down."""
         if self.search_results:
-            # Navigate results
             self.selected_result_idx = min(len(self.search_results) - 1, self.selected_result_idx + 1)
         else:
-            # Cycle character
             self.char_index = (self.char_index + 1) % len(self.CHAR_SET)
 
     def _setup_enter(self):
-        """Add character or select result."""
         if self.search_results:
-            # Select location
             result = self.search_results[self.selected_result_idx]
             display_name = f"{result['name']}, {result.get('admin1', '')}"
             if result.get('country'):
@@ -198,22 +170,18 @@ class WeatherApp(AppBase):
                 result['longitude']
             )
 
-            # Fetch weather for new location
             self.weather.update_async()
 
-            # Return to main view
             self.view = 'MAIN'
             self.search_query = ""
             self.search_results = []
-            self.selected_section = SECTION_CURRENT
+            self.selected_section = SECTION_TODAY
             self.day_offset = 0
             self.chart_scroll = 0
         else:
-            # Add current character to query
             self.search_query += self.CHAR_SET[self.char_index]
 
     def _setup_search(self):
-        """Perform location search."""
         if len(self.search_query) >= 2:
             self.is_searching = True
             self.search_results = self.weather.search_location(self.search_query)
@@ -221,15 +189,11 @@ class WeatherApp(AppBase):
             self.selected_result_idx = 0
 
     def _setup_back(self):
-        """Delete character or exit setup."""
         if self.search_results:
-            # Clear results to go back to input
             self.search_results = []
         elif self.search_query:
-            # Delete last character
             self.search_query = self.search_query[:-1]
         else:
-            # Exit setup (return to main or exit app if no location)
             if self.weather.is_configured:
                 self.view = 'MAIN'
             else:
@@ -237,7 +201,6 @@ class WeatherApp(AppBase):
 
     def update(self) -> bool:
         """Update app state."""
-        # Periodic update check
         now = time.time()
         if now - self.last_update_check > self.update_check_interval:
             self.last_update_check = now
@@ -256,7 +219,6 @@ class WeatherApp(AppBase):
                 self.is_searching
             )
 
-        # Main weather view
         weather_data = self.weather.data
         title = self.weather.config.location_name or t('menu.weather')
 
