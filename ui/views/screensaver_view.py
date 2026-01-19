@@ -36,8 +36,8 @@ class ScreensaverRenderer:
         img_w, img_h = img.size
                 
         # Calculate panel size to fit image
-        panel_w = img_w + 2
-        panel_h = img_h + 2
+        panel_w = img_w + 1
+        panel_h = img_h + 1
         
         x = (cfg.SCREEN_WIDTH - panel_w) // 2
         y = (cfg.SCREEN_HEIGHT - panel_h) // 2
@@ -71,7 +71,7 @@ class ScreensaverRenderer:
             img_x = (cfg.SCREEN_WIDTH - img_w - 2) // 2
             img_y = (cfg.SCREEN_HEIGHT - img_h - 2) // 2
             
-            panel_img = Panel(img_x, img_y, img_w + 2, img_h + 2)
+            panel_img = Panel(img_x, img_y, img_w + 1, img_h + 1)
             menu_img = panel_img.create_menu()
             art_item = Item(show_image=True, image=image)
             art_item.set_height(img_h)

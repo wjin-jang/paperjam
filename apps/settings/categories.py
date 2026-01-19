@@ -256,6 +256,7 @@ class AudioCategory(SettingsCategory):
             return None
         elif t('settings.audio.endless_play') in item_text:
             self.settings.toggle('endless_playback')
+            self.refresh()
             return None
 
         return None
@@ -328,8 +329,10 @@ class DisplayCategory(SettingsCategory):
 
         if t('settings.display.invert_colors') in item_text:
             self.settings.toggle('invert_colors')
+            self.refresh()
         elif t('settings.display.screensaver') in item_text:
             self.settings.cycle('screensaver_timeout')
+            self.refresh()
 
         return None
 
@@ -751,6 +754,7 @@ class SystemCategory(SettingsCategory):
             self.refresh()
         elif t('settings.system.auto_update') in item_text:
             self.settings.toggle('auto_update')
+            self.refresh()
         elif t('settings.system.check_updates') in item_text:
             if self._update_callback:
                 self._update_callback()
@@ -758,6 +762,7 @@ class SystemCategory(SettingsCategory):
             subprocess.run(["sudo", "reboot"], timeout=5)
         elif t('settings.system.long_press') in item_text:
             self.settings.cycle('long_press_duration')
+            self.refresh()
         elif t('settings.system.reset_data') in item_text:
             if self._reset_callback:
                 self._reset_callback()

@@ -59,17 +59,22 @@ def _get_nested(data: Dict[str, Any], key: str) -> Optional[str]:
 def load_translations():
     """Load all available translations."""
     global _translations
+    import logging
+    logger = logging.getLogger(__name__)
 
     if not HAS_YAML:
+        logger.warning("PyYAML not installed - translations unavailable")
         return
 
     locales_dir = Path(__file__).parent.parent / 'locales'
     if not locales_dir.exists():
+        logger.warning(f"Locales directory not found: {locales_dir}")
         return
 
     for locale_file in locales_dir.glob('*.yaml'):
         locale = locale_file.stem
         _translations[locale] = _load_locale(locale)
+        logger.info(f"Loaded locale: {locale} ({len(_translations[locale])} keys)")
 
 
 def set_locale(locale: str):
