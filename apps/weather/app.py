@@ -2,7 +2,6 @@
 Weather application for PaperJam.
 
 Displays current weather, hourly forecasts, and weekly outlook.
-Fetches data from Open-Meteo API and caches locally.
 """
 import time
 from typing import Dict, Callable, List
@@ -14,8 +13,7 @@ from core.i18n import t
 from core.weather import WeatherManager
 from ui.views.weather_view import (
     WeatherViewRenderer,
-    SECTION_TODAY, SECTION_TOMORROW, SECTION_WEEKDAY,
-    SECTION_TEMPERATURE, SECTION_PRECIPITATION, SECTION_WEEKLY,
+    SECTION_DAY, SECTION_TEMPERATURE, SECTION_PRECIPITATION, SECTION_WEEKLY,
     SECTION_COUNT
 )
 import config as cfg
@@ -31,6 +29,7 @@ class WeatherApp(AppBase):
     )
 
     MAX_CHART_SCROLL = 16
+    MAX_DAY_OFFSET = 2
 
     def __init__(self):
         super().__init__(name=t('menu.weather'))
@@ -42,7 +41,7 @@ class WeatherApp(AppBase):
         self.update_check_interval = 60
 
         # Navigation state
-        self.selected_section = SECTION_TODAY
+        self.selected_section = SECTION_DAY
         self.day_offset = 0
         self.chart_scroll = 0
 
@@ -55,7 +54,7 @@ class WeatherApp(AppBase):
 
     def on_enter(self):
         super().on_enter()
-        self.selected_section = SECTION_TODAY
+        self.selected_section = SECTION_DAY
         self.day_offset = 0
         self.chart_scroll = 0
 
@@ -91,49 +90,56 @@ class WeatherApp(AppBase):
         }
 
     def _nav_up(self):
-        """Move to previous selectable section."""
-        # Find previous selectable section
-        new_section = self.selected_section - 1
-        while new_section >= 0:
-            if new_section in (SECTION_TODAY, SECTION_TOMORROW, SECTION_WEEKDAY,
-                              SECTION_TEMPERATURE, SECTION_PRECIPITATION, SECTION_WEEKLY):
-                self.selected_section = new_section
-                return
-            new_section -= 1
+        """Navigate up - change day or move to previous section."""
+        if self.selected_section == SECTION_DAY:
+            # Change day up
+            if self.day_offset > 0:
+                self.day_offset -= 1
+                self.chart_scroll = 0
+        else:
+            # Move to previous section
+            section_order = [SECTION_DAY, SECTION_TEMPERATURE, SECTION_PRECIPITATION, SECTION_WEEKLY]
+            idx = section_order.index(self.selected_section)
+            if idx > 0:
+                self.selected_section = section_order[idx - 1]
 
     def _nav_down(self):
-        """Move to next selectable section."""
-        new_section = self.selected_section + 1
-        while new_section < SECTION_COUNT:
-            if new_section in (SECTION_TODAY, SECTION_TOMORROW, SECTION_WEEKDAY,
-                              SECTION_TEMPERATURE, SECTION_PRECIPITATION, SECTION_WEEKLY):
-                self.selected_section = new_section
-                return
-            new_section += 1
+        """Navigate down - change day or move to next section."""
+        if self.selected_section == SECTION_DAY:
+            # Change day down
+            if self.day_offset < self.MAX_DAY_OFFSET:
+                self.day_offset += 1
+                self.chart_scroll = 0
+        else:
+            # Move to next section
+            section_order = [SECTION_DAY, SECTION_TEMPERATURE, SECTION_PRECIPITATION, SECTION_WEEKLY]
+            idx = section_order.index(self.selected_section)
+            if idx < len(section_order) - 1:
+                self.selected_section = section_order[idx + 1]
 
     def _nav_left(self):
-        """Scroll chart left when on chart sections."""
-        if self.selected_section in (SECTION_TEMPERATURE, SECTION_PRECIPITATION):
+        """Scroll chart left or move from day selector to sections."""
+        if self.selected_section == SECTION_DAY:
+            # Move to sections
+            pass
+        elif self.selected_section in (SECTION_TEMPERATURE, SECTION_PRECIPITATION):
             if self.chart_scroll > 0:
                 self.chart_scroll -= 1
 
     def _nav_right(self):
-        """Scroll chart right when on chart sections."""
-        if self.selected_section in (SECTION_TEMPERATURE, SECTION_PRECIPITATION):
+        """Scroll chart right or move to day selector."""
+        if self.selected_section == SECTION_DAY:
+            # Move to first section header
+            self.selected_section = SECTION_TEMPERATURE
+        elif self.selected_section in (SECTION_TEMPERATURE, SECTION_PRECIPITATION):
             if self.chart_scroll < self.MAX_CHART_SCROLL:
                 self.chart_scroll += 1
 
     def _nav_action(self):
-        """Select day or refresh."""
-        if self.selected_section == SECTION_TODAY:
-            self.day_offset = 0
-            self.chart_scroll = 0
-        elif self.selected_section == SECTION_TOMORROW:
-            self.day_offset = 1
-            self.chart_scroll = 0
-        elif self.selected_section == SECTION_WEEKDAY:
-            self.day_offset = 2
-            self.chart_scroll = 0
+        """Action on current selection."""
+        if self.selected_section == SECTION_DAY:
+            # Confirm day selection - just stay on current day
+            pass
 
     def _open_setup(self):
         self.view = 'SETUP'
@@ -145,7 +151,7 @@ class WeatherApp(AppBase):
     def _exit(self):
         self.running = False
 
-    # Setup view callbacks
+    # Setup callbacks
 
     def _setup_char_up(self):
         if self.search_results:
@@ -176,7 +182,7 @@ class WeatherApp(AppBase):
             self.view = 'MAIN'
             self.search_query = ""
             self.search_results = []
-            self.selected_section = SECTION_TODAY
+            self.selected_section = SECTION_DAY
             self.day_offset = 0
             self.chart_scroll = 0
         else:
