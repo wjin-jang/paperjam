@@ -40,7 +40,7 @@ class ScreensaverRenderer:
         panel_w = img_w + 1
         panel_h = img_h + 1
 
-        x = (cfg.SCREEN_WIDTH - panel_w) // 2 - 80
+        x = (cfg.SCREEN_WIDTH - panel_w) // 2 - 64
         y = (cfg.SCREEN_HEIGHT - panel_h) // 2
 
         # Create panel
