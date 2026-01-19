@@ -864,7 +864,6 @@ class NetworkCategory(SettingsCategory):
             Item(columns=[t('settings.network.bluetooth'), bt_info], selectable=False),
             Item(columns=[t('settings.network.toggle_wifi'), wifi_state], selectable=True),
             Item(text=t('settings.network.wifi_networks')),
-            Item(text=t('settings.network.scan_wifi')),
             Item(columns=[t('settings.network.toggle_bt'), bt_state], selectable=True)
         ]
 
@@ -879,8 +878,6 @@ class NetworkCategory(SettingsCategory):
             self.wifi_networks = self.get_known_wifi_networks()
             self.wifi_idx = 0
             return 'WIFI_NETWORKS'
-        elif t('settings.network.scan_wifi') in item_text:
-            return 'WIFI_SCAN'
         elif t('settings.network.toggle_bt') in item_text:
             self._toggle_bt()
             self.refresh()
