@@ -92,52 +92,49 @@ class ScreensaverRenderer:
         """Render tiled welcome screen with dialog."""
         self.clear()
 
-        # 1. Draw tiled background
-        cols = 5
-        rows = 3
-        tile_w = cfg.SCREEN_WIDTH // cols
-        tile_h = cfg.SCREEN_HEIGHT // rows
-        
-        num_covers = len(covers)
-        idx = 0
-        for r in range(rows):
-            for c in range(cols):
-                if num_covers > 0:
+        # 1. Draw tiled background at original size, offset by half
+        if covers:
+            # Use original image size (no resizing)
+            tile_w = covers[0].width
+            tile_h = covers[0].height
+
+            # Offset by half the tile size
+            offset_x = tile_w // 2
+            offset_y = tile_h // 2
+
+            # Calculate how many tiles fit on screen (accounting for offset)
+            cols = (cfg.SCREEN_WIDTH + offset_x) // tile_w + 1
+            rows = (cfg.SCREEN_HEIGHT + offset_y) // tile_h + 1
+
+            # Only show as many unique covers as we have (no repeating)
+            idx = 0
+            for r in range(rows):
+                for c in range(cols):
+                    if idx >= len(covers):
+                        break
                     img = covers[idx]
                     if img:
                         try:
-                            # Resize if needed - convert to L mode for better resize, then back to 1-bit
-                            if img.width != tile_w or img.height != tile_h:
-                                img = img.convert('L').resize((tile_w, tile_h)).convert('1')
-                            self.canvas.paste(img, (c * tile_w, r * tile_h))
+                            x = c * tile_w - offset_x
+                            y = r * tile_h - offset_y
+                            self.canvas.paste(img, (x, y))
                         except Exception:
-                            pass  # Skip invalid images
-                    idx = (idx + 1) % num_covers
+                            pass
+                    idx += 1
+                if idx >= len(covers):
+                    break
 
-        # 2. Draw Dialog Overlay
-        w = 180
-        h = 96
-        x = (cfg.SCREEN_WIDTH - w) // 2
-        y = (cfg.SCREEN_HEIGHT - h) // 2
+        # 2. Draw small panel with header
+        panel_w = 130
+        panel_h = cfg.ROW_HEIGHT * 2  # Header + one item row
+        x = (cfg.SCREEN_WIDTH - panel_w) // 2
+        y = (cfg.SCREEN_HEIGHT - panel_h) // 2
 
-        # Create panel with white background (to cover tiles)
-        panel = Panel(x, y, w, h, header=None)
-        
-        # Manually clear the area under the panel first
-        self.draw.rectangle((x, y, x + w, y + h), fill=cfg.WHITE)
-        
+        panel = Panel(x, y, panel_w, panel_h, header=dialog_text)
         menu = panel.create_menu()
-        
-        # Add text and button
-        menu.items = [
-            Item(text=dialog_text, padding=(5, 10), wrap_text=True, selectable=False),
-            Item(text=button_text, selectable=True)
-        ]
-        
-        # Select the button
-        menu.cursor.row = 1
-        menu.cursor.col = 0
-        
+        menu.items = [Item(text=button_text, selectable=True)]
+        menu.cursor.row = 0
+
         panel.render(self.canvas)
 
         return self.canvas
