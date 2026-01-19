@@ -146,7 +146,7 @@ def load_fonts():
         return ImageFont.truetype(str(path), size, layout_engine=ImageFont.Layout.BASIC)
 
     main = get_font(_config.get("font_main", "BMmini.ttf"), 10)
-    header = get_font(_config.get("font_header", "Nintendo-DS-BIOS.ttf"), 13)
+    header = get_font(_config.get("font_header", "Nintendo-DS-BIOS.ttf"), 14)
 
     # CJK fonts (Galmuri)
     cjk_main = get_font("Galmuri7.ttf", 8)
@@ -158,6 +158,21 @@ def load_fonts():
     return main, header, icons, cjk_main, cjk_header
 
 FONT_MAIN, FONT_HEADER, FONT_ICONS, FONT_CJK_MAIN, FONT_CJK_HEADER = load_fonts()
+
+# --- Font Padding ---
+# Default padding (x, y) for each font, applied before custom padding
+FONT_PADDING = {}  # Populated after fonts are loaded
+
+def _init_font_padding():
+    global FONT_PADDING
+    FONT_PADDING = {
+        FONT_MAIN: (5, 0),
+        FONT_HEADER: (2, -2),
+        FONT_CJK_MAIN: (5, 3),
+        FONT_CJK_HEADER: (2, 0),
+    }
+
+_init_font_padding()
 
 # --- Status Icons ---
 STATUS_ICONS = {

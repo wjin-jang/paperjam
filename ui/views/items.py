@@ -14,6 +14,18 @@ from core.i18n import t
 from ui.graphics import draw_text_with_cjk, get_text_width_with_cjk
 
 
+def get_font_padding(font) -> tuple:
+    """Get default padding for a font.
+
+    Args:
+        font: The font to get padding for
+
+    Returns:
+        (x, y) padding tuple
+    """
+    return cfg.FONT_PADDING.get(font, (5, 0))
+
+
 # Default character sets for text input
 CHARSET_PASSWORD = (
     list('abcdefghijklmnopqrstuvwxyz') +
@@ -103,13 +115,16 @@ class TextInput:
             x, y, w, h: Bounding box
             selected: Whether this input is currently selected (shows cursor)
             font: Font to use (defaults to cfg.FONT_MAIN)
-            padding: (x, y) padding tuple
+            padding: (x, y) custom padding tuple (added to font padding)
             prefix: Optional prefix text to display before input
         """
         font = font or cfg.FONT_MAIN
         cjk_font = cfg.FONT_CJK_HEADER if font == cfg.FONT_HEADER else cfg.FONT_CJK_MAIN
-        padding = padding or (5, 2)
-        padding_x, padding_y = padding
+        # Get font padding, then add custom padding on top
+        font_pad = get_font_padding(font)
+        custom_pad = padding or (0, 0)
+        padding_x = font_pad[0] + custom_pad[0]
+        padding_y = font_pad[1] + custom_pad[1]
 
         # Draw background box
         bg = cfg.BLACK if selected else cfg.WHITE
@@ -420,11 +435,12 @@ class Item:
     def _draw_aligned_text(self, draw, text, x, y, w, h, align, fill):
         font = cfg.FONT_MAIN
         cjk_font = cfg.FONT_CJK_MAIN
+        font_pad = get_font_padding(font)
         text_w = get_text_width_with_cjk(text, font, cjk_font)
         if align == 'center': text_x = x + (w - text_w) // 2
-        elif align == 'right': text_x = x + w - text_w - 5
-        else: text_x = x + 5
-        draw_text_with_cjk(draw, (text_x, y + 1), text, font, cjk_font, fill=fill)
+        elif align == 'right': text_x = x + w - text_w - font_pad[0]
+        else: text_x = x + font_pad[0]
+        draw_text_with_cjk(draw, (text_x, y + font_pad[1]), text, font, cjk_font, fill=fill)
 
     def _draw_icon_content(self, canvas, icon, x, y, w, h, invert):
         if invert: icon = ImageOps.invert(icon.convert('L')).convert('1')
@@ -436,14 +452,16 @@ class Item:
         total_h = len(self.lines) * cfg.ROW_HEIGHT
         self._draw_container(draw, x, y, w, total_h, invert=invert)
         fg = cfg.WHITE if invert else cfg.BLACK
+        font_pad = get_font_padding(cfg.FONT_MAIN)
         for i, line in enumerate(self.lines):
             line_y = y + (i * cfg.ROW_HEIGHT)
             if isinstance(line, list): self._render_plain_columns(draw, line, x, line_y, w, fg=fg, column_widths=column_widths)
-            else: draw_text_with_cjk(draw, (x + 5, line_y + 1), str(line), cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=fg)
+            else: draw_text_with_cjk(draw, (x + font_pad[0], line_y + font_pad[1]), str(line), cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=fg)
 
     def _render_plain_columns(self, draw, columns, x, y, w, fg=cfg.BLACK, column_widths=None):
         if not columns: return
-        draw_text_with_cjk(draw, (x + 5, y + 1), str(columns[0]), cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=fg)
+        font_pad = get_font_padding(cfg.FONT_MAIN)
+        draw_text_with_cjk(draw, (x + font_pad[0], y + font_pad[1]), str(columns[0]), cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=fg)
         if len(columns) > 1:
             right_widths = column_widths if column_widths else self._calc_column_widths(columns, w)
             col_x = x + max(20, w - sum(right_widths))
@@ -477,12 +495,15 @@ class Item:
         else:
             total_h = len(lines) * cfg.ROW_HEIGHT
             self._draw_container(draw, x, y, w, total_h, invert=invert)
-            padding_x = self.padding[0] if self.padding else 5
-            padding_y = self.padding[1] if self.padding else 2
             fg = cfg.WHITE if invert else cfg.BLACK
             font = self.font or cfg.FONT_MAIN
             cjk_font = cfg.FONT_CJK_HEADER if font == cfg.FONT_HEADER else cfg.FONT_CJK_MAIN
             cjk_y_offset = 1 if font == cfg.FONT_HEADER else 0
+            # Get font padding, then add custom padding on top
+            font_pad = get_font_padding(font)
+            custom_pad = self.padding or (0, 0)
+            padding_x = font_pad[0] + custom_pad[0]
+            padding_y = font_pad[1] + custom_pad[1]
             for i, line in enumerate(lines):
                 draw_text_with_cjk(draw, (x + padding_x, y + (i * cfg.ROW_HEIGHT) + padding_y), line, font, cjk_font, fill=fg, cjk_y_offset=cjk_y_offset)
 
@@ -495,8 +516,11 @@ class Item:
         font = font or (self.font if self.font else cfg.FONT_MAIN)
         cjk_font = cfg.FONT_CJK_HEADER if font == cfg.FONT_HEADER else cfg.FONT_CJK_MAIN
         cjk_y_offset = 1 if font == cfg.FONT_HEADER else 0
-        padding = padding or (self.padding if self.padding else (5, 3))
-        padding_x, padding_y = padding
+        # Get font padding, then add custom padding on top
+        font_pad = get_font_padding(font)
+        custom_pad = padding or (self.padding if self.padding else (0, 0))
+        padding_x = font_pad[0] + custom_pad[0]
+        padding_y = font_pad[1] + custom_pad[1]
         bg = cfg.BLACK if invert else cfg.WHITE
         fg = cfg.WHITE if invert else cfg.BLACK
         draw.rectangle((x, y, x + w, y + h), fill=bg, outline=cfg.BLACK)
@@ -520,7 +544,10 @@ class Item:
 
     def _wrap_text(self, text: str, width: int) -> List[str]:
         font = self.font if self.font else cfg.FONT_MAIN
-        padding_x = self.padding[0] if self.padding else 5
+        # Get font padding, then add custom padding on top
+        font_pad = get_font_padding(font)
+        custom_pad = self.padding or (0, 0)
+        padding_x = font_pad[0] + custom_pad[0]
         max_text_width = width - (padding_x * 2)
         temp = Image.new('1', (1, 1))
         temp_draw = ImageDraw.Draw(temp)

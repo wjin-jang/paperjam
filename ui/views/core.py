@@ -380,7 +380,7 @@ class Panel:
                 fill=cfg.BLACK
             )
             draw_text_with_cjk(
-                draw, (self.x + 5, self.y - 1),
+                draw, (self.x + 5, self.y - 2),
                 self.header,
                 cfg.FONT_HEADER, cfg.FONT_CJK_HEADER, fill=cfg.WHITE, cjk_y_offset=1
             )

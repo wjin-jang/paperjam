@@ -202,7 +202,7 @@ class MusicViewRenderer:
         status_key = state.get_status_text()
         status_icon = cfg.STATUS_ICONS.get(status_key, '')
         status_text = f"{status_icon} {t(status_key)}" if status_icon else t(status_key)
-        status_item = Item(text=status_text, font=cfg.FONT_HEADER, padding=(2, 0), selectable=False)
+        status_item = Item(text=status_text, font=cfg.FONT_HEADER, selectable=False)
         status_menu.items = [status_item]
 
         status_panel.render(self.canvas)
