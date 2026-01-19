@@ -247,15 +247,36 @@ class Item:
             if isinstance(line, list): self._render_plain_columns(draw, line, x, line_y, w, fg=fg)
             else: draw.text((x + 5, line_y + 1), sanitize_text(str(line)), font=cfg.FONT_MAIN, fill=fg)
 
+    def _calc_column_widths(self, columns, total_width):
+        """Calculate column widths with consistent sizing unless text is significantly larger."""
+        if len(columns) <= 1:
+            return []
+
+        default_col_width = 50  # Default width for right columns
+        threshold = 1.5  # Only expand if text needs more than 1.5x default
+
+        right_widths = []
+        for col in columns[1:]:
+            text_width = len(sanitize_text(str(col))) * 6 + 8
+            # Only use larger width if significantly bigger than default
+            if text_width > default_col_width * threshold:
+                right_widths.append(text_width)
+            else:
+                right_widths.append(default_col_width)
+
+        # Scale down if total exceeds available space
+        total_right = sum(right_widths)
+        if total_right + 20 > total_width:
+            scale = (total_width - 20) / total_right if total_right > 0 else 1
+            right_widths = [max(10, int(cw * scale)) for cw in right_widths]
+
+        return right_widths
+
     def _render_plain_columns(self, draw, columns, x, y, w, fg=cfg.BLACK):
         if not columns: return
         draw.text((x + 5, y + 1), sanitize_text(str(columns[0])), font=cfg.FONT_MAIN, fill=fg)
         if len(columns) > 1:
-            right_widths = [max(20, len(sanitize_text(str(c))) * 6 + 8) for c in columns[1:]]
-            total_right = sum(right_widths)
-            if total_right + 20 > w:
-                scale = (w - 20) / total_right if total_right > 0 else 1
-                right_widths = [max(10, int(cw * scale)) for cw in right_widths]
+            right_widths = self._calc_column_widths(columns, w)
             col_x = x + max(20, w - sum(right_widths))
             for i, col in enumerate(columns[1:]):
                 col_w = right_widths[i]
@@ -264,13 +285,8 @@ class Item:
 
     def _render_info_columns(self, draw, canvas, x, y, w, invert=False):
         if not self.columns: return
-        right_widths = [max(20, len(sanitize_text(str(c))) * 6 + 8) for c in self.columns[1:]]
-        total_right = sum(right_widths)
-        left_w = w - total_right
-        if total_right + 20 > w:
-            scale = (w - 20) / total_right if total_right > 0 else 1
-            right_widths = [max(10, int(cw * scale)) for cw in right_widths]
-            left_w = max(20, w - sum(right_widths))
+        right_widths = self._calc_column_widths(self.columns, w)
+        left_w = max(20, w - sum(right_widths)) if right_widths else w
         self._draw_text_box(draw, canvas, sanitize_text(str(self.columns[0])), x, y, left_w, cfg.ROW_HEIGHT, invert=invert)
         col_x = x + left_w
         for i, col in enumerate(self.columns[1:]):
