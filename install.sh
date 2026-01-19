@@ -120,7 +120,7 @@ echo "[6/9] Setting up Python environment..."
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
-pip install pillow mutagen python-vlc smbus2 evdev numpy spidev RPi.GPIO gpiozero pykakasi korean_romanizer pyyaml
+pip install pillow mutagen python-vlc smbus2 evdev numpy spidev RPi.GPIO gpiozero pyyaml
 
 # Symlink system lgpio into venv (can't be pip installed)
 PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")

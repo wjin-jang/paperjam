@@ -139,8 +139,8 @@ def load_fonts():
     header = get_font(_config.get("font_header", "Nintendo-DS-BIOS.ttf"), 12)
 
     # CJK fonts (Galmuri)
-    cjk_main = get_font("Galmuri7.ttf", 7)
-    cjk_header = get_font("Galmuri9.ttf", 9)
+    cjk_main = get_font("Galmuri7.ttf", 8)
+    cjk_header = get_font("Galmuri9.ttf", 10)
 
     icons_path = base_path / _config.get("font_icons", "Icons.ttf")
     icons = ImageFont.truetype(str(icons_path), 6) if icons_path.exists() else None
