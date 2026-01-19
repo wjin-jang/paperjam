@@ -35,13 +35,8 @@ class SettingsApp(AppBase):
         self._init_categories()
 
         # Main Menu
-        self.main_menu = MenuController([
-            Item(text=t('settings.categories.audio'), id="AUDIO"),
-            Item(text=t('settings.categories.library'), id="LIBRARY"),
-            Item(text=t('settings.categories.network'), id="NETWORK"),
-            Item(text=t('settings.categories.system'), id="SYSTEM"),
-            Item(text=t('settings.categories.display'), id="DISPLAY")
-        ])
+        self.main_menu = MenuController([])
+        self._refresh_main_menu()
 
         # Submenus
         self.submenu_controller = MenuController([])
@@ -93,6 +88,26 @@ class SettingsApp(AppBase):
         }
         # Link categories that need cross-references
         self.categories['SYSTEM'].set_network_category(self.categories['NETWORK'])
+
+    def _refresh_main_menu(self):
+        """Rebuild main menu items with current locale."""
+        items = [
+            Item(text=t('settings.categories.audio'), id="AUDIO"),
+            Item(text=t('settings.categories.library'), id="LIBRARY"),
+            Item(text=t('settings.categories.network'), id="NETWORK"),
+            Item(text=t('settings.categories.system'), id="SYSTEM"),
+            Item(text=t('settings.categories.display'), id="DISPLAY")
+        ]
+        self.main_menu.set_items(items, reset_index=False)
+
+    def on_locale_change(self):
+        """Called when locale changes - refresh all menu text."""
+        self.name = t('menu.settings')
+        self._refresh_main_menu()
+        # Refresh category names
+        for key, cat in self.categories.items():
+            cat.name = t(f'settings.categories.{key.lower()}')
+            cat.refresh()
 
     def get_callbacks(self):
         return {

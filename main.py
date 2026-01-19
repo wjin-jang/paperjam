@@ -39,12 +39,13 @@ class MainApp:
         self.music_app.set_settings(self.settings_app.settings)
 
         # Register Apps
-        self.music_app.name = t('menu.music')
-        self.weather_app.name = t('menu.weather')
-        self.settings_app.name = t('menu.settings')
+        self._refresh_app_names()
         self.registry.register("music", self.music_app)
         self.registry.register("weather", self.weather_app)
         self.registry.register("settings", self.settings_app)
+
+        # Connect locale change callback
+        self.settings_app.categories['DISPLAY'].set_locale_callback(self._on_locale_change)
 
         # UI State
         self.current_app = None
@@ -95,6 +96,18 @@ class MainApp:
             self._check_auto_update()
             # Check if version requires library rescan
             self._check_needs_rescan()
+
+    def _refresh_app_names(self):
+        """Refresh app names with current locale."""
+        self.music_app.name = t('menu.music')
+        self.weather_app.name = t('menu.weather')
+        self.settings_app.name = t('menu.settings')
+
+    def _on_locale_change(self, new_locale):
+        """Called when locale changes - refresh all localized text."""
+        self._refresh_app_names()
+        self._refresh_home_menu()
+        self.settings_app.on_locale_change()
 
     def _refresh_home_menu(self):
         """Rebuild home menu items."""
