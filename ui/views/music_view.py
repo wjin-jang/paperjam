@@ -267,7 +267,7 @@ class MusicViewRenderer:
         header_h = cfg.ROW_HEIGHT
 
         num_opts = len(state.context_options)
-        needed_h = header_h + (num_opts * cfg.ROW_HEIGHT) + 4
+        needed_h = header_h + (num_opts * cfg.ROW_HEIGHT)
         menu_h = min(needed_h, max_h)
 
         x = (cfg.SCREEN_WIDTH - w) // 2

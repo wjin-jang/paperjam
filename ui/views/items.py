@@ -188,9 +188,11 @@ class Item:
             ix = x + (icon_w - icon.width) // 2
             iy = y + (h - icon.height) // 2
             if invert:
-                draw.rectangle((x, y, x + icon_w - 1, y + h - 1), fill=cfg.BLACK)
+                draw.rectangle((x, y, x + icon_w - 1, y + h), fill=cfg.BLACK)
             canvas.paste(icon, (ix, iy))
-        
+
+        if invert:
+            draw.line((x + icon_w, y + 1, x + icon_w, y + h), fill=cfg.WHITE)
         self._draw_text_box(draw, canvas, text, x + icon_w, y, w - icon_w, h,
                            invert=invert)
 
@@ -272,11 +274,15 @@ class Item:
         col0_text = sanitize_text(str(self.columns[0])) if self.sanitize else str(self.columns[0])
         self._draw_text_box(draw, canvas, col0_text, x, y, left_w, cfg.ROW_HEIGHT, invert=invert)
         col_x = x + left_w
+        if invert:
+            draw.line((col_x, y + 1, col_x, y + cfg.ROW_HEIGHT), fill=cfg.WHITE)
         for i, col in enumerate(self.columns[1:]):
             col_w = right_widths[i] if i < len(right_widths) else 12
             col_text = sanitize_text(str(col)) if self.sanitize else str(col)
             self._draw_text_box(draw, canvas, col_text, col_x, y, col_w, cfg.ROW_HEIGHT, center=True, invert=invert)
             col_x += col_w
+            if invert and i < len(self.columns) - 2:
+                draw.line((col_x, y + 1, col_x, y + cfg.ROW_HEIGHT), fill=cfg.WHITE)
 
     def _render_wrapped_text(self, draw, canvas, x, y, w, invert=False):
         if w != self._last_width:
