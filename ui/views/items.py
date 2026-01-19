@@ -110,8 +110,13 @@ class Item:
 
     def render(self, draw: ImageDraw.Draw, canvas: Image.Image,
                x: int, y: int, w: int, h: int,
-               selected: bool = False, selected_col: int = -1):
-        """Unified render method."""
+               selected: bool = False, selected_col: int = -1,
+               column_widths: list = None):
+        """Unified render method.
+
+        Args:
+            column_widths: Optional pre-calculated column widths from menu
+        """
 
         # Volume slider
         if self.show_volume:
@@ -139,10 +144,10 @@ class Item:
         if not self.selectable or self.lines or (self.columns and not self.column_nav):
             invert = (selected and self.selectable)
             if self.lines:
-                self._render_multi_line(draw, canvas, x, y, w, invert=invert)
+                self._render_multi_line(draw, canvas, x, y, w, invert=invert, column_widths=column_widths)
                 return
             if self.columns:
-                self._render_info_columns(draw, canvas, x, y, w, invert=invert)
+                self._render_info_columns(draw, canvas, x, y, w, invert=invert, column_widths=column_widths)
                 return
             if self.text:
                 if self.wrap_text:
@@ -238,59 +243,92 @@ class Item:
         iy = y + (h - icon.height) // 2
         canvas.paste(icon, (ix, iy + 1), mask=icon if not invert else None)
 
-    def _render_multi_line(self, draw, canvas, x, y, w, invert=False):
+    def _render_multi_line(self, draw, canvas, x, y, w, invert=False, column_widths=None):
         total_h = len(self.lines) * cfg.ROW_HEIGHT
         self._draw_container(draw, x, y, w, total_h, invert=invert)
         fg = cfg.WHITE if invert else cfg.BLACK
         for i, line in enumerate(self.lines):
             line_y = y + (i * cfg.ROW_HEIGHT)
-            if isinstance(line, list): self._render_plain_columns(draw, line, x, line_y, w, fg=fg)
+            if isinstance(line, list): self._render_plain_columns(draw, line, x, line_y, w, fg=fg, column_widths=column_widths)
             else: draw.text((x + 5, line_y + 1), sanitize_text(str(line)), font=cfg.FONT_MAIN, fill=fg)
 
     def _calc_column_widths(self, columns, total_width):
-        """Calculate column widths with consistent sizing unless text is significantly larger."""
-        if len(columns) <= 1:
-            return []
+        """Calculate column widths for a single item (fallback)."""
+        return calc_menu_column_widths([self], total_width)
 
-        default_col_width = 50  # Default width for right columns
-        threshold = 1.5  # Only expand if text needs more than 1.5x default
+    def get_columns_for_width_calc(self):
+        """Get columns from this item for width calculation."""
+        if self.columns and not self.column_nav:
+            return self.columns
+        if self.lines:
+            for line in self.lines:
+                if isinstance(line, list):
+                    return line
+        return None
 
-        right_widths = []
-        for col in columns[1:]:
-            text_width = len(sanitize_text(str(col))) * 6 + 8
-            # Only use larger width if significantly bigger than default
-            if text_width > default_col_width * threshold:
-                right_widths.append(text_width)
-            else:
-                right_widths.append(default_col_width)
 
-        # Scale down if total exceeds available space
-        total_right = sum(right_widths)
-        if total_right + 20 > total_width:
-            scale = (total_width - 20) / total_right if total_right > 0 else 1
-            right_widths = [max(10, int(cw * scale)) for cw in right_widths]
+def calc_menu_column_widths(items, total_width):
+    """Calculate consistent column widths across all items in a menu.
 
-        return right_widths
+    Args:
+        items: List of Item objects
+        total_width: Available width for content
 
-    def _render_plain_columns(self, draw, columns, x, y, w, fg=cfg.BLACK):
+    Returns:
+        List of column widths for right columns (excluding first/label column)
+    """
+    if not items:
+        return []
+
+    # Find max columns and max width needed for each column position
+    max_cols = 0
+    col_max_widths = {}
+
+    for item in items:
+        cols = item.get_columns_for_width_calc() if hasattr(item, 'get_columns_for_width_calc') else None
+        if cols and len(cols) > 1:
+            max_cols = max(max_cols, len(cols) - 1)
+            for i, col in enumerate(cols[1:]):
+                text_width = len(sanitize_text(str(col))) * 6 + 8
+                col_max_widths[i] = max(col_max_widths.get(i, 0), text_width)
+
+    if max_cols == 0:
+        return []
+
+    # Build widths using max for each column, with minimum default
+    default_col_width = 50
+    right_widths = []
+    for i in range(max_cols):
+        width = max(default_col_width, col_max_widths.get(i, default_col_width))
+        right_widths.append(width)
+
+    # Scale down if total exceeds available space
+    total_right = sum(right_widths)
+    if total_right + 20 > total_width:
+        scale = (total_width - 20) / total_right if total_right > 0 else 1
+        right_widths = [max(10, int(cw * scale)) for cw in right_widths]
+
+    return right_widths
+
+    def _render_plain_columns(self, draw, columns, x, y, w, fg=cfg.BLACK, column_widths=None):
         if not columns: return
         draw.text((x + 5, y + 1), sanitize_text(str(columns[0])), font=cfg.FONT_MAIN, fill=fg)
         if len(columns) > 1:
-            right_widths = self._calc_column_widths(columns, w)
+            right_widths = column_widths if column_widths else self._calc_column_widths(columns, w)
             col_x = x + max(20, w - sum(right_widths))
             for i, col in enumerate(columns[1:]):
-                col_w = right_widths[i]
+                col_w = right_widths[i] if i < len(right_widths) else 50
                 self._draw_aligned_text(draw, str(col), col_x, y, col_w, cfg.ROW_HEIGHT, 'center', fg)
                 col_x += col_w
 
-    def _render_info_columns(self, draw, canvas, x, y, w, invert=False):
+    def _render_info_columns(self, draw, canvas, x, y, w, invert=False, column_widths=None):
         if not self.columns: return
-        right_widths = self._calc_column_widths(self.columns, w)
+        right_widths = column_widths if column_widths else self._calc_column_widths(self.columns, w)
         left_w = max(20, w - sum(right_widths)) if right_widths else w
         self._draw_text_box(draw, canvas, sanitize_text(str(self.columns[0])), x, y, left_w, cfg.ROW_HEIGHT, invert=invert)
         col_x = x + left_w
         for i, col in enumerate(self.columns[1:]):
-            col_w = right_widths[i]
+            col_w = right_widths[i] if i < len(right_widths) else 50
             self._draw_text_box(draw, canvas, sanitize_text(str(col)), col_x, y, col_w, cfg.ROW_HEIGHT, center=True, invert=invert)
             col_x += col_w
 
