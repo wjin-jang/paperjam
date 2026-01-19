@@ -224,7 +224,7 @@ class Item:
             else:
                 self._draw_icon_content(canvas, col.content, col_x, y, col_w, h, invert)
             if add_border:
-                draw.rectangle((col_x + 1, y + 1, col_x + col_w - 2, y + h - 2), outline=fg)
+                draw.rectangle((col_x + 1, y + 1, col_x + col_w - 1, y + h - 1), outline=fg)
             col_x += col_w
 
     def _draw_aligned_text(self, draw, text, x, y, w, h, align, fill):

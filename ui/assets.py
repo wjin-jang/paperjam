@@ -73,6 +73,7 @@ class AssetManager:
             'back': 'back.png',
             'shuffle': 'shuffle.png',
             'loop': 'loop.png',
+            'loop_one': 'loop_one.png',
             'fav': 'heart.png',
             'clear': 'trash.png'
         }

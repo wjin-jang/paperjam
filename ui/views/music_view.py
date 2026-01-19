@@ -44,6 +44,8 @@ class MusicViewRenderer:
                 active = True
             elif key == 'loop' and state.loop_mode > 0:
                 active = True
+                if state.loop_mode == 2:
+                    icon = UI_ICONS.get('loop_one', icon)
             elif key == 'fav':
                 if state.browse_mode == 'ARTIST_VIEW':
                     if state.fav_artists and state.album in state.fav_artists:
