@@ -32,18 +32,8 @@ class MenuViewRenderer:
 
         # Calculate panel dimensions
         box_w = 160
-        total_rows = len(items)
-        full_content_h = (total_rows * cfg.ROW_HEIGHT) + cfg.ROW_HEIGHT
-        box_h = min(cfg.PANEL_H, full_content_h)
-        box_x = (cfg.SCREEN_WIDTH - box_w) // 2
-        box_y = (cfg.SCREEN_HEIGHT - box_h) // 2
 
-        # Create panel and menu
-        panel = Panel(box_x, box_y, box_w, box_h, header=title)
-        menu = panel.create_menu()
-        menu.scroll_offset = scroll_idx
-
-        # Ensure all items are Item objects
+        # Ensure all items are Item objects first (needed for height calculation)
         new_items = []
         for item in items:
             if isinstance(item, Item):
@@ -58,6 +48,17 @@ class MenuViewRenderer:
             else:
                 new_items.append(Item(text=str(item)))
 
+        # Calculate actual content height based on item heights
+        content_width = box_w - 2  # Account for borders
+        full_content_h = sum(item.get_height(content_width) for item in new_items) + cfg.ROW_HEIGHT
+        box_h = min(cfg.PANEL_H, full_content_h)
+        box_x = (cfg.SCREEN_WIDTH - box_w) // 2
+        box_y = (cfg.SCREEN_HEIGHT - box_h) // 2
+
+        # Create panel and menu
+        panel = Panel(box_x, box_y, box_w, box_h, header=title)
+        menu = panel.create_menu()
+        menu.scroll_offset = scroll_idx
         menu.items = new_items
 
         # Set cursor position based on sel_idx

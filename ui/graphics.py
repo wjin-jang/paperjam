@@ -107,7 +107,9 @@ def _load_cached_cover(cache_key: str, size: str) -> Optional[Image.Image]:
     cache_file = _COVER_CACHE_DIR / f"{cache_key}_{size}.png"
     if cache_file.exists():
         try:
-            return Image.open(cache_file).convert('1')
+            img = Image.open(cache_file)
+            img.load()  # Force load image data (PIL uses lazy loading)
+            return img.convert('1')
         except Exception:
             pass
     return None

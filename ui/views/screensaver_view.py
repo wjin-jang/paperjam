@@ -105,10 +105,13 @@ class ScreensaverRenderer:
                 if num_covers > 0:
                     img = covers[idx]
                     if img:
-                        # Resize if needed
-                        if img.width != tile_w or img.height != tile_h:
-                            img = img.resize((tile_w, tile_h))
-                        self.canvas.paste(img, (c * tile_w, r * tile_h))
+                        try:
+                            # Resize if needed - convert to L mode for better resize, then back to 1-bit
+                            if img.width != tile_w or img.height != tile_h:
+                                img = img.convert('L').resize((tile_w, tile_h)).convert('1')
+                            self.canvas.paste(img, (c * tile_w, r * tile_h))
+                        except Exception:
+                            pass  # Skip invalid images
                     idx = (idx + 1) % num_covers
 
         # 2. Draw Dialog Overlay
