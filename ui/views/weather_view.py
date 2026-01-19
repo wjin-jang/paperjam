@@ -5,26 +5,24 @@ Layout:
 ┌─────────────────────────────────────────────────────────┐
 │ Location Name                                           │
 ├─────────────────────────────────────────────────────────┤
-│ [ICON] 22°  │ Precip 30%  │ > Today                    │
+│ [ICON] 22°  │ Precip 30%  │ ██Today██                  │
 │       Clear │ Humid  65%  │   Tomorrow                  │
 │             │ Wind   12   │   Wednesday                 │
 ├─────────────────────────────────────────────────────────┤
 │ TEMPERATURE                                             │
-├─────────────────────────────────────────────────────────┤
 │ 22   24   26   28   26   24   22   20                   │
 │ ██   ████████████████████   ██   ██                     │
 │ 09   10   11   12   13   14   15   16                   │
 ├─────────────────────────────────────────────────────────┤
 │ PRECIPITATION                                           │
-├─────────────────────────────────────────────────────────┤
 │  0   20   40   60   40   20   10    0                   │
 │      ██   ████████████████   ██                         │
 │ 09   10   11   12   13   14   15   16                   │
 ├─────────────────────────────────────────────────────────┤
 │ THIS WEEK                                               │
-├─────────────────────────────────────────────────────────┤
-│ [☀]MO │ [☁]TU │ [☂]WE │ [☀]TH │ [☀]FR │ [☁]SA │ [☂]SU │
-│  15°  │  12°  │  10°  │  14°  │  16°  │  13°  │  11°  │
+│ [☀]  [☁]  [☂]  [☀]  [☀]  [☁]  [☂]                      │
+│  MO   TU   WE   TH   FR   SA   SU                      │
+│  15°  12°  10°  14°  16°  13°  11°                     │
 └─────────────────────────────────────────────────────────┘
 """
 from datetime import datetime
@@ -108,29 +106,25 @@ def render_current_section(weather: WeatherData, width: int, height: int,
     else:
         return img
 
-    # Column widths
-    col1_w = 55  # Icon + temp + condition
-    col2_w = 70  # Stats
-    col3_w = width - col1_w - col2_w  # Day selector
+    # Equal column widths
+    col_w = width // 3
 
     # Column 1: Icon, temperature, condition
     icon = load_icon(condition_name)
     if icon:
         img.paste(icon, (2, 2))
 
-    # Temperature
     temp_text = f"{int(temp)}°"
     draw.text((20, 0), temp_text, font=cfg.FONT_HEADER, fill=cfg.BLACK)
 
-    # Condition
     cond_text = SHORT_CONDITIONS.get(condition_name, '???')
     draw.text((20, 14), cond_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
     # Vertical divider
-    draw.line((col1_w, 0, col1_w, height - 1), fill=cfg.BLACK)
+    draw.line((col_w, 0, col_w, height - 1), fill=cfg.BLACK)
 
     # Column 2: Stats
-    stats_x = col1_w + 4
+    stats_x = col_w + 4
     stats = [
         (t('weather.precip'), f"{precip}%"),
         (t('weather.humidity'), f"{humid}%"),
@@ -141,10 +135,13 @@ def render_current_section(weather: WeatherData, width: int, height: int,
         draw.text((stats_x, y), f"{label} {value}", font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
     # Vertical divider
-    draw.line((col1_w + col2_w, 0, col1_w + col2_w, height - 1), fill=cfg.BLACK)
+    draw.line((col_w * 2, 0, col_w * 2, height - 1), fill=cfg.BLACK)
 
-    # Column 3: Day selector
-    day_x = col1_w + col2_w + 4
+    # Column 3: Day selector (full day names, invert selected)
+    day_x = col_w * 2 + 2
+    day_col_w = col_w - 4
+
+    # Get day labels
     day_labels = [t('weather.today'), t('weather.tomorrow')]
     if len(weather.daily) > 2:
         day_labels.append(weather.daily[2].day_name)
@@ -153,24 +150,26 @@ def render_current_section(weather: WeatherData, width: int, height: int,
 
     for i, label in enumerate(day_labels):
         y = i * 8
-        prefix = ">" if i == day_offset else " "
-        text = f"{prefix}{label}"
 
-        if selected and i == day_offset:
-            # Highlight selected day
-            text_w = len(text) * 6
-            draw.rectangle((day_x - 2, y, day_x + text_w, y + 8), fill=cfg.BLACK)
-            draw.text((day_x, y), text, font=cfg.FONT_MAIN, fill=cfg.WHITE)
+        if i == day_offset:
+            # Selected day - invert the row
+            draw.rectangle((day_x, y, day_x + day_col_w, y + 8), fill=cfg.BLACK)
+            draw.text((day_x + 2, y), label, font=cfg.FONT_MAIN, fill=cfg.WHITE)
         else:
-            draw.text((day_x, y), text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+            draw.text((day_x + 2, y), label, font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
     return img
 
 
 def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
                      value_fn, format_fn, is_percentage: bool = False,
-                     scroll_offset: int = 0, visible_hours: int = 8) -> Image.Image:
-    """Render bar chart as an image."""
+                     scroll_offset: int = 0, visible_hours: int = 8,
+                     min_range: float = 10.0) -> Image.Image:
+    """Render bar chart as an image.
+
+    Args:
+        min_range: Minimum range for scaling (prevents over-exaggeration of small differences)
+    """
     img = Image.new('1', (width, height), cfg.WHITE)
     draw = ImageDraw.Draw(img)
 
@@ -190,8 +189,19 @@ def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
     if is_percentage:
         min_val, max_val = 0, 100
     else:
-        min_val = min(all_values) if all_values else 0
-        max_val = max(all_values) if all_values else 1
+        # Use all hourly data for consistent scaling
+        data_min = min(all_values) if all_values else 0
+        data_max = max(all_values) if all_values else 1
+        data_range = data_max - data_min
+
+        # Ensure minimum range to prevent over-exaggeration
+        if data_range < min_range:
+            center = (data_max + data_min) / 2
+            min_val = center - min_range / 2
+            max_val = center + min_range / 2
+        else:
+            min_val = data_min
+            max_val = data_max
 
     val_range = max_val - min_val if max_val != min_val else 1
 
@@ -204,11 +214,11 @@ def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
         text_w = cfg.FONT_MAIN.getbbox(val_text)[2]
         draw.text((center - text_w // 2, 0), val_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
-        # Bar
+        # Bar - clamp normalized value to 0-1
         if is_percentage:
             normalized = val / 100
         else:
-            normalized = (val - min_val) / val_range
+            normalized = max(0, min(1, (val - min_val) / val_range))
 
         bar_h = max(1, int(normalized * bar_area_h))
         bar_y = 8 + bar_area_h - bar_h
@@ -319,7 +329,7 @@ class WeatherViewRenderer:
         current_item.set_height(self.CURRENT_H)
         items.append(current_item)
 
-        # Get hourly data
+        # Get hourly data for selected day
         hourly = self._get_hourly(weather.hourly, day_offset)
 
         # Temperature section
@@ -330,7 +340,8 @@ class WeatherViewRenderer:
             hourly, content_w, self.CHART_H,
             value_fn=lambda h: h.temperature,
             format_fn=lambda v: f"{int(v)}",
-            scroll_offset=chart_scroll
+            scroll_offset=chart_scroll,
+            min_range=10.0  # Minimum 10 degree range
         )
         temp_item = Item(image=temp_chart, show_image=True, selectable=False)
         temp_item.set_height(self.CHART_H)
@@ -376,16 +387,27 @@ class WeatherViewRenderer:
         return self.canvas
 
     def _get_hourly(self, hourly: List[HourlyForecast], day_offset: int) -> List[HourlyForecast]:
+        """Get hourly data for selected day."""
         if not hourly:
             return []
 
         now = datetime.now()
+
         if day_offset == 0:
+            # Today: start from current hour
             start_idx = now.hour
         else:
+            # Future days: start from beginning of that day
+            # Day 1 = tomorrow = hours 24-47
+            # Day 2 = day after = hours 48-71
             start_idx = day_offset * 24
 
-        return hourly[start_idx:start_idx + self.TOTAL_HOURS]
+        # Make sure we don't go past available data
+        if start_idx >= len(hourly):
+            return []
+
+        end_idx = min(start_idx + self.TOTAL_HOURS, len(hourly))
+        return hourly[start_idx:end_idx]
 
     def render_location_setup(self, results: List[dict], selected_idx: int,
                                search_query: str, is_searching: bool) -> Image.Image:
