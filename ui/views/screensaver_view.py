@@ -83,8 +83,8 @@ class ScreensaverRenderer:
         # Add items for status, title, artist, album
         info_menu.items = [
             Item(columns=[title,status_icon], font=cfg.FONT_HEADER, padding=(2, 0), selectable=False, sanitize=False),
-            Item(text=album, selectable=False),
-            Item(text=artist, selectable=False),
+            Item(text=album, padding=(2,3), selectable=False),
+            Item(text=artist, padding=(2,3), selectable=False),
         ]
 
         info_panel.render(self.canvas)
