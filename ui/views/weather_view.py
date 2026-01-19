@@ -1,26 +1,25 @@
 """
 Weather view renderer for the e-ink display.
 
-Layout (with Panel, 8px padding, top bar space):
+Layout (with Panel, 8px padding, navigation):
 ┌─────────────────────────────────────────┐ y=8
-│ [Location Name - Panel Header]          │
+│ [Location Name]            Today ►      │ <- Day selector top right
 ├─────────────────────────────────────────┤
-│ [ICON] TEMP    │ Precip XX%             │
+│ [ICON] TEMP    │ Precip XX%             │ <- Current conditions
 │        Condition│ Humid  XX%            │
 │                │ Wind   XX              │
 ├─────────────────────────────────────────┤
-│ TEMP  [bar chart with 8 hours]          │
+│ TEMPERATURE    [bar chart scrollable]  ▐│ <- Selectable row
 ├─────────────────────────────────────────┤
-│ RAIN  [bar chart with 8 hours]          │
+│ PRECIPITATION  [bar chart scrollable]  ▐│ <- Selectable row
 ├─────────────────────────────────────────┤
-│ WEEK  MON TUE WED THU FRI SAT SUN       │
-│       ○   ●   ○   ○   ○   ●   ○         │
-│       15° 12° 18° 20° 22° 14° 16°       │
+│ THIS WEEK      MON TUE WED ...         ▐│ <- Selectable row
 └─────────────────────────────────────────┘
 """
+from datetime import datetime
 from pathlib import Path
 from PIL import Image, ImageDraw
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import config as cfg
 from core.i18n import t
@@ -77,6 +76,13 @@ CONDITION_ICONS = {
     'unknown': 'unknown.png',
 }
 
+# Navigation sections
+SECTION_CURRENT = 0
+SECTION_TEMPERATURE = 1
+SECTION_PRECIPITATION = 2
+SECTION_WEEKLY = 3
+SECTION_COUNT = 4
+
 
 def load_weather_icon(condition: str) -> Optional[Image.Image]:
     """Load a weather icon for the given condition."""
@@ -91,8 +97,19 @@ def load_weather_icon(condition: str) -> Optional[Image.Image]:
     return None
 
 
+def get_day_label(day_offset: int, daily: List[DailyForecast]) -> str:
+    """Get display label for day offset (0=Today, 1=Tomorrow, 2+=day name)."""
+    if day_offset == 0:
+        return t('weather.today')
+    elif day_offset == 1:
+        return t('weather.tomorrow')
+    elif day_offset < len(daily):
+        return daily[day_offset].day_name
+    return "???"
+
+
 class WeatherViewRenderer:
-    """Renderer for weather display using Panel structure."""
+    """Renderer for weather display with navigation support."""
 
     # Layout constants (accounting for top bar at y=0-7)
     PANEL_X = 8
@@ -101,12 +118,17 @@ class WeatherViewRenderer:
     PANEL_H = cfg.SCREEN_HEIGHT - 16  # 8px padding top and bottom
 
     # Internal layout
+    HEADER_H = cfg.ROW_HEIGHT  # Panel header height
     CURRENT_H = 26  # Height for current conditions section
     CHART_H = 22  # Height for each bar chart
     WEEKLY_H = 26  # Height for weekly section
 
     # Bar chart settings
-    CHART_HOURS = 8  # Show 8 hours to fit better
+    CHART_HOURS = 8  # Visible hours at once
+    TOTAL_HOURS = 24  # Total hours available for scrolling
+
+    # Scrollbar
+    SCROLLBAR_W = 3
 
     def __init__(self):
         self.canvas = Image.new('1', (cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), cfg.WHITE)
@@ -123,20 +145,32 @@ class WeatherViewRenderer:
             self._icon_cache[condition] = load_weather_icon(condition)
         return self._icon_cache[condition]
 
-    def render(self, weather: Optional[WeatherData], title: str, updating: bool = False,
+    def render(self, weather: Optional[WeatherData], title: str,
+               selected_section: int = 0, day_offset: int = 0,
+               chart_scroll: int = 0, updating: bool = False,
                error: Optional[str] = None) -> Image.Image:
-        """Render the weather view with Panel."""
+        """Render the weather view with navigation.
+
+        Args:
+            weather: Weather data to display
+            title: Location name for header
+            selected_section: Currently selected section (0-3)
+            day_offset: Day to show (0=today, 1=tomorrow, etc.)
+            chart_scroll: Scroll offset for bar charts
+            updating: Whether data is being updated
+            error: Error message if any
+        """
         self.clear()
 
         # Create main panel with location as header
-        header = title[:20] if title else t('menu.weather')
+        header = title if title else t('menu.weather')
         if updating:
-            header = f"{header[:15]}..."
+            header = f"{header}..."
 
         panel = Panel(self.PANEL_X, self.PANEL_Y, self.PANEL_W, self.PANEL_H, header=header)
 
-        # Draw panel border and header
-        self._draw_panel_frame(panel)
+        # Draw panel border and header with day selector
+        self._draw_panel_frame(panel, weather, day_offset if weather else 0)
 
         if error and not weather:
             self._draw_error(panel, error)
@@ -147,12 +181,16 @@ class WeatherViewRenderer:
             return self.canvas
 
         # Content area starts after header
-        content_y = self.PANEL_Y + cfg.ROW_HEIGHT + 1
+        content_y = self.PANEL_Y + self.HEADER_H + 1
         content_x = self.PANEL_X + 1
         content_w = self.PANEL_W - 2
 
+        # Get hourly data starting from current hour
+        hourly = self._get_hourly_from_current(weather.hourly, day_offset)
+
         # Draw current conditions
-        self._draw_current(weather, content_x, content_y, content_w)
+        self._draw_current(weather, content_x, content_y, content_w, day_offset,
+                          selected=selected_section == SECTION_CURRENT)
 
         # Divider
         div_y = content_y + self.CURRENT_H
@@ -161,10 +199,12 @@ class WeatherViewRenderer:
         # Draw temperature chart
         chart_y = div_y + 1
         self._draw_bar_chart(
-            weather.hourly, chart_y, content_x, content_w,
-            label=t('weather.temperature')[:4],
+            hourly, chart_y, content_x, content_w,
+            label=t('weather.temperature'),
             value_fn=lambda h: h.temperature,
-            format_fn=lambda v: f"{int(v)}°"
+            format_fn=lambda v: f"{int(v)}",
+            scroll_offset=chart_scroll,
+            selected=selected_section == SECTION_TEMPERATURE
         )
 
         # Divider
@@ -174,11 +214,13 @@ class WeatherViewRenderer:
         # Draw precipitation chart
         chart_y = div_y + 1
         self._draw_bar_chart(
-            weather.hourly, chart_y, content_x, content_w,
-            label=t('weather.precipitation')[:4],
+            hourly, chart_y, content_x, content_w,
+            label=t('weather.precipitation'),
             value_fn=lambda h: h.precipitation_probability,
             format_fn=lambda v: f"{int(v)}",
-            is_percentage=True
+            is_percentage=True,
+            scroll_offset=chart_scroll,
+            selected=selected_section == SECTION_PRECIPITATION
         )
 
         # Divider
@@ -187,12 +229,31 @@ class WeatherViewRenderer:
 
         # Draw weekly forecast
         weekly_y = div_y + 1
-        self._draw_weekly(weather.daily, weekly_y, content_x, content_w)
+        self._draw_weekly(weather.daily, weekly_y, content_x, content_w,
+                         selected=selected_section == SECTION_WEEKLY)
 
         return self.canvas
 
-    def _draw_panel_frame(self, panel: Panel):
-        """Draw panel border and header manually (not using Menu)."""
+    def _get_hourly_from_current(self, hourly: List[HourlyForecast], day_offset: int) -> List[HourlyForecast]:
+        """Get hourly data starting from current hour or day start."""
+        if not hourly:
+            return []
+
+        now = datetime.now()
+        current_hour = now.hour
+
+        if day_offset == 0:
+            # Today: start from current hour
+            start_idx = current_hour
+        else:
+            # Other days: start from midnight of that day
+            start_idx = day_offset * 24
+
+        # Return slice of hourly data
+        return hourly[start_idx:start_idx + self.TOTAL_HOURS]
+
+    def _draw_panel_frame(self, panel: Panel, weather: Optional[WeatherData], day_offset: int):
+        """Draw panel border, header, and day selector."""
         # Shadow
         self.draw.rectangle(
             (panel.x + 1, panel.y + 1, panel.x + panel.width + 1, panel.y + panel.height + 1),
@@ -203,22 +264,50 @@ class WeatherViewRenderer:
             (panel.x, panel.y, panel.x + panel.width, panel.y + panel.height),
             fill=cfg.WHITE, outline=cfg.BLACK
         )
-        # Header
+        # Header background
         if panel.header:
             self.draw.rectangle(
                 (panel.x, panel.y, panel.x + panel.width, panel.y + cfg.ROW_HEIGHT),
                 fill=cfg.BLACK
             )
+            # Location name on left
             draw_text_with_cjk(
                 self.draw, (panel.x + 4, panel.y),
                 panel.header,
                 cfg.FONT_HEADER, cfg.FONT_CJK_HEADER, fill=cfg.WHITE, cjk_y_offset=1
             )
 
-    def _draw_current(self, weather: WeatherData, x: int, y: int, w: int):
+            # Day selector on right
+            if weather and weather.daily:
+                day_label = get_day_label(day_offset, weather.daily)
+                day_text = f"< {day_label} >"
+                day_w = get_text_width_with_cjk(day_text, cfg.FONT_MAIN, cfg.FONT_CJK_MAIN)
+                day_x = panel.x + panel.width - day_w - 4
+                draw_text_with_cjk(
+                    self.draw, (day_x, panel.y + 2), day_text,
+                    cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.WHITE
+                )
+
+    def _draw_current(self, weather: WeatherData, x: int, y: int, w: int,
+                     day_offset: int, selected: bool = False):
         """Draw current weather conditions section."""
-        current = weather.current
-        condition_name, _ = current.condition
+        # Get appropriate data for the day
+        if day_offset == 0:
+            current = weather.current
+            condition_name, _ = current.condition
+            temp = current.temperature
+            precip = current.precipitation_probability
+            humid = current.humidity
+            wind = current.wind_speed
+        elif day_offset < len(weather.daily):
+            day = weather.daily[day_offset]
+            condition_name, _ = day.condition
+            temp = day.avg_temperature
+            precip = day.precipitation_probability
+            humid = 0  # Not available in daily
+            wind = 0  # Not available in daily
+        else:
+            return
 
         # Left side: Icon + Temperature + Condition
         icon = self._get_icon(condition_name)
@@ -230,13 +319,13 @@ class WeatherViewRenderer:
 
         # Temperature (large)
         temp_x = x + icon_w + 4
-        temp_text = f"{int(current.temperature)}°"
+        temp_text = f"{int(temp)}°"
         self.draw.text((temp_x, y + 1), temp_text, font=cfg.FONT_HEADER, fill=cfg.BLACK)
 
-        # Condition text (short)
-        cond_text = SHORT_CONDITIONS.get(condition_name, condition_name[:6])
+        # Condition text
+        cond_text = SHORT_CONDITIONS.get(condition_name, condition_name)
         draw_text_with_cjk(
-            self.draw, (temp_x, y + 14), cond_text[:8],
+            self.draw, (temp_x, y + 14), cond_text,
             cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK
         )
 
@@ -247,9 +336,9 @@ class WeatherViewRenderer:
         # Right side: Stats
         stats_x = div_x + 4
         stats = [
-            (t('weather.precip')[:5], f"{current.precipitation_probability}%"),
-            (t('weather.humidity')[:5], f"{current.humidity}%"),
-            (t('weather.wind')[:4], f"{int(current.wind_speed)}"),
+            (t('weather.precip'), f"{precip}%"),
+            (t('weather.humidity'), f"{humid}%"),
+            (t('weather.wind'), f"{int(wind)}"),
         ]
 
         for i, (label, value) in enumerate(stats):
@@ -260,44 +349,57 @@ class WeatherViewRenderer:
             )
 
     def _draw_bar_chart(self, hourly: List[HourlyForecast], y: int, x: int, w: int,
-                        label: str, value_fn, format_fn, is_percentage: bool = False):
-        """Draw a horizontal bar chart for hourly data."""
+                        label: str, value_fn, format_fn, is_percentage: bool = False,
+                        scroll_offset: int = 0, selected: bool = False):
+        """Draw a horizontal bar chart for hourly data with scrolling."""
+        # Draw row label (full text, not truncated)
+        label_w = get_text_width_with_cjk(label, cfg.FONT_MAIN, cfg.FONT_CJK_MAIN)
+
+        if selected:
+            # Invert the label area when selected
+            self.draw.rectangle(
+                (x, y, x + label_w + 2, y + 10),
+                fill=cfg.BLACK
+            )
+            draw_text_with_cjk(
+                self.draw, (x + 1, y + 1), label,
+                cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.WHITE
+            )
+        else:
+            draw_text_with_cjk(
+                self.draw, (x + 1, y + 1), label,
+                cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK
+            )
+
         if not hourly:
             return
 
-        hours = hourly[:self.CHART_HOURS]
-        if not hours:
-            return
-
-        # Draw label on left
-        draw_text_with_cjk(
-            self.draw, (x + 1, y + 1), label,
-            cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK
-        )
-
         # Chart area (after label)
-        label_w = 22
-        chart_x = x + label_w
-        chart_w = w - label_w - 2
-        bar_w = chart_w // self.CHART_HOURS
+        chart_label_w = label_w + 4
+        chart_x = x + chart_label_w
+        chart_w = w - chart_label_w - self.SCROLLBAR_W - 2
         chart_h = self.CHART_H - 10  # Leave room for hour labels
 
+        # Get visible slice with scroll
+        visible_hours = hourly[scroll_offset:scroll_offset + self.CHART_HOURS]
+        if not visible_hours:
+            return
+
+        bar_w = chart_w // self.CHART_HOURS
+
         # Get values and calculate range
-        values = [value_fn(h) for h in hours]
+        all_values = [value_fn(h) for h in hourly]
+        values = [value_fn(h) for h in visible_hours]
 
         if is_percentage:
             min_val, max_val = 0, 100
         else:
-            min_val = min(values)
-            max_val = max(values)
-            # Add padding to range
-            val_range = max_val - min_val
-            if val_range == 0:
-                val_range = 1
+            min_val = min(all_values) if all_values else 0
+            max_val = max(all_values) if all_values else 1
 
         val_range = max_val - min_val if max_val != min_val else 1
 
-        for i, (h, val) in enumerate(zip(hours, values)):
+        for i, (h, val) in enumerate(zip(visible_hours, values)):
             bx = chart_x + i * bar_w
 
             # Calculate bar height
@@ -308,26 +410,25 @@ class WeatherViewRenderer:
 
             bar_h = max(1, int(normalized * chart_h))
             bar_y = y + 1 + chart_h - bar_h
+            bar_bottom = y + chart_h
 
             # Draw bar
             if bar_h > 0:
                 self.draw.rectangle(
-                    (bx + 1, bar_y, bx + bar_w - 2, y + chart_h),
+                    (bx + 1, bar_y, bx + bar_w - 2, bar_bottom),
                     fill=cfg.BLACK
                 )
 
-            # Draw value text
+            # Draw value text in top left of bar cell
             val_text = format_fn(val)
-            text_w = cfg.FONT_MAIN.getbbox(val_text)[2]
-            text_x = bx + (bar_w - text_w) // 2
-            text_y = bar_y - 8
+            text_x = bx + 2
+            text_y = y + 1
 
-            # Invert text if overlapping bar
-            if bar_h > chart_h - 8:
-                text_y = bar_y + 1
-                self.draw.text((text_x, text_y), val_text, font=cfg.FONT_MAIN, fill=cfg.WHITE)
-            else:
-                self.draw.text((text_x, text_y), val_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+            # Draw text with partial inversion where it overlaps the bar
+            self._draw_text_with_bar_inversion(
+                text_x, text_y, val_text,
+                bx + 1, bar_y, bx + bar_w - 2, bar_bottom
+            )
 
             # Draw hour label at bottom
             hour_text = h.hour[:2]
@@ -335,8 +436,91 @@ class WeatherViewRenderer:
             hour_x = bx + (bar_w - hour_w) // 2
             self.draw.text((hour_x, y + chart_h + 1), hour_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
-    def _draw_weekly(self, daily: List[DailyForecast], y: int, x: int, w: int):
+        # Draw scrollbar
+        self._draw_scrollbar(
+            x + w - self.SCROLLBAR_W - 1, y + 1,
+            self.SCROLLBAR_W, self.CHART_H - 2,
+            scroll_offset, len(hourly), self.CHART_HOURS
+        )
+
+    def _draw_text_with_bar_inversion(self, text_x: int, text_y: int, text: str,
+                                       bar_x1: int, bar_y1: int, bar_x2: int, bar_y2: int):
+        """Draw text with inversion where it overlaps a black bar."""
+        # Get text dimensions
+        bbox = cfg.FONT_MAIN.getbbox(text)
+        text_w = bbox[2]
+        text_h = bbox[3]
+        text_bottom = text_y + text_h
+
+        # Check if text overlaps with bar
+        if text_y < bar_y2 and text_bottom > bar_y1 and text_x < bar_x2 and text_x + text_w > bar_x1:
+            # Text overlaps bar - need to handle inversion
+            # For simplicity, draw character by character
+            char_x = text_x
+            for char in text:
+                char_bbox = cfg.FONT_MAIN.getbbox(char)
+                char_w = char_bbox[2]
+                char_right = char_x + char_w
+
+                # Check if this character overlaps the bar
+                char_overlaps = (char_x < bar_x2 and char_right > bar_x1 and
+                               text_y < bar_y2 and text_bottom > bar_y1)
+
+                if char_overlaps:
+                    # Draw white on black
+                    self.draw.text((char_x, text_y), char, font=cfg.FONT_MAIN, fill=cfg.WHITE)
+                else:
+                    # Draw black on white
+                    self.draw.text((char_x, text_y), char, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+
+                char_x += char_w
+        else:
+            # No overlap, draw normally
+            self.draw.text((text_x, text_y), text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+
+    def _draw_scrollbar(self, x: int, y: int, w: int, h: int,
+                        offset: int, total: int, visible: int):
+        """Draw a vertical scrollbar."""
+        if total <= visible:
+            return
+
+        # Calculate thumb size and position
+        thumb_h = max(4, (visible / total) * h)
+        max_offset = total - visible
+        thumb_y = y + (offset / max_offset) * (h - thumb_h) if max_offset > 0 else y
+
+        # Draw track
+        self.draw.rectangle((x, y, x + w - 1, y + h - 1), outline=cfg.BLACK)
+
+        # Draw thumb
+        self.draw.rectangle(
+            (x + 1, int(thumb_y), x + w - 2, int(thumb_y + thumb_h)),
+            fill=cfg.BLACK
+        )
+
+    def _draw_weekly(self, daily: List[DailyForecast], y: int, x: int, w: int,
+                    selected: bool = False):
         """Draw weekly forecast section."""
+        # Draw row label (full text)
+        label = t('weather.this_week')
+        label_w = get_text_width_with_cjk(label, cfg.FONT_MAIN, cfg.FONT_CJK_MAIN)
+
+        if selected:
+            # Invert the label area when selected
+            self.draw.rectangle(
+                (x, y, x + label_w + 2, y + 10),
+                fill=cfg.BLACK
+            )
+            draw_text_with_cjk(
+                self.draw, (x + 1, y + 1), label,
+                cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.WHITE
+            )
+        else:
+            draw_text_with_cjk(
+                self.draw, (x + 1, y + 1), label,
+                cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK
+            )
+
         if not daily:
             return
 
@@ -344,22 +528,16 @@ class WeatherViewRenderer:
         if not days:
             return
 
-        # Label
-        draw_text_with_cjk(
-            self.draw, (x + 1, y + 1), t('weather.this_week')[:4],
-            cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK
-        )
-
         # Days area (after label)
-        label_w = 22
-        days_x = x + label_w
-        days_w = w - label_w - 2
+        days_label_w = label_w + 4
+        days_x = x + days_label_w
+        days_w = w - days_label_w - 2
         day_w = days_w // len(days)
 
         for i, d in enumerate(days):
             dx = days_x + i * day_w
 
-            # Day name (short)
+            # Day name (short, 2 chars)
             day_name = d.day_name[:2]
             name_w = cfg.FONT_MAIN.getbbox(day_name)[2]
             name_x = dx + (day_w - name_w) // 2
@@ -385,9 +563,8 @@ class WeatherViewRenderer:
             self.draw, (panel.x + 8, y), t('weather.error'),
             cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK
         )
-        error_short = error[:28] if len(error) > 28 else error
         draw_text_with_cjk(
-            self.draw, (panel.x + 8, y + 12), error_short,
+            self.draw, (panel.x + 8, y + 12), error,
             cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK
         )
 
@@ -411,7 +588,7 @@ class WeatherViewRenderer:
         # Create panel
         panel = Panel(self.PANEL_X, self.PANEL_Y, self.PANEL_W, self.PANEL_H,
                       header=t('weather.setup_title'))
-        self._draw_panel_frame(panel)
+        self._draw_panel_frame(panel, None, 0)
 
         content_y = self.PANEL_Y + cfg.ROW_HEIGHT + 2
         content_x = self.PANEL_X + 4
@@ -419,7 +596,7 @@ class WeatherViewRenderer:
         # Search input
         search_display = f"{t('weather.search')}: {search_query}"
         draw_text_with_cjk(
-            self.draw, (content_x, content_y), search_display[:32],
+            self.draw, (content_x, content_y), search_display,
             cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=cfg.BLACK
         )
         content_y += 12
@@ -433,8 +610,7 @@ class WeatherViewRenderer:
             # Draw results list
             for i, r in enumerate(results[:4]):
                 item_y = content_y + i * 12
-                loc_text = f"{r['name']}, {r.get('country', '')[:8]}"
-                loc_text = loc_text[:30]
+                loc_text = f"{r['name']}, {r.get('country', '')}"
 
                 if i == selected_idx:
                     # Highlight selected

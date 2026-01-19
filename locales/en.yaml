@@ -245,6 +245,8 @@ weather:
   temperature: "TEMPERATURE"
   precipitation: "PRECIPITATION"
   this_week: "THIS WEEK"
+  today: "Today"
+  tomorrow: "Tomorrow"
   conditions:
     clear: "Clear"
     mostly_clear: "Mostly Clear"

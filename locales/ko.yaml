@@ -245,6 +245,8 @@ weather:
   temperature: "기온"
   precipitation: "강수확률"
   this_week: "이번 주"
+  today: "오늘"
+  tomorrow: "내일"
   conditions:
     clear: "맑음"
     mostly_clear: "대체로 맑음"
