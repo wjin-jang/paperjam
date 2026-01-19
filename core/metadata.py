@@ -14,10 +14,6 @@ from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
 
 
-def sanitize_text(text):
-    if not text: return ""
-    return text.strip()
-
 def format_track_name(file_path):
     name = file_path.stem
     parts = name.split(' ', 1)
@@ -92,9 +88,9 @@ def get_metadata(file_path):
     if not title: title = format_track_name(file_path)
 
     return (
-        sanitize_text(album or "Unknown Album"),
-        sanitize_text(album_artist or "Unknown Artist"),
-        sanitize_text(title),
+        album or "Unknown Album",
+        album_artist or "Unknown Artist",
+        title,
         track_num,
         disc_num,
         str(year) if year else "",

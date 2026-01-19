@@ -7,7 +7,6 @@ from core.i18n import t
 from ui.views.core import Panel, Menu
 from ui.views.items import Item, Column
 from ui.graphics import UI_ICONS
-from core.metadata import sanitize_text
 
 
 class MusicViewRenderer:
@@ -93,7 +92,7 @@ class MusicViewRenderer:
 
         # Icon+text items (file, album, artist, dir, playlist, recent)
         icon_str = self._get_item_icon(item, state, display_idx)
-        name = sanitize_text(item.get('title', item.get('name', '')))
+        name = item.get('title', item.get('name', ''))
 
         pinned = item.get('pinned', False)
         return Item(text=name, icon=icon_str, selectable=True, pinned=pinned, id=item.get('id'))
@@ -203,7 +202,7 @@ class MusicViewRenderer:
         status_key = state.get_status_text()
         status_icon = cfg.STATUS_ICONS.get(status_key, '')
         status_text = f"{status_icon} {t(status_key)}" if status_icon else t(status_key)
-        status_item = Item(text=status_text, font=cfg.FONT_HEADER, padding=(2, 0), selectable=False, sanitize=False)
+        status_item = Item(text=status_text, font=cfg.FONT_HEADER, padding=(2, 0), selectable=False)
         status_menu.items = [status_item]
 
         status_panel.render(self.canvas)

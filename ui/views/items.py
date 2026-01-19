@@ -10,7 +10,6 @@ from typing import List, Union, Optional, Any, Callable
 from PIL import Image, ImageDraw, ImageOps
 
 import config as cfg
-from core.metadata import sanitize_text
 from core.i18n import t
 from ui.graphics import draw_text_with_cjk, get_text_width_with_cjk
 
@@ -228,7 +227,6 @@ class Item:
                  font=None,
                  padding: tuple = None,
                  id: Any = None,
-                 sanitize: bool = True,
                  # Text input support
                  text_input: 'TextInput' = None):
         # Content
@@ -254,7 +252,6 @@ class Item:
         self.font = font
         self.padding = padding
         self.id = id
-        self.sanitize = sanitize
 
         self._wrapped_lines: List[str] = []
         self._last_width: int = 0
@@ -280,7 +277,7 @@ class Item:
                 if self.wrap_text:
                     # Eagerly compute wrapped lines if width is provided
                     if width and width != self._last_width:
-                        self._wrapped_lines = self._wrap_text(sanitize_text(self.text), width)
+                        self._wrapped_lines = self._wrap_text(self.text, width)
                         self._last_width = width
 
                     if self._wrapped_lines:
@@ -345,8 +342,7 @@ class Item:
                 if self.wrap_text:
                     self._render_wrapped_text(draw, canvas, x, y, w, invert=invert)
                 else:
-                    display_text = sanitize_text(self.text) if self.sanitize else self.text
-                    self._draw_text_box(draw, canvas, display_text, x, y, w, cfg.ROW_HEIGHT,
+                    self._draw_text_box(draw, canvas, self.text, x, y, w, cfg.ROW_HEIGHT,
                                        invert=invert, font=self.font, padding=self.padding)
                 return
 
@@ -356,7 +352,7 @@ class Item:
         if self.heading:
              draw.rectangle((x, y, x + w, y + h), fill=cfg.BLACK)
 
-        text = sanitize_text(self.text or "") if self.sanitize else (self.text or "")
+        text = self.text or ""
         if self.heading:
             text = text.upper()
 
@@ -414,8 +410,7 @@ class Item:
             fg = cfg.WHITE if invert else cfg.BLACK
             draw.rectangle((col_x, y, col_x + col_w , y + h ), fill=bg, outline=cfg.BLACK)
             if isinstance(col.content, str):
-                col_text = sanitize_text(col.content) if self.sanitize else col.content
-                self._draw_aligned_text(draw, col_text, col_x, y, col_w, h, col.align, fg)
+                self._draw_aligned_text(draw, col.content, col_x, y, col_w, h, col.align, fg)
             else:
                 self._draw_icon_content(canvas, col.content, col_x, y, col_w, h, invert)
             if add_border:
@@ -444,41 +439,37 @@ class Item:
         for i, line in enumerate(self.lines):
             line_y = y + (i * cfg.ROW_HEIGHT)
             if isinstance(line, list): self._render_plain_columns(draw, line, x, line_y, w, fg=fg, column_widths=column_widths)
-            else: draw_text_with_cjk(draw, (x + 5, line_y + 1), sanitize_text(str(line)), cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=fg)
+            else: draw_text_with_cjk(draw, (x + 5, line_y + 1), str(line), cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=fg)
 
     def _render_plain_columns(self, draw, columns, x, y, w, fg=cfg.BLACK, column_widths=None):
         if not columns: return
-        col0_text = sanitize_text(str(columns[0])) if self.sanitize else str(columns[0])
-        draw_text_with_cjk(draw, (x + 5, y + 1), col0_text, cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=fg)
+        draw_text_with_cjk(draw, (x + 5, y + 1), str(columns[0]), cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=fg)
         if len(columns) > 1:
             right_widths = column_widths if column_widths else self._calc_column_widths(columns, w)
             col_x = x + max(20, w - sum(right_widths))
             for i, col in enumerate(columns[1:]):
                 col_w = right_widths[i] if i < len(right_widths) else 12
-                col_text = sanitize_text(str(col)) if self.sanitize else str(col)
-                self._draw_aligned_text(draw, col_text, col_x, y, col_w, cfg.ROW_HEIGHT, 'center', fg)
+                self._draw_aligned_text(draw, str(col), col_x, y, col_w, cfg.ROW_HEIGHT, 'center', fg)
                 col_x += col_w
 
     def _render_info_columns(self, draw, canvas, x, y, w, invert=False, column_widths=None):
         if not self.columns: return
         right_widths = column_widths if column_widths else self._calc_column_widths(self.columns, w)
         left_w = max(20, w - sum(right_widths)) if right_widths else w
-        col0_text = sanitize_text(str(self.columns[0])) if self.sanitize else str(self.columns[0])
-        self._draw_text_box(draw, canvas, col0_text, x, y, left_w, cfg.ROW_HEIGHT, invert=invert)
+        self._draw_text_box(draw, canvas, str(self.columns[0]), x, y, left_w, cfg.ROW_HEIGHT, invert=invert)
         col_x = x + left_w
         if invert:
             draw.line((col_x, y + 1, col_x, y + cfg.ROW_HEIGHT), fill=cfg.WHITE)
         for i, col in enumerate(self.columns[1:]):
             col_w = right_widths[i] if i < len(right_widths) else 12
-            col_text = sanitize_text(str(col)) if self.sanitize else str(col)
-            self._draw_text_box(draw, canvas, col_text, col_x, y, col_w, cfg.ROW_HEIGHT, center=True, invert=invert)
+            self._draw_text_box(draw, canvas, str(col), col_x, y, col_w, cfg.ROW_HEIGHT, center=True, invert=invert)
             col_x += col_w
             if invert and i < len(self.columns) - 2:
                 draw.line((col_x, y + 1, col_x, y + cfg.ROW_HEIGHT), fill=cfg.WHITE)
 
     def _render_wrapped_text(self, draw, canvas, x, y, w, invert=False):
         if w != self._last_width:
-            self._wrapped_lines = self._wrap_text(sanitize_text(self.text), w)
+            self._wrapped_lines = self._wrap_text(self.text, w)
             self._last_width = w
         lines = self._wrapped_lines
         if len(lines) == 1:
@@ -585,7 +576,7 @@ def calc_menu_column_widths(items, total_width):
             max_cols = max(max_cols, len(cols) - 1)
             widths = []
             for col in cols[1:]:
-                text_width = len(sanitize_text(str(col))) * 6 + 8
+                text_width = len(str(col)) * 6 + 8
                 widths.append(max(default_col_width, text_width))
             item_widths[idx] = widths
 
