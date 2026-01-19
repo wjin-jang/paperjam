@@ -175,6 +175,12 @@ class AudioCategory(SettingsCategory):
             if current_sink.get('name'):
                 self._audio_sinks.append(current_sink)
 
+            # Add 'none' option if no sinks found
+            if not self._audio_sinks:
+                self._audio_sinks = [{'id': 'none', 'name': 'none', 'display': t('settings.bluetooth.none')}]
+                self._current_sink_index = 0
+                return
+
             # Find current default sink
             default = subprocess.check_output(
                 ["pactl", "get-default-sink"],
@@ -186,8 +192,8 @@ class AudioCategory(SettingsCategory):
                     break
         except Exception as e:
             logger.warning(f"PulseAudio sinks not available: {e}")
-            # PulseAudio not available, add a default entry
-            self._audio_sinks = [{'id': '0', 'name': 'default', 'display': t('general.default')}]
+            # PulseAudio not available, add a none entry
+            self._audio_sinks = [{'id': 'none', 'name': 'none', 'display': t('settings.bluetooth.none')}]
             self._current_sink_index = 0
 
     def _get_current_output_name(self) -> str:
@@ -252,7 +258,8 @@ class AudioCategory(SettingsCategory):
         elif t('settings.audio.volume') in item_text:
             return 'VOLUME'
         elif t('settings.audio.output') in item_text:
-            new_output = self._cycle_audio_output()
+            self._cycle_audio_output()
+            self.refresh()
             return None
         elif t('settings.audio.endless_play') in item_text:
             self.settings.toggle('endless_playback')
