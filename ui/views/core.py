@@ -263,8 +263,8 @@ class Menu:
 
         draw.rectangle((0, 0, self.width - 1, self.height - 1), fill=cfg.WHITE, outline=cfg.BLACK)
 
-        # Calculate consistent column widths for all items
-        column_widths = calc_menu_column_widths(self.items, self.width)
+        # Calculate column widths (grouped by similarity)
+        column_widths_map = calc_menu_column_widths(self.items, self.width)
 
         # scroll_offset is in pixels
         render_y = -self.scroll_offset
@@ -282,7 +282,7 @@ class Menu:
                     draw, frame,
                     x=0, y=render_y, w=self.width, h=h,
                     selected=is_selected, selected_col=selected_col,
-                    column_widths=column_widths
+                    column_widths=column_widths_map.get(i)
                 )
 
             render_y += h

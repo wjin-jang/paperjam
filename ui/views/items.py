@@ -354,44 +354,84 @@ class Item:
 
 
 def calc_menu_column_widths(items, total_width):
-    """Calculate consistent column widths across all items in a menu.
+    """Calculate column widths for items, grouping similar widths together.
 
     Args:
         items: List of Item objects
         total_width: Available width for content
 
     Returns:
-        List of column widths for right columns (excluding first/label column)
+        Dict mapping item index to list of column widths
     """
     if not items:
-        return []
+        return {}
 
-    # Find max columns and max width needed for each column position
+    default_col_width = 32
+    group_threshold = 32  # Group widths within this difference
+
+    # Collect all column widths per item
+    item_widths = {}
     max_cols = 0
-    col_max_widths = {}
-
-    for item in items:
+    for idx, item in enumerate(items):
         cols = item.get_columns_for_width_calc() if hasattr(item, 'get_columns_for_width_calc') else None
         if cols and len(cols) > 1:
             max_cols = max(max_cols, len(cols) - 1)
-            for i, col in enumerate(cols[1:]):
+            widths = []
+            for col in cols[1:]:
                 text_width = len(sanitize_text(str(col))) * 6 + 8
-                col_max_widths[i] = max(col_max_widths.get(i, 0), text_width)
+                widths.append(max(default_col_width, text_width))
+            item_widths[idx] = widths
 
-    if max_cols == 0:
-        return []
+    if not item_widths:
+        return {}
 
-    # Build widths using max for each column, with minimum default
-    default_col_width = 32
-    right_widths = []
-    for i in range(max_cols):
-        width = max(default_col_width, col_max_widths.get(i, default_col_width))
-        right_widths.append(width)
+    # For each column position, group similar widths
+    col_groups = {}  # col_position -> list of (group_max, [item_indices])
+    for col_pos in range(max_cols):
+        # Collect widths for this column position
+        widths_at_pos = []
+        for idx, widths in item_widths.items():
+            if col_pos < len(widths):
+                widths_at_pos.append((widths[col_pos], idx))
 
-    # Scale down if total exceeds available space
-    total_right = sum(right_widths)
-    if total_right + 20 > total_width:
-        scale = (total_width - 20) / total_right if total_right > 0 else 1
-        right_widths = [max(10, int(cw * scale)) for cw in right_widths]
+        if not widths_at_pos:
+            continue
 
-    return right_widths
+        # Sort by width and group
+        widths_at_pos.sort(key=lambda x: x[0])
+        groups = []
+        current_group = [widths_at_pos[0]]
+
+        for w, idx in widths_at_pos[1:]:
+            if w - current_group[0][0] <= group_threshold:
+                current_group.append((w, idx))
+            else:
+                groups.append(current_group)
+                current_group = [(w, idx)]
+        groups.append(current_group)
+
+        col_groups[col_pos] = groups
+
+    # Build result: map item index to its column widths
+    result = {}
+    for idx, widths in item_widths.items():
+        final_widths = []
+        for col_pos, w in enumerate(widths):
+            # Find which group this item belongs to for this column
+            group_width = w
+            if col_pos in col_groups:
+                for group in col_groups[col_pos]:
+                    if any(i == idx for _, i in group):
+                        group_width = max(gw for gw, _ in group)
+                        break
+            final_widths.append(group_width)
+
+        # Scale down if total exceeds available space
+        total_right = sum(final_widths)
+        if total_right + 20 > total_width:
+            scale = (total_width - 20) / total_right if total_right > 0 else 1
+            final_widths = [max(10, int(cw * scale)) for cw in final_widths]
+
+        result[idx] = final_widths
+
+    return result
