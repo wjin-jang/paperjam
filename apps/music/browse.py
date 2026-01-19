@@ -213,18 +213,19 @@ class BrowseHandler:
             year = str(tracks[0].get('year', '') or '')
 
             # Check if album has multiple discs
-            discs = set(track.get('disc', 1) for track in tracks)
+            discs = set(track.get('disc', 0) or 1 for track in tracks)
             if len(discs) > 1:
                 # Insert disc headings
                 tracks_with_headings = []
                 current_disc = None
                 for track in tracks:
-                    disc = track.get('disc', 1)
+                    disc = track.get('disc', 0) or 1
                     if disc != current_disc:
                         current_disc = disc
                         tracks_with_headings.append({
                             'heading': True,
-                            'name': t('player.browse.disc', num=disc)
+                            'name': t('player.browse.disc', num=disc),
+                            'id': {'kind': 'disc', 'disc': disc}
                         })
                     tracks_with_headings.append(track)
                 tracks = tracks_with_headings

@@ -180,6 +180,12 @@ class LibraryManager:
                     logger.warning(f"Scan error processing {p}: {e}")
                     continue
 
+        # Sort tracks within each artist/album by disc, then track number
+        for tracks in temp_artists.values():
+            tracks.sort(key=lambda x: (x.get('album', '').lower(), x.get('disc', 0), x.get('track', 0)))
+        for tracks in temp_albums.values():
+            tracks.sort(key=lambda x: (x.get('disc', 0), x.get('track', 0)))
+
         with self._lock:
             self.artists = dict(sorted(temp_artists.items(), key=lambda x: x[0].lower()))
             self.albums = dict(sorted(temp_albums.items(), key=lambda x: x[0].lower()))
@@ -263,14 +269,12 @@ class LibraryManager:
         return tracks
 
     def get_artist_tracks(self, artist):
-        tracks = self.artists.get(artist, [])
-        tracks.sort(key=lambda x: (x.get('album','').lower(), x.get('disc',0), x.get('track',0)))
-        return tracks
+        """Get tracks for an artist (pre-sorted by album, disc, track)."""
+        return self.artists.get(artist, [])
 
     def get_album_tracks(self, album):
-        tracks = self.albums.get(album, [])
-        tracks.sort(key=lambda x: (x.get('disc',0), x.get('track',0)))
-        return tracks
+        """Get tracks for an album (pre-sorted by disc, track)."""
+        return self.albums.get(album, [])
 
     def get_random_cover(self, with_album=False):
         """Used for screensaver/shutdown. Calls the heavy get_cover explicitly.
