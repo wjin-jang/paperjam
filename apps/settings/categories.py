@@ -12,7 +12,8 @@ import config as cfg
 from core.settings_manager import format_duration
 from config import setup_logger
 from core.i18n import t
-from ui.views.items import Item, TextInput, CHARSET_PASSWORD
+from ui.views.items import Item, TextInput, CHARSET_PASSWORD, CHARSET_LOCATION
+from core.weather import WeatherManager
 
 logger = setup_logger()
 
@@ -326,6 +327,13 @@ class DisplayCategory(SettingsCategory):
         super().__init__(t('settings.categories.display'), settings_manager)
         self._locale_callback = None
 
+        # Weather location state
+        self.weather = WeatherManager()
+        self.location_input = TextInput(charset=CHARSET_LOCATION)
+        self.location_results: List[dict] = []
+        self.location_result_idx = 0
+        self.is_searching = False
+
     def set_locale_callback(self, callback):
         """Set callback to be called when locale changes."""
         self._locale_callback = callback
@@ -334,17 +342,23 @@ class DisplayCategory(SettingsCategory):
         """Get the display name for a locale."""
         return t(f'languages.{locale}', default=locale)
 
+    def _get_weather_location(self) -> str:
+        """Get current weather location name."""
+        return self.weather.config.location_name or t('settings.display.not_set')
+
     def build_menu(self) -> List[Item]:
         invert = self.settings.get('invert_colors', False)
         state = t('general.on') if invert else t('general.off')
         ss_timeout = self.settings.get('screensaver_timeout', 60)
         current_locale = self.settings.get('locale', 'en')
         lang_name = self._get_language_name(current_locale)
+        weather_loc = self._get_weather_location()
 
         return [
             Item(columns=[t('settings.display.invert_colors'), state], selectable=True),
             Item(columns=[t('settings.display.screensaver'), format_duration(ss_timeout)], selectable=True),
-            Item(columns=[t('settings.display.language'), lang_name], selectable=True)
+            Item(columns=[t('settings.display.language'), lang_name], selectable=True),
+            Item(columns=[t('settings.display.weather_location'), weather_loc], selectable=True)
         ]
 
     def handle_action(self, item_index: int) -> Optional[str]:
@@ -369,8 +383,43 @@ class DisplayCategory(SettingsCategory):
             # Notify callback if set
             if self._locale_callback:
                 self._locale_callback(new_locale)
+        elif t('settings.display.weather_location') in item_text:
+            # Enter weather location setup
+            self.reset_location_search()
+            return 'WEATHER_LOCATION'
 
         return None
+
+    # Weather location helpers
+    def reset_location_search(self):
+        """Reset location search state."""
+        self.location_input.reset()
+        self.location_results = []
+        self.location_result_idx = 0
+        self.is_searching = False
+
+    def search_location(self):
+        """Search for locations matching current input."""
+        if len(self.location_input.text) >= 2:
+            self.is_searching = True
+            self.location_results = self.weather.search_location(self.location_input.text)
+            self.is_searching = False
+            self.location_result_idx = 0
+
+    def select_location(self, result: dict):
+        """Select a location from search results."""
+        display_name = f"{result['name']}, {result.get('admin1', '')}"
+        if result.get('country'):
+            display_name += f", {result['country']}"
+
+        self.weather.set_location(
+            display_name[:30],
+            result['latitude'],
+            result['longitude']
+        )
+        self.weather.update_async()
+        self.reset_location_search()
+        self.refresh()
 
 
 class NetworkCategory(SettingsCategory):

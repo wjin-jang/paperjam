@@ -101,6 +101,7 @@ class SettingsApp(AppBase):
             'left': self.nav_left,
             'right': self.nav_right,
             'enter': self.nav_enter,
+            'enter_long': self.nav_enter_long,
             'back': self.nav_back,
             'vol_up': lambda: self._audio_category.set_volume(5),
             'vol_down': lambda: self._audio_category.set_volume(-5)
@@ -139,6 +140,14 @@ class SettingsApp(AppBase):
                 self.categories['NETWORK'].prev_char()
             return
 
+        if self.view == 'WEATHER_LOCATION':
+            disp_cat = self.categories['DISPLAY']
+            if disp_cat.location_results:
+                disp_cat.location_result_idx = max(0, disp_cat.location_result_idx - 1)
+            else:
+                disp_cat.location_input.prev_char()
+            return
+
         if self.view == 'MAIN':
             self.main_menu.move_selection(-1)
         elif self.view == 'SUBMENU':
@@ -168,6 +177,17 @@ class SettingsApp(AppBase):
                 self.wifi_password_mode = 'input'
             return
 
+        if self.view == 'WEATHER_LOCATION':
+            disp_cat = self.categories['DISPLAY']
+            if disp_cat.location_results:
+                disp_cat.location_result_idx = min(
+                    len(disp_cat.location_results) - 1,
+                    disp_cat.location_result_idx + 1
+                )
+            else:
+                disp_cat.location_input.next_char()
+            return
+
         if self.view == 'MAIN':
             self.main_menu.move_selection(1)
         elif self.view == 'SUBMENU':
@@ -190,6 +210,10 @@ class SettingsApp(AppBase):
             if self.wifi_password_mode == 'input':
                 # Cycle to previous character
                 self.categories['NETWORK'].prev_char()
+        elif self.view == 'WEATHER_LOCATION':
+            disp_cat = self.categories['DISPLAY']
+            if not disp_cat.location_results:
+                disp_cat.location_input.prev_char()
 
     def nav_right(self):
         if self.view == 'VOLUME':
@@ -198,6 +222,10 @@ class SettingsApp(AppBase):
             if self.wifi_password_mode == 'input':
                 # Cycle to next character
                 self.categories['NETWORK'].next_char()
+        elif self.view == 'WEATHER_LOCATION':
+            disp_cat = self.categories['DISPLAY']
+            if not disp_cat.location_results:
+                disp_cat.location_input.next_char()
 
     def nav_enter(self):
         if self.view == 'VOLUME':
@@ -290,6 +318,24 @@ class SettingsApp(AppBase):
         elif self.view == 'WIFI_NETWORK_MENU':
             self._handle_wifi_network_action()
 
+        elif self.view == 'WEATHER_LOCATION':
+            disp_cat = self.categories['DISPLAY']
+            if disp_cat.location_results:
+                # Select location from results
+                result = disp_cat.location_results[disp_cat.location_result_idx]
+                disp_cat.select_location(result)
+                self.view = 'SUBMENU'
+                self._update_submenu_items(disp_cat)
+            else:
+                # Add current character to search
+                disp_cat.location_input.confirm_char()
+
+    def nav_enter_long(self):
+        """Handle long press on enter - used for weather location search."""
+        if self.view == 'WEATHER_LOCATION':
+            disp_cat = self.categories['DISPLAY']
+            disp_cat.search_location()
+
     def nav_back(self):
         if self.view == 'VOLUME':
             self.view = 'SUBMENU'
@@ -323,6 +369,19 @@ class SettingsApp(AppBase):
             net_cat.reset_password_entry()
             self.wifi_password_mode = 'input'
             self._enter_wifi_scan()
+        elif self.view == 'WEATHER_LOCATION':
+            disp_cat = self.categories['DISPLAY']
+            if disp_cat.location_results:
+                # Clear results, go back to input
+                disp_cat.location_results = []
+                disp_cat.location_result_idx = 0
+            elif disp_cat.location_input.text:
+                # Delete last character
+                disp_cat.location_input.delete_char()
+            else:
+                # No input - go back to submenu
+                disp_cat.reset_location_search()
+                self.view = 'SUBMENU'
         elif self.view == 'SUBMENU':
             self.view = 'MAIN'
         elif self.view == 'MAIN':
@@ -367,6 +426,8 @@ class SettingsApp(AppBase):
             self._enter_wifi_networks()
         elif result == 'WIFI_SCAN':
             self._enter_wifi_scan()
+        elif result == 'WEATHER_LOCATION':
+            self.view = 'WEATHER_LOCATION'
 
         # Sync settings to config
         self.settings.sync_to_config()
@@ -687,6 +748,33 @@ class SettingsApp(AppBase):
 
             frame, _ = self.renderer.render_menu(
                 t('settings.network.password_title', ssid=self.wifi_status),
+                items, sel_idx, 0
+            )
+            return frame
+
+        elif self.view == 'WEATHER_LOCATION':
+            disp_cat = self.categories['DISPLAY']
+
+            # Build items for location search
+            if disp_cat.location_results:
+                # Show search text and results
+                items = [
+                    Item(text=f"{t('weather.search')}: {disp_cat.location_input.text}", selectable=False)
+                ]
+                for i, r in enumerate(disp_cat.location_results[:4]):
+                    loc_text = f"{r['name']}, {r.get('country', '')}"
+                    items.append(Item(text=loc_text, selectable=True))
+                sel_idx = 1 + disp_cat.location_result_idx
+            else:
+                # Show input with cursor
+                items = [
+                    Item(text=f"{t('weather.search')}: ", text_input=disp_cat.location_input, selectable=False),
+                    Item(text=t('weather.setup_hint'), selectable=False)
+                ]
+                sel_idx = 0
+
+            frame, _ = self.renderer.render_menu(
+                t('settings.display.weather_location'),
                 items, sel_idx, 0
             )
             return frame

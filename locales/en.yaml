@@ -137,6 +137,8 @@ settings:
     invert_colors: "Invert Colors"
     screensaver: "Screensaver"
     language: "Language"
+    weather_location: "Weather Location"
+    not_set: "Not Set"
 
   system:
     disk: "Disk"

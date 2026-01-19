@@ -137,6 +137,8 @@ settings:
     invert_colors: "색상 반전"
     screensaver: "화면보호기"
     language: "언어"
+    weather_location: "날씨 위치"
+    not_set: "설정 안 됨"
 
   system:
     disk: "디스크"
