@@ -5,9 +5,19 @@ Provides:
 - Bayer matrix dithering for e-paper display
 - Pre-rendered UI icons (back, shuffle, loop, fav, clear)
 - Image processing helpers
+- Cover art extraction
 """
+import io
+import os
+from pathlib import Path
+from typing import Optional, Tuple
+
 import numpy
 from PIL import Image, ImageDraw, ImageOps, ImageEnhance
+from mutagen import File
+from mutagen.flac import FLAC
+from mutagen.mp3 import MP3
+
 from config import SCREEN_WIDTH, SCREEN_HEIGHT, BLACK
 
 
@@ -72,6 +82,50 @@ def create_dithered_strip(width, height):
     draw.rectangle((0, 0, width - 1, height - 1), outline=BLACK)
 
     return dither
+
+
+def get_cover(file_path: Path) -> Tuple[Optional[Image.Image], Optional[Image.Image]]:
+    """
+    Extract and process cover art from an audio file.
+
+    Args:
+        file_path: Path to the audio file
+
+    Returns:
+        Tuple of (small_cover, large_cover) where each is a dithered
+        1-bit PIL Image, or (None, None) if no cover found
+    """
+    if not os.path.exists(file_path):
+        return (None, None)
+
+    cover_bytes = None
+
+    try:
+        audio = File(file_path)
+        if isinstance(audio, FLAC):
+            if audio.pictures:
+                cover_bytes = audio.pictures[0].data
+        elif isinstance(audio, MP3):
+            if audio.tags:
+                for key in audio.tags.keys():
+                    if key.startswith('APIC'):
+                        cover_bytes = audio.tags[key].data
+                        break
+    except Exception:
+        pass
+
+    final_small = None
+    final_large = None
+
+    if cover_bytes:
+        try:
+            img_obj = Image.open(io.BytesIO(cover_bytes))
+            final_small = dither_image(img_obj.copy(), target_size=(83, 83))
+            final_large = dither_image(img_obj.copy(), target_size=(112, 112))
+        except Exception:
+            pass
+
+    return (final_small, final_large)
 
 
 # Use asset manager for icons (backward compatible)

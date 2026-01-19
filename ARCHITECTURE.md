@@ -7,9 +7,9 @@ A music player for Raspberry Pi with e-ink (Waveshare) display.
 ```
 paperjam/
 ├── main.py              # Application entry point, main loop
-├── config.py            # Configuration management
-├── version.py           # Version information
+├── config.py            # Configuration, logging, version info
 ├── apps/                # Application modules
+│   ├── base.py          # App base class and registry
 │   ├── music/           # Music player app
 │   │   ├── player.py    # Main orchestrator
 │   │   ├── state.py     # Player state management
@@ -25,15 +25,17 @@ paperjam/
 │   ├── bluetooth.py     # Bluetooth device management
 │   ├── inputs.py        # Input device handling (evdev)
 │   ├── library.py       # Music library scanner/manager
-│   ├── metadata.py      # Audio file metadata extraction
+│   ├── metadata.py      # Audio metadata and track info
 │   ├── system.py        # System operations (shutdown, display)
 │   ├── battery.py       # I2C battery monitor
+│   ├── settings_manager.py # Settings persistence
 │   └── i18n.py          # Internationalization (translations)
 ├── ui/                  # UI rendering
 │   ├── renderer.py      # Main renderer facade
-│   ├── menu.py          # Menu controller logic
+│   ├── menu.py          # Menu controller and navigation
+│   ├── graphics.py      # Image processing, cover art, icons
 │   ├── overlays.py      # Status bar, battery indicator
-│   ├── image_utils.py   # Cover art extraction/processing
+│   ├── assets.py        # Asset loading
 │   └── views/           # View components
 │       ├── core.py      # Panel, Menu, Cursor
 │       ├── items.py     # TextItem, ColumnItem, etc.

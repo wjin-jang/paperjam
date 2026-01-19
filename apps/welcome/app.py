@@ -13,7 +13,7 @@ from ui.renderer import UIRenderer
 from ui.menu import MenuController
 import config as cfg
 from core.i18n import t
-from core.logger import setup_logger
+from config import setup_logger
 from apps.base import AppBase
 
 logger = setup_logger()

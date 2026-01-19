@@ -19,9 +19,9 @@ import os
 from pathlib import Path
 from dataclasses import dataclass
 import config as cfg
-from ui.image_utils import get_cover
-from core.track_info import extract_track_info
-from core.logger import setup_logger
+from ui.graphics import get_cover
+from core.metadata import extract_track_info
+from config import setup_logger
 from core.i18n import t
 
 logger = setup_logger()

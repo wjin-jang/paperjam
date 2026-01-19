@@ -1,15 +1,14 @@
-from core.app_registry import AppRegistry
+from apps.base import AppRegistry
 from core.i18n import t
 from ui.renderer import UIRenderer
 from ui.menu import MenuController
 from ui.views.items import Item
 
 import config as cfg
-import version
 from core.audio import AudioEngine
 from core.inputs import InputHandler
 from core.system import SystemManager
-from core.logger import setup_logger
+from config import setup_logger
 import time
 
 from apps.music import MusicPlayerApp
@@ -143,7 +142,7 @@ class MainApp:
 
     def _check_needs_rescan(self):
         """Check if version requires library rescan."""
-        if not version.NEEDS_RESCAN:
+        if not cfg.NEEDS_RESCAN:
             return
 
         logger.info("Version requires library rescan")

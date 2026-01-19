@@ -14,7 +14,7 @@ import evdev
 import select
 from evdev import ecodes
 import config as cfg
-from core.logger import setup_logger
+from config import setup_logger
 
 logger = setup_logger()
 

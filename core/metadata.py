@@ -9,6 +9,9 @@ Optional text romanization for Korean/Japanese characters
 using korean_romanizer and pykakasi libraries.
 """
 import os
+from pathlib import Path
+from dataclasses import dataclass
+from typing import Optional, Dict, Any
 from mutagen import File
 from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
@@ -125,3 +128,56 @@ def format_duration(seconds: int) -> str:
     if hours > 0:
         return f"{hours}:{minutes:02d}:{secs:02d}"
     return f"{minutes}:{secs:02d}"
+
+
+@dataclass
+class TrackInfo:
+    """Unified track information container."""
+    path: Path
+    title: str
+    artist: str
+    album: str
+    year: str
+    track_num: int
+    disc_num: int
+    duration: int = 0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for compatibility with existing code."""
+        return {
+            'path': self.path,
+            'title': self.title,
+            'artist': self.artist,
+            'album': self.album,
+            'year': self.year,
+            'track': self.track_num,
+            'disc': self.disc_num,
+            'duration': self.duration
+        }
+
+
+def extract_track_info(file_path: Path) -> TrackInfo:
+    """
+    Extract track metadata from a file path.
+
+    Args:
+        file_path: Path to the audio file
+
+    Returns:
+        TrackInfo object with extracted metadata
+    """
+    if not isinstance(file_path, Path):
+        file_path = Path(file_path)
+
+    meta = get_metadata(file_path)
+
+    return TrackInfo(
+        path=file_path,
+        album=meta[0] if meta[0] else "Unknown Album",
+        artist=meta[1] if meta[1] else "Unknown Artist",
+        title=meta[2] if meta[2] else file_path.stem,
+        track_num=meta[3] if meta[3] else 0,
+        disc_num=meta[4] if meta[4] else 0,
+        year=meta[5] if meta[5] else "",
+        duration=meta[6] if len(meta) > 6 else 0
+    )

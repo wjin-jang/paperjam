@@ -8,14 +8,38 @@ Provides global constants for:
 - File paths (music, data, cache)
 - UI layout parameters
 - Status and menu icons
+- Logging setup
 """
 import json
 import logging
-import os
+import sys
 from pathlib import Path
 from PIL import ImageFont
 
 logger = logging.getLogger(__name__)
+
+
+# --- Logging ---
+def setup_logger():
+    """Configure logging for the application."""
+    log_dir = Path.home() / ".cache" / "paperjam"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "paperjam.log"
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_file),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+
+    # Quiet down some noisy libraries
+    logging.getLogger("PIL").setLevel(logging.WARNING)
+    logging.getLogger("vlc").setLevel(logging.WARNING)
+
+    return logging.getLogger("paperjam")
 
 # --- Defaults ---
 DEFAULT_CONFIG = {
@@ -148,3 +172,24 @@ MENU_ICONS = {
     'playing': 'Ⓟ',
     'paused': 'Ⓢ'
 }
+
+# --- Version ---
+import subprocess
+import os
+
+VERSION = "1.0"
+NEEDS_RESCAN = False  # Set True when update requires library rescan
+
+def _get_version_date():
+    try:
+        dir_path = os.path.dirname(os.path.abspath(__file__))
+        return subprocess.check_output(
+            ["git", "log", "-1", "--format=%cd", "--date=format:%Y-%m-%d %H:%M"],
+            cwd=dir_path,
+            encoding='utf-8',
+            stderr=subprocess.DEVNULL
+        ).strip()
+    except Exception:
+        return "2026-01-15"
+
+VERSION_DATE = _get_version_date()

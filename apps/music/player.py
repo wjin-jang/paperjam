@@ -8,11 +8,10 @@ from PIL import Image
 
 from core.library import LibraryManager
 from core.i18n import t
-from ui.image_utils import get_cover
-from core.track_info import extract_track_info
-from core.navigation import find_next_heading
+from ui.graphics import get_cover
+from core.metadata import extract_track_info
 from ui.renderer import UIRenderer
-from ui.menu import MenuController
+from ui.menu import MenuController, find_next_heading
 from ui.views.items import Item
 import config as cfg
 

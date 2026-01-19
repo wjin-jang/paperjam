@@ -118,3 +118,26 @@ class MenuController:
             'scroll_idx': self.scroll_offset,
             'info_indices': info_indices
         }
+
+
+def _is_item_heading(item) -> bool:
+    """Check if an item is a heading (works with Item objects or dicts)."""
+    if isinstance(item, Item):
+        return item.heading
+    return item.get('heading', False)
+
+
+def find_next_heading(current: int, items: list) -> int:
+    """Find the next heading item after current index. Wraps around."""
+    if not items:
+        return 0
+    total = len(items)
+    idx = (current + 1) % total
+    start_idx = idx
+    while True:
+        if _is_item_heading(items[idx]):
+            return idx
+        idx = (idx + 1) % total
+        if idx == start_idx:
+            return current
+    return current

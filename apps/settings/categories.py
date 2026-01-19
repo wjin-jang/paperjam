@@ -9,9 +9,8 @@ from pathlib import Path
 from typing import List, Optional, Callable, Any
 
 import config as cfg
-import version
 from core.settings_manager import format_duration
-from core.logger import setup_logger
+from config import setup_logger
 from core.i18n import t
 from ui.views.items import Item
 
@@ -733,7 +732,7 @@ class SystemCategory(SettingsCategory):
         disk = self._get_disk_usage()
         return [
             Item(columns=[t('settings.system.disk'), disk], selectable=False),
-            Item(columns=[t('settings.system.version'), f"{version.VERSION} ({version.VERSION_DATE})"], selectable=False),
+            Item(columns=[t('settings.system.version'), f"{cfg.VERSION} ({cfg.VERSION_DATE})"], selectable=False),
             Item(columns=[t('settings.system.power_mode'), power_mode], selectable=True),
             Item(columns=[t('settings.system.long_press'), f"{long_press}s"], selectable=True),
             Item(columns=[t('settings.system.auto_update'), auto_update_str], selectable=True),

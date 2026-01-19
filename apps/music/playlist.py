@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import List, Optional, Callable
 
 import config as cfg
-from ui.image_utils import get_cover
-from core.logger import setup_logger
+from ui.graphics import get_cover
+from config import setup_logger
 
 logger = setup_logger()
 

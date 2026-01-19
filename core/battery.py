@@ -3,7 +3,7 @@ Battery monitoring for SugarPi 3 (IP5312 chip).
 """
 import threading
 import time
-from core.logger import setup_logger
+from config import setup_logger
 
 logger = setup_logger()
 

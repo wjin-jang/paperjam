@@ -8,8 +8,8 @@ from typing import List, Optional, Tuple
 import config as cfg
 from core.i18n import t
 from core.metadata import format_duration
-from ui.image_utils import get_cover
-from core.track_info import extract_track_info
+from ui.graphics import get_cover
+from core.metadata import extract_track_info
 from core.library import LibraryManager
 
 

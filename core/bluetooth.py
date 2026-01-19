@@ -15,7 +15,7 @@ import time
 import threading
 import re
 import shlex
-from core.logger import setup_logger
+from config import setup_logger
 
 logger = setup_logger()
 

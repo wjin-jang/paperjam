@@ -15,7 +15,7 @@ import subprocess
 from pathlib import Path
 import config as cfg
 from core.battery import get_battery_monitor
-from core.logger import setup_logger
+from config import setup_logger
 
 logger = setup_logger()
 
