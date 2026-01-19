@@ -108,6 +108,10 @@ class Menu:
         if not self.items:
             return False
 
+        # No selectable items - do nothing
+        if self.cursor.row < 0:
+            return False
+
         original_row = self.cursor.row
         new_row = self.cursor.row
 
@@ -129,6 +133,10 @@ class Menu:
     def nav_down(self) -> bool:
         """Move cursor down. Returns True if moved."""
         if not self.items:
+            return False
+
+        # No selectable items - do nothing
+        if self.cursor.row < 0:
             return False
 
         original_row = self.cursor.row
@@ -182,7 +190,8 @@ class Menu:
     def _ensure_valid_cursor(self):
         """Ensure cursor is on a selectable item."""
         if not self.items:
-            self.cursor.reset()
+            self.cursor.row = -1
+            self.cursor.col = 0
             return
 
         # If current item is selectable, we're fine

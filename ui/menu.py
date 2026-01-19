@@ -45,32 +45,29 @@ class MenuController:
     def _validate_selection(self):
         """Ensure selected_index points to a selectable item if possible."""
         if not self.items:
-            self.selected_index = 0
+            self.selected_index = -1
             return
 
         if self._is_selectable(self.selected_index):
             return
 
         # Try searching forward
-        original = self.selected_index
-        found = False
-        
+        original = max(0, self.selected_index)
+
         # Search forward
         for i in range(original, len(self.items)):
             if self._is_selectable(i):
                 self.selected_index = i
-                found = True
-                break
-        
-        if not found:
-            # Search backward
-            for i in range(original - 1, -1, -1):
-                if self._is_selectable(i):
-                    self.selected_index = i
-                    found = True
-                    break
-        
-        # If still not found (no selectable items), keep original index but it won't render cursor
+                return
+
+        # Search backward
+        for i in range(original - 1, -1, -1):
+            if self._is_selectable(i):
+                self.selected_index = i
+                return
+
+        # No selectable items found
+        self.selected_index = -1
         
     def move_selection(self, delta: int):
         """
@@ -81,9 +78,13 @@ class MenuController:
         if not self.items:
             return
 
+        # No selectable items - do nothing
+        if self.selected_index < 0:
+            return
+
         count = len(self.items)
         current = self.selected_index
-        
+
         # Simple safety break to prevent infinite loops if NOTHING is selectable
         attempts = 0
         while attempts < count:
