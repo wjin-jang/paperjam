@@ -28,6 +28,11 @@ class MenuController:
         if reset_index:
             self.selected_index = 0
             self.scroll_offset = 0
+        else:
+            # Clamp scroll_offset to valid range for new items
+            # This prevents stuck scrolling when item list changes
+            if self.selected_index >= len(items):
+                self.selected_index = max(0, len(items) - 1)
         self._validate_selection()
 
     def _is_selectable(self, index: int) -> bool:

@@ -211,8 +211,16 @@ class Menu:
         self.cursor.col = 0
 
     def _ensure_visible(self):
-        """Ensure cursor row is visible in the viewport using smart scrolling."""
+        """Ensure cursor row is visible using paginated scrolling.
+
+        Scrolls by full pages rather than keeping selection at edge.
+        """
+        # Calculate max possible scroll offset first
+        max_scroll = max(0, self.get_total_height() - self.height)
+
+        # No items or no selection - reset scroll to valid range
         if not self.items or self.cursor.row < 0:
+            self.scroll_offset = max(0, min(self.scroll_offset, max_scroll))
             return
 
         # Ensure cursor is in bounds
@@ -225,26 +233,21 @@ class Menu:
             row_top += self.items[i].get_height(self.width)
         row_height = self.items[idx].get_height(self.width)
         row_bottom = row_top + row_height
-        
-        # Max possible scroll offset
-        max_scroll = max(0, self.get_total_height() - self.height)
-        
-        # Clamp existing scroll_offset first to ensure comparison is fair
+
+        # Clamp existing scroll_offset first
         self.scroll_offset = max(0, min(self.scroll_offset, max_scroll))
-        
+
         view_top = self.scroll_offset
         view_bottom = view_top + self.height
-        
-        # Decision logic
+
+        # Paginated scrolling: scroll by full page when item is out of view
         if row_top < view_top:
-            # Above viewport -> scroll UP to show top of item
-            self.scroll_offset = row_top
+            # Item is above viewport -> scroll up by one page
+            # Align so the selected item is at the bottom of the new page
+            self.scroll_offset = max(0, row_bottom - self.height)
         elif row_bottom > view_bottom:
-            # Below viewport -> scroll DOWN to show bottom of item
-            self.scroll_offset = row_bottom - self.height
-            
-        # Preference: Always show the top of an item if it's taller than the viewport
-        if row_height > self.height:
+            # Item is below viewport -> scroll down by one page
+            # Align so the selected item is at the top of the new page
             self.scroll_offset = row_top
 
         # Final safety clamp

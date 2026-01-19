@@ -75,6 +75,18 @@ class AudioEngine:
         except Exception:
             return False
 
+    def load(self, path):
+        """Load media without playing. Returns True if successful."""
+        self.current_media_path = path
+        logger.info(f"Loading: {path}")
+        media = self.instance.media_new(str(path))
+        if media is None:
+            logger.error(f"Failed to create media for: {path}")
+            return False
+        self.player.set_media(media)
+        self.player.audio_set_volume(100)
+        return True
+
     def play(self, path):
         import time
         self.current_media_path = path

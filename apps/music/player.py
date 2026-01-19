@@ -285,7 +285,7 @@ class MusicPlayerApp(AppBase):
     def _play_media(self, path, play=True):
         """Play a media file and update state."""
         self.state.playing_path = str(path)
-        
+
         # Update playing metadata
         try:
             info = extract_track_info(Path(path))
@@ -299,7 +299,8 @@ class MusicPlayerApp(AppBase):
             self.audio.play(path)
             self.state.is_playing = True
         else:
-            self.audio.stop()
+            # Load media without playing (for resume state)
+            self.audio.load(path)
             self.state.is_playing = False
 
         covers = get_cover(Path(path))
