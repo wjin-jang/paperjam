@@ -156,11 +156,13 @@ class SystemManager:
         Returns:
             Tuple of (has_updates: bool, message: str)
         """
+        repo_path = Path(__file__).parent.parent
+
         try:
-            # Fetch from remote
+            # Fetch from remote (explicitly specify origin)
             result = subprocess.run(
-                ["git", "fetch"],
-                cwd=Path(__file__).parent.parent,
+                ["git", "fetch", "origin"],
+                cwd=repo_path,
                 capture_output=True,
                 text=True,
                 timeout=30
@@ -168,17 +170,35 @@ class SystemManager:
 
             # Check for network errors
             if result.returncode != 0:
-                error_msg = result.stderr.lower() if result.stderr else ""
+                error_msg = (result.stderr or "").lower()
                 if "could not resolve" in error_msg or "unable to access" in error_msg:
                     return False, "No internet"
                 if "connection refused" in error_msg or "connection timed out" in error_msg:
                     return False, "Connection failed"
+                if "not a git repository" in error_msg:
+                    return False, "Not a repo"
+                logger.warning(f"Git fetch failed: {result.stderr}")
                 return False, "Fetch failed"
 
             # Check if we're behind origin/main
             result = subprocess.run(
+                ["git", "rev-list", "--count", "HEAD..origin/main"],
+                cwd=repo_path,
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if result.returncode == 0:
+                behind_count = result.stdout.strip()
+                if behind_count and int(behind_count) > 0:
+                    return True, "Updates available"
+                return False, "Up to date"
+
+            # Fallback to git status if rev-list fails
+            result = subprocess.run(
                 ["git", "status", "-uno"],
-                cwd=Path(__file__).parent.parent,
+                cwd=repo_path,
                 capture_output=True,
                 text=True,
                 timeout=10
@@ -189,10 +209,11 @@ class SystemManager:
             elif "Your branch is up to date" in result.stdout:
                 return False, "Up to date"
             else:
-                return False, "Unknown status"
+                return False, "Up to date"
         except subprocess.TimeoutExpired:
             return False, "Connection timeout"
-        except (subprocess.SubprocessError, OSError) as e:
+        except (subprocess.SubprocessError, OSError, ValueError) as e:
+            logger.error(f"Update check failed: {e}")
             return False, f"Error: {str(e)[:20]}"
 
     def perform_update(self):
