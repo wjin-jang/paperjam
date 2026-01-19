@@ -44,6 +44,7 @@ class AudioEngine:
             logger.info("Audio: Default output selected")
 
         self.player = self.instance.media_player_new()
+        self.player.audio_set_volume(100)  # Set VLC internal volume to max
         self.current_media_path = None
 
     def _check_pulseaudio(self):
@@ -61,9 +62,12 @@ class AudioEngine:
 
     def play(self, path):
         self.current_media_path = path
+        logger.info(f"Playing: {path}")
         media = self.instance.media_new(str(path))
         self.player.set_media(media)
-        self.player.play()
+        self.player.audio_set_volume(100)  # Ensure volume is set before play
+        result = self.player.play()
+        logger.info(f"Play result: {result}, state: {self.get_state()}")
 
     def toggle_pause(self):
         if self.player.is_playing():
