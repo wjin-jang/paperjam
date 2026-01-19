@@ -324,18 +324,32 @@ class DisplayCategory(SettingsCategory):
 
     def __init__(self, settings_manager):
         super().__init__(t('settings.categories.display'), settings_manager)
+        self._locale_callback = None
+
+    def set_locale_callback(self, callback):
+        """Set callback to be called when locale changes."""
+        self._locale_callback = callback
+
+    def _get_language_name(self, locale: str) -> str:
+        """Get the display name for a locale."""
+        return t(f'languages.{locale}', default=locale)
 
     def build_menu(self) -> List[Item]:
         invert = self.settings.get('invert_colors', False)
         state = t('general.on') if invert else t('general.off')
         ss_timeout = self.settings.get('screensaver_timeout', 60)
+        current_locale = self.settings.get('locale', 'en')
+        lang_name = self._get_language_name(current_locale)
 
         return [
             Item(columns=[t('settings.display.invert_colors'), state], selectable=True),
-            Item(columns=[t('settings.display.screensaver'), format_duration(ss_timeout)], selectable=True)
+            Item(columns=[t('settings.display.screensaver'), format_duration(ss_timeout)], selectable=True),
+            Item(columns=[t('settings.display.language'), lang_name], selectable=True)
         ]
 
     def handle_action(self, item_index: int) -> Optional[str]:
+        from core.i18n import set_locale, get_available_locales
+
         item = self.items[item_index]
         item_text = item.columns[0] if item.columns else item.text
 
@@ -345,6 +359,16 @@ class DisplayCategory(SettingsCategory):
         elif t('settings.display.screensaver') in item_text:
             self.settings.cycle('screensaver_timeout')
             self.refresh()
+        elif t('settings.display.language') in item_text:
+            # Cycle through available locales
+            new_locale = self.settings.cycle('locale')
+            set_locale(new_locale)
+            # Update category name with new translation
+            self.name = t('settings.categories.display')
+            self.refresh()
+            # Notify callback if set
+            if self._locale_callback:
+                self._locale_callback(new_locale)
 
         return None
 

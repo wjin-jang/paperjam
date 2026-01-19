@@ -133,6 +133,7 @@ settings:
   display:
     invert_colors: "Invert Colors"
     screensaver: "Screensaver"
+    language: "Language"
 
   system:
     disk: "Disk"
@@ -224,3 +225,8 @@ system_messages:
   reset: "RESET"
   resetting: "Resetting data..."
   confirm: "CONFIRM {target}?"
+
+# Language names (for language selector)
+languages:
+  en: "English"
+  ko: "한국어"

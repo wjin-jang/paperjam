@@ -137,5 +137,24 @@ def get_available_locales() -> list:
     return list(_translations.keys())
 
 
+def init_locale_from_settings():
+    """Initialize locale from saved settings."""
+    global _current_locale
+    try:
+        import json
+        from pathlib import Path
+        config_file = Path.home() / ".config" / "paperjam" / "config.json"
+        if config_file.exists():
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                saved_locale = config.get('locale', DEFAULT_LOCALE)
+                if saved_locale in _translations:
+                    _current_locale = saved_locale
+    except (json.JSONDecodeError, OSError, KeyError):
+        pass  # Use default locale
+
+
 # Auto-load translations on import
 load_translations()
+# Initialize locale from saved settings
+init_locale_from_settings()

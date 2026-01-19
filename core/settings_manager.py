@@ -75,6 +75,11 @@ class SettingsManager:
         'auto_update': SettingDefinition(
             key='auto_update',
             default=False
+        ),
+        'locale': SettingDefinition(
+            key='locale',
+            default='en',
+            options=['en', 'ko']
         )
     }
 

@@ -48,6 +48,7 @@ DEFAULT_CONFIG = {
     "long_press_duration": 0.5,
     "recents_limit": 50,
     "invert_colors": False,
+    "locale": "en",
     "font_main": "BMmini.ttf",
     "font_header": "Nintendo-DS-BIOS.ttf",
     "font_icons": "Icons.ttf"
