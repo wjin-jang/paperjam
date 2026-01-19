@@ -40,7 +40,7 @@ class ScreensaverRenderer:
         panel_w = img_w + 1
         panel_h = img_h + 1
 
-        x = (cfg.SCREEN_WIDTH - panel_w) // 2 - 64
+        x = cfg.SCREEN_WIDTH - panel_w - 104
         y = (cfg.SCREEN_HEIGHT - panel_h) // 2
 
         # Create panel
@@ -64,7 +64,6 @@ class ScreensaverRenderer:
         # Get status text with icon
         status_key = state.get_status_text()
         status_icon = cfg.STATUS_ICONS.get(status_key, '')
-        status_text = f"{status_icon} {t(status_key)}" if status_icon else t(status_key)
 
         # Get track info
         title = state.playing_title or ""
@@ -74,8 +73,8 @@ class ScreensaverRenderer:
         # Panel dimensions
         info_w = 96
         info_h = cfg.ROW_HEIGHT * 4
-        info_x = cfg.SCREEN_WIDTH - info_w - 8
-        info_y = cfg.SCREEN_HEIGHT - info_h - 8
+        info_x = cfg.SCREEN_WIDTH - info_w - 4
+        info_y = cfg.SCREEN_HEIGHT - info_h - 4
 
         # Create panel
         info_panel = Panel(info_x, info_y, info_w, info_h)
@@ -83,8 +82,7 @@ class ScreensaverRenderer:
 
         # Add items for status, title, artist, album
         info_menu.items = [
-            Item(text=status_text, font=cfg.FONT_HEADER, padding=(2, 0), selectable=False, sanitize=False),
-            Item(text=title, selectable=False),
+            Item(columns=[title,status_icon], font=cfg.FONT_HEADER, padding=(2, 0), selectable=False, sanitize=False),
             Item(text=artist, selectable=False),
             Item(text=album, selectable=False),
         ]
