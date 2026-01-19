@@ -157,7 +157,7 @@ def render_current_section(weather: WeatherData, width: int, height: int,
         fg = cfg.WHITE if is_selected else cfg.BLACK
         draw.rectangle((day_x, row_y, day_x + day_col_w, row_y + cfg.ROW_HEIGHT),
                       fill=bg, outline=cfg.BLACK)
-        draw.text((day_x + 5, row_y + 3), label, font=cfg.FONT_MAIN, fill=fg)
+        draw.text((day_x + 5, row_y), label, font=cfg.FONT_MAIN, fill=fg)
 
     return img
 
