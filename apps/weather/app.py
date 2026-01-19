@@ -16,17 +16,12 @@ from ui.views.weather_view import (
     SECTION_DAY, SECTION_TEMPERATURE, SECTION_PRECIPITATION, SECTION_WEEKLY,
     SECTION_COUNT
 )
+from ui.views.items import TextInput, CHARSET_LOCATION
 import config as cfg
 
 
 class WeatherApp(AppBase):
     """Weather application displaying forecasts."""
-
-    CHAR_SET = (
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "abcdefghijklmnopqrstuvwxyz"
-        " -'.,0123456789"
-    )
 
     MAX_CHART_SCROLL = 16
     MAX_DAY_OFFSET = 2
@@ -46,12 +41,11 @@ class WeatherApp(AppBase):
         self.chart_scroll = 0
         self.menu_scroll = 0
 
-        # Setup state
-        self.search_query = ""
+        # Setup state using TextInput
+        self.search_input = TextInput(charset=CHARSET_LOCATION)
         self.search_results: List[dict] = []
         self.selected_result_idx = 0
         self.is_searching = False
-        self.char_index = 0
 
     def on_enter(self):
         super().on_enter()
@@ -62,7 +56,7 @@ class WeatherApp(AppBase):
 
         if not self.weather.is_configured:
             self.view = 'SETUP'
-            self.search_query = ""
+            self.search_input.reset()
             self.search_results = []
         else:
             self.view = 'MAIN'
@@ -148,10 +142,9 @@ class WeatherApp(AppBase):
 
     def _open_setup(self):
         self.view = 'SETUP'
-        self.search_query = ""
+        self.search_input.reset()
         self.search_results = []
         self.selected_result_idx = 0
-        self.char_index = 0
 
     def _exit(self):
         self.running = False
@@ -162,13 +155,13 @@ class WeatherApp(AppBase):
         if self.search_results:
             self.selected_result_idx = max(0, self.selected_result_idx - 1)
         else:
-            self.char_index = (self.char_index - 1) % len(self.CHAR_SET)
+            self.search_input.prev_char()
 
     def _setup_char_down(self):
         if self.search_results:
             self.selected_result_idx = min(len(self.search_results) - 1, self.selected_result_idx + 1)
         else:
-            self.char_index = (self.char_index + 1) % len(self.CHAR_SET)
+            self.search_input.next_char()
 
     def _setup_enter(self):
         if self.search_results:
@@ -185,26 +178,26 @@ class WeatherApp(AppBase):
             self.weather.update_async()
 
             self.view = 'MAIN'
-            self.search_query = ""
+            self.search_input.reset()
             self.search_results = []
             self.selected_section = SECTION_DAY
             self.day_offset = 0
             self.chart_scroll = 0
         else:
-            self.search_query += self.CHAR_SET[self.char_index]
+            self.search_input.confirm_char()
 
     def _setup_search(self):
-        if len(self.search_query) >= 2:
+        if len(self.search_input.text) >= 2:
             self.is_searching = True
-            self.search_results = self.weather.search_location(self.search_query)
+            self.search_results = self.weather.search_location(self.search_input.text)
             self.is_searching = False
             self.selected_result_idx = 0
 
     def _setup_back(self):
         if self.search_results:
             self.search_results = []
-        elif self.search_query:
-            self.search_query = self.search_query[:-1]
+        elif self.search_input.text:
+            self.search_input.delete_char()
         else:
             if self.weather.is_configured:
                 self.view = 'MAIN'
@@ -221,10 +214,12 @@ class WeatherApp(AppBase):
 
     def get_frame(self) -> Image.Image:
         if self.view == 'SETUP':
+            # Pass TextInput for cursor rendering when no results yet
             return self.renderer.render_location_setup(
                 self.search_results,
                 self.selected_result_idx,
-                self.search_query + f"[{self.CHAR_SET[self.char_index]}]" if not self.search_results else self.search_query,
+                self.search_input if not self.search_results else None,
+                self.search_input.text,
                 self.is_searching
             )
 

@@ -12,7 +12,7 @@ import config as cfg
 from core.settings_manager import format_duration
 from config import setup_logger
 from core.i18n import t
-from ui.views.items import Item
+from ui.views.items import Item, TextInput, CHARSET_PASSWORD
 
 logger = setup_logger()
 
@@ -379,14 +379,6 @@ class NetworkCategory(SettingsCategory):
     # WiFi connection timeout in seconds
     WIFI_TIMEOUT = 15
 
-    # Character set for password entry (a-z, A-Z, 0-9, common symbols)
-    PASSWORD_CHARS = (
-        list('abcdefghijklmnopqrstuvwxyz') +
-        list('ABCDEFGHIJKLMNOPQRSTUVWXYZ') +
-        list('0123456789') +
-        list('!@#$%^&*()-_=+[]{}|;:,.<>?/~` ')
-    )
-
     def __init__(self, settings_manager):
         super().__init__(t('settings.categories.network'), settings_manager)
         from core.bluetooth import BluetoothManager
@@ -398,9 +390,8 @@ class NetworkCategory(SettingsCategory):
         self._wifi_on_demand = True  # Enable WiFi on-demand by default
         self._is_scanning_wifi = False
 
-        # Password entry state
-        self.password_chars = []  # List of characters entered
-        self.password_char_idx = 0  # Current character in PASSWORD_CHARS
+        # Password entry state using TextInput
+        self.password_input = TextInput(charset=CHARSET_PASSWORD)
         self.password_target_ssid = ""  # SSID we're entering password for
 
     def set_wifi_view_callback(self, callback):
@@ -857,38 +848,35 @@ class NetworkCategory(SettingsCategory):
             logger.error(f"Failed to add open WiFi network: {e}")
             return False
 
-    # Password entry helpers
+    # Password entry helpers (delegate to TextInput)
     def reset_password_entry(self, ssid: str = ""):
         """Reset password entry state."""
-        self.password_chars = []
-        self.password_char_idx = 0
+        self.password_input.reset()
         self.password_target_ssid = ssid
 
     def get_current_password(self) -> str:
         """Get the currently entered password."""
-        return ''.join(self.password_chars)
+        return self.password_input.text
 
     def get_current_char(self) -> str:
         """Get the currently selected character."""
-        return self.PASSWORD_CHARS[self.password_char_idx]
+        return self.password_input.current_char
 
     def next_char(self):
         """Move to next character in the character set."""
-        self.password_char_idx = (self.password_char_idx + 1) % len(self.PASSWORD_CHARS)
+        self.password_input.next_char()
 
     def prev_char(self):
         """Move to previous character in the character set."""
-        self.password_char_idx = (self.password_char_idx - 1) % len(self.PASSWORD_CHARS)
+        self.password_input.prev_char()
 
     def confirm_char(self):
         """Add current character to password."""
-        self.password_chars.append(self.PASSWORD_CHARS[self.password_char_idx])
-        self.password_char_idx = 0  # Reset to 'a'
+        self.password_input.confirm_char()
 
     def delete_char(self):
         """Delete last character from password."""
-        if self.password_chars:
-            self.password_chars.pop()
+        self.password_input.delete_char()
 
     def build_menu(self) -> List[Item]:
         wifi_info = self._get_wifi_info()

@@ -6,13 +6,142 @@ All items are now instances of the unified Item class, configured via parameters
 """
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List, Union, Optional, Any
+from typing import List, Union, Optional, Any, Callable
 from PIL import Image, ImageDraw, ImageOps
 
 import config as cfg
 from core.metadata import sanitize_text
 from core.i18n import t
 from ui.graphics import draw_text_with_cjk, get_text_width_with_cjk
+
+
+# Default character sets for text input
+CHARSET_PASSWORD = (
+    list('abcdefghijklmnopqrstuvwxyz') +
+    list('ABCDEFGHIJKLMNOPQRSTUVWXYZ') +
+    list('0123456789') +
+    list('!@#$%^&*()-_=+[]{}|;:,.<>?/~` ')
+)
+
+CHARSET_LOCATION = list(
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz -'.,0123456789"
+)
+
+
+class TextInput:
+    """
+    Reusable text input component with character-by-character entry.
+
+    Uses underline to indicate the current character position.
+    """
+
+    def __init__(self, charset: List[str] = None, initial_text: str = ""):
+        """
+        Initialize text input.
+
+        Args:
+            charset: List of characters to cycle through. Defaults to CHARSET_PASSWORD.
+            initial_text: Starting text value.
+        """
+        self.charset = charset or CHARSET_PASSWORD
+        self.chars: List[str] = list(initial_text)
+        self.char_idx: int = 0
+
+    def reset(self, initial_text: str = ""):
+        """Reset input state."""
+        self.chars = list(initial_text)
+        self.char_idx = 0
+
+    @property
+    def text(self) -> str:
+        """Get the current entered text."""
+        return ''.join(self.chars)
+
+    @property
+    def current_char(self) -> str:
+        """Get the currently selected character."""
+        return self.charset[self.char_idx]
+
+    def next_char(self):
+        """Move to next character in the charset."""
+        self.char_idx = (self.char_idx + 1) % len(self.charset)
+
+    def prev_char(self):
+        """Move to previous character in the charset."""
+        self.char_idx = (self.char_idx - 1) % len(self.charset)
+
+    def confirm_char(self):
+        """Add current character to text."""
+        self.chars.append(self.charset[self.char_idx])
+        self.char_idx = 0
+
+    def delete_char(self) -> bool:
+        """Delete last character. Returns True if a char was deleted."""
+        if self.chars:
+            self.chars.pop()
+            return True
+        return False
+
+    def get_display_text(self, show_cursor: bool = True) -> str:
+        """
+        Get text for simple display (without underline rendering).
+
+        Args:
+            show_cursor: If True, append current char. If False, append underscore placeholder.
+        """
+        if show_cursor:
+            return self.text + self.current_char
+        return self.text + "_"
+
+    def render(self, draw: ImageDraw.Draw, x: int, y: int, w: int, h: int,
+               selected: bool = True, font=None, padding: tuple = None,
+               prefix: str = None):
+        """
+        Render the text input with underline cursor.
+
+        Args:
+            draw: PIL ImageDraw object
+            x, y, w, h: Bounding box
+            selected: Whether this input is currently selected (shows cursor)
+            font: Font to use (defaults to cfg.FONT_MAIN)
+            padding: (x, y) padding tuple
+            prefix: Optional prefix text to display before input
+        """
+        font = font or cfg.FONT_MAIN
+        cjk_font = cfg.FONT_CJK_HEADER if font == cfg.FONT_HEADER else cfg.FONT_CJK_MAIN
+        padding = padding or (5, 3)
+        padding_x, padding_y = padding
+
+        # Draw background box
+        bg = cfg.BLACK if selected else cfg.WHITE
+        fg = cfg.WHITE if selected else cfg.BLACK
+        draw.rectangle((x, y, x + w, y + h), fill=bg, outline=cfg.BLACK)
+
+        text_x = x + padding_x
+        text_y = y + padding_y
+
+        # Draw prefix text if provided
+        if prefix:
+            draw_text_with_cjk(draw, (text_x, text_y), prefix, font, cjk_font, fill=fg)
+            text_x += get_text_width_with_cjk(prefix, font, cjk_font)
+
+        # Draw entered text
+        entered_text = self.text
+        if entered_text:
+            draw_text_with_cjk(draw, (text_x, text_y), entered_text, font, cjk_font, fill=fg)
+            text_x += get_text_width_with_cjk(entered_text, font, cjk_font)
+
+        if selected:
+            # Draw current character with underline
+            current = self.current_char
+            char_width = get_text_width_with_cjk(current, font, cjk_font)
+
+            # Draw the character
+            draw_text_with_cjk(draw, (text_x, text_y), current, font, cjk_font, fill=fg)
+
+            # Draw underline beneath the character
+            underline_y = y + h - 3
+            draw.line((text_x, underline_y, text_x + char_width, underline_y), fill=fg)
 
 
 @dataclass
@@ -99,7 +228,9 @@ class Item:
                  font=None,
                  padding: tuple = None,
                  id: Any = None,
-                 sanitize: bool = True):
+                 sanitize: bool = True,
+                 # Text input support
+                 text_input: 'TextInput' = None):
         # Content
         self.text = text
         self.icon = icon
@@ -108,6 +239,7 @@ class Item:
         self.image = image
         self.placeholder = placeholder or t('player.browse.no_image')
         self.value = value
+        self.text_input = text_input
 
         # Rendering flags
         self.heading = heading
@@ -174,6 +306,13 @@ class Item:
         # Volume slider
         if self.show_volume:
             self._render_volume(draw, x, y, w, h)
+            return
+
+        # Text input with underline cursor
+        if self.text_input is not None:
+            self.text_input.render(draw, x, y, w, h, selected=selected,
+                                   font=self.font, padding=self.padding,
+                                   prefix=self.text)
             return
 
         # Image display

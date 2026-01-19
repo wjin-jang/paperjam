@@ -315,7 +315,7 @@ class SettingsApp(AppBase):
             self._enter_wifi_networks()
         elif self.view == 'WIFI_PASSWORD':
             net_cat = self.categories['NETWORK']
-            if net_cat.password_chars:
+            if net_cat.password_input.text:
                 # Delete last character
                 net_cat.delete_char()
                 return True
@@ -511,7 +511,7 @@ class SettingsApp(AppBase):
         else:
             self.wifi_status = t('settings.network.failed')
             # Stay in password view to retry
-            net_cat.password_chars = []  # Clear password for retry
+            net_cat.password_input.reset()  # Clear password for retry
 
     def _enter_bt_saved_view(self):
         self.view = 'BT_SAVED'
@@ -665,21 +665,21 @@ class SettingsApp(AppBase):
 
         elif self.view == 'WIFI_PASSWORD':
             net_cat = self.categories['NETWORK']
-            current_char = net_cat.get_current_char()
             password = net_cat.get_current_password()
 
-            # Show password entry UI
-            # Display: current password + cursor with current char
+            # Show password entry UI with underline cursor
             if self.wifi_password_mode == 'input':
-                display_password = password + "[" + current_char + "]"
                 sel_idx = 1  # Password input line selected
+                # Use text_input for underline cursor rendering
+                input_item = Item(text_input=net_cat.password_input, selectable=True, id='INPUT')
             else:
-                display_password = password + "_"
                 sel_idx = 2  # Connect button selected
+                # Show just the password with underscore placeholder
+                input_item = Item(text=password + "_", selectable=True, id='INPUT')
 
             items = [
                 Item(text=t('settings.network.password_hint'), selectable=False),
-                Item(text=display_password, selectable=True, id='INPUT'),
+                input_item,
                 Item(text=t('settings.network.confirm_connect'), id='CONNECT'),
             ]
 

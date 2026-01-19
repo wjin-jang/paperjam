@@ -34,7 +34,7 @@ import config as cfg
 from core.i18n import t
 from core.weather import WeatherData, HourlyForecast, DailyForecast
 from ui.views.core import Panel, Menu
-from ui.views.items import Item
+from ui.views.items import Item, TextInput
 
 # Icon directories
 WEATHER_ICONS_DIR = Path(__file__).parent.parent.parent / "assets" / "weather"
@@ -452,17 +452,32 @@ class WeatherViewRenderer:
         return hourly[start_idx:end_idx]
 
     def render_location_setup(self, results: List[dict], selected_idx: int,
-                               search_query: str, is_searching: bool) -> Image.Image:
-        """Render location setup screen."""
+                               search_input: Optional[TextInput], search_text: str,
+                               is_searching: bool) -> Image.Image:
+        """Render location setup screen.
+
+        Args:
+            results: Search results to display
+            selected_idx: Index of selected result
+            search_input: TextInput object for cursor rendering (None when results shown)
+            search_text: The search query text
+            is_searching: Whether currently searching
+        """
         self.canvas = Image.new('1', (cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), cfg.WHITE)
 
         panel = Panel(self.PANEL_X, self.PANEL_Y, self.PANEL_W, self.PANEL_H,
                       header=t('weather.setup_title'))
         menu = panel.create_menu()
 
-        items = [
-            Item(text=f"{t('weather.search')}: {search_query}", selectable=False)
-        ]
+        # Build search input item - use TextInput for underline cursor when active
+        if search_input is not None and not results:
+            # Active text input with underline cursor
+            search_item = Item(text=f"{t('weather.search')}: ", text_input=search_input, selectable=False)
+        else:
+            # Just display the text when showing results
+            search_item = Item(text=f"{t('weather.search')}: {search_text}", selectable=False)
+
+        items = [search_item]
 
         if is_searching:
             items.append(Item(text=t('weather.searching'), selectable=False))
@@ -470,7 +485,7 @@ class WeatherViewRenderer:
             for r in results[:4]:
                 loc_text = f"{r['name']}, {r.get('country', '')}"
                 items.append(Item(text=loc_text, selectable=True, id={'result': r}))
-        elif search_query and len(search_query) >= 2:
+        elif search_text and len(search_text) >= 2:
             items.append(Item(text=t('weather.no_results'), selectable=False))
 
         items.append(Item(text=t('weather.setup_hint'), selectable=False))
