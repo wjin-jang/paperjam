@@ -186,17 +186,21 @@ class InputHandler:
         elif code == ecodes.KEY_KPENTER or code == ecodes.KEY_ENTER:
             action = 'enter_long' if is_long else 'enter'
 
+        # Left/Right navigation (also triggers prev/next if no left/right callback)
+        elif code in (ecodes.KEY_KP4, ecodes.KEY_LEFT):
+            action = 'left' if 'left' in self.callbacks else 'prev'
+        elif code in (ecodes.KEY_KP6, ecodes.KEY_RIGHT):
+            action = 'right' if 'right' in self.callbacks else 'next'
+
         # Play/pause keys
         elif code in (ecodes.KEY_KP5, ecodes.KEY_P, ecodes.KEY_PLAYPAUSE,
                       ecodes.KEY_PLAYCD, ecodes.KEY_PAUSECD, ecodes.KEY_PLAY):
             action = 'play_pause_long' if is_long else 'play_pause'
 
-        # Next track keys
-        elif code in (ecodes.KEY_KP6, ecodes.KEY_RIGHT, ecodes.KEY_NEXTSONG):
+        # Next/Previous track keys (dedicated media keys)
+        elif code == ecodes.KEY_NEXTSONG:
             action = 'next'
-
-        # Previous track keys
-        elif code in (ecodes.KEY_KP4, ecodes.KEY_LEFT, ecodes.KEY_PREVIOUSSONG):
+        elif code == ecodes.KEY_PREVIOUSSONG:
             action = 'prev'
 
         # Volume keys
