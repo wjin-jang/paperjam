@@ -186,10 +186,15 @@ class AudioCategory(SettingsCategory):
                 ["pactl", "get-default-sink"],
                 text=True, stderr=subprocess.DEVNULL, timeout=2
             ).strip()
+            found = False
             for i, sink in enumerate(self._audio_sinks):
                 if sink['name'] == default:
                     self._current_sink_index = i
+                    found = True
                     break
+            # Reset to first sink if default not found (e.g., Bluetooth disconnected)
+            if not found:
+                self._current_sink_index = 0
         except Exception as e:
             logger.warning(f"PulseAudio sinks not available: {e}")
             # PulseAudio not available, add a none entry

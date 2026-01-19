@@ -328,12 +328,22 @@ class BluetoothManager:
     def forget_device(self, mac):
         if not self._is_valid_mac(mac):
             return
+        is_audio = self._is_audio_device(mac)
         self._run_cmd(['bluetoothctl', 'remove', mac])
+        # Reset audio to non-Bluetooth sink if this was an audio device
+        if is_audio:
+            time.sleep(0.5)
+            self._reset_audio_to_fallback()
 
     def disconnect_device(self, mac):
         if not self._is_valid_mac(mac):
             return
+        is_audio = self._is_audio_device(mac)
         self._run_cmd(['bluetoothctl', 'disconnect', mac])
+        # Reset audio to non-Bluetooth sink if this was an audio device
+        if is_audio:
+            time.sleep(0.5)  # Brief delay for PulseAudio to update
+            self._reset_audio_to_fallback()
 
     def set_audio_output(self, mac):
         """Set audio output to the connected Bluetooth device.
@@ -394,3 +404,29 @@ class BluetoothManager:
                         )
         except (subprocess.SubprocessError, OSError):
             pass
+
+    def _reset_audio_to_fallback(self):
+        """Reset audio output to a non-Bluetooth sink after disconnection."""
+        try:
+            result = subprocess.check_output(
+                ["pactl", "list", "sinks", "short"],
+                text=True, stderr=subprocess.DEVNULL, timeout=2
+            )
+            # Find first non-Bluetooth sink
+            for line in result.split('\n'):
+                if line and 'bluez' not in line.lower():
+                    parts = line.split('\t')
+                    if len(parts) >= 2:
+                        sink_name = parts[1]
+                        subprocess.run(
+                            ["pactl", "set-default-sink", sink_name],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2
+                        )
+                        self._move_streams_to_sink(sink_name)
+                        logger.info(f"Audio output reset to fallback: {sink_name}")
+                        return True
+            logger.warning("No non-Bluetooth audio sink found for fallback")
+            return False
+        except (subprocess.SubprocessError, OSError) as e:
+            logger.error(f"Failed to reset audio to fallback: {e}")
+            return False
