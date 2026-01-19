@@ -76,13 +76,13 @@ player:
 
 # Settings
 settings:
-  title: "SETTINGS"
+  title: "Settings"
   categories:
-    audio: "AUDIO"
-    library: "LIBRARY"
-    network: "NETWORK"
-    system: "SYSTEM"
-    display: "DISPLAY"
+    audio: "Audio"
+    library: "Library"
+    network: "Network"
+    system: "System"
+    display: "Display"
 
   audio:
     volume: "Volume"

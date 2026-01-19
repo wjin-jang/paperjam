@@ -140,7 +140,7 @@ class TextInput:
             draw_text_with_cjk(draw, (text_x, text_y), current, font, cjk_font, fill=fg)
 
             # Draw underline beneath the character
-            underline_y = y + h - 3
+            underline_y = y + h - 1
             draw.line((text_x, underline_y, text_x + char_width, underline_y), fill=fg)
 
 
