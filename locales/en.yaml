@@ -169,10 +169,10 @@ welcome:
 
 # General
 general:
-  on: "ON"
-  off: "OFF"
-  yes: "Yes"
-  no: "No"
+  "on": "ON"
+  "off": "OFF"
+  "yes": "Yes"
+  "no": "No"
   ok: "OK"
   cancel: "Cancel"
   loading: "Loading..."
