@@ -72,7 +72,7 @@ class ScreensaverRenderer:
 
         # Panel dimensions
         info_w = 96
-        info_h = cfg.ROW_HEIGHT * 4
+        info_h = cfg.ROW_HEIGHT * 3
         info_x = cfg.SCREEN_WIDTH - info_w - 4
         info_y = cfg.SCREEN_HEIGHT - info_h - 4
 
