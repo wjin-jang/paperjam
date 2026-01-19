@@ -144,7 +144,7 @@ class PopupManager:
         w = 200
         # Estimate height
         lines = len(text.split('\n')) # Simple estimation
-        h = (lines * cfg.ROW_HEIGHT) + cfg.ROW_HEIGHT + 10
+        h = (lines * cfg.ROW_HEIGHT) + cfg.ROW_HEIGHT
         x = (cfg.SCREEN_WIDTH - w) // 2
         y = (cfg.SCREEN_HEIGHT - h) // 2
         
