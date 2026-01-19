@@ -242,8 +242,15 @@ class PlaylistManager:
             self.loop_mode = state.get('loop_mode', 0)
             
             # Validate indices
+            if self.playlist_source:
+                # Filter out invalid indices from queue
+                valid_queue = [i for i in self.queue if 0 <= i < len(self.playlist_source)]
+                if len(valid_queue) != len(self.queue):
+                    logger.warning(f"Removed {len(self.queue) - len(valid_queue)} invalid queue indices")
+                    self.queue = valid_queue
+
             if self.queue and self.queue_idx >= len(self.queue):
                 self.queue_idx = 0
-                
+
         except Exception as e:
             logger.error(f"Failed to load queue: {e}")

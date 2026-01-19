@@ -22,8 +22,20 @@ class AudioEngine:
         # Try audio outputs in order of preference
         self.instance = None
 
-        # Common VLC options for headless audio playback
-        base_opts = ['--no-video', '--no-xlib']
+        # VLC options optimized for headless Raspberry Pi OS Lite
+        base_opts = [
+            '--no-video',           # Disable video output
+            '--no-xlib',            # Disable X11 dependency
+            '--no-keyboard-events', # No keyboard input handling
+            '--no-mouse-events',    # No mouse input handling
+            '--no-disable-screensaver',  # Don't try to manage screensaver
+            '--no-snapshot-preview', # Disable snapshot preview
+            '--no-osd',             # Disable on-screen display
+            '--no-spu',             # Disable subtitles
+            '--no-lua',             # Disable Lua scripting
+            '--no-plugins-cache',   # Don't use plugin cache (saves memory)
+            '--quiet',              # Reduce log verbosity
+        ]
 
         # Try PulseAudio first
         if self._check_pulseaudio():

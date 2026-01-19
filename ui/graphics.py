@@ -5,10 +5,12 @@ Provides:
 - Bayer matrix dithering for e-paper display
 - Pre-rendered UI icons (back, shuffle, loop, fav, clear)
 - Image processing helpers
-- Cover art extraction
+- Cover art extraction with disk caching
 """
 import io
 import os
+import hashlib
+import logging
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -19,6 +21,12 @@ from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
 
 from config import SCREEN_WIDTH, SCREEN_HEIGHT, BLACK
+
+logger = logging.getLogger(__name__)
+
+# Cover art cache directory
+_COVER_CACHE_DIR = Path.home() / ".cache" / "paperjam" / "covers"
+_COVER_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def get_bayer_matrix():
@@ -84,9 +92,40 @@ def create_dithered_strip(width, height):
     return dither
 
 
+def _get_cache_key(file_path: Path) -> str:
+    """Generate a cache key based on file path and modification time."""
+    try:
+        mtime = os.path.getmtime(file_path)
+        key_str = f"{file_path}:{mtime}"
+        return hashlib.md5(key_str.encode()).hexdigest()
+    except OSError:
+        return hashlib.md5(str(file_path).encode()).hexdigest()
+
+
+def _load_cached_cover(cache_key: str, size: str) -> Optional[Image.Image]:
+    """Load a cached cover image from disk."""
+    cache_file = _COVER_CACHE_DIR / f"{cache_key}_{size}.png"
+    if cache_file.exists():
+        try:
+            return Image.open(cache_file).convert('1')
+        except Exception:
+            pass
+    return None
+
+
+def _save_cached_cover(cache_key: str, size: str, img: Image.Image):
+    """Save a cover image to the disk cache."""
+    cache_file = _COVER_CACHE_DIR / f"{cache_key}_{size}.png"
+    try:
+        img.save(cache_file, 'PNG')
+    except Exception as e:
+        logger.debug(f"Failed to cache cover: {e}")
+
+
 def get_cover(file_path: Path) -> Tuple[Optional[Image.Image], Optional[Image.Image]]:
     """
     Extract and process cover art from an audio file.
+    Uses disk cache to avoid re-processing on subsequent loads.
 
     Args:
         file_path: Path to the audio file
@@ -98,6 +137,15 @@ def get_cover(file_path: Path) -> Tuple[Optional[Image.Image], Optional[Image.Im
     if not os.path.exists(file_path):
         return (None, None)
 
+    # Check disk cache first
+    cache_key = _get_cache_key(file_path)
+    cached_small = _load_cached_cover(cache_key, "small")
+    cached_large = _load_cached_cover(cache_key, "large")
+
+    if cached_small is not None and cached_large is not None:
+        return (cached_small, cached_large)
+
+    # Extract cover from audio file
     cover_bytes = None
 
     try:
@@ -122,6 +170,12 @@ def get_cover(file_path: Path) -> Tuple[Optional[Image.Image], Optional[Image.Im
             img_obj = Image.open(io.BytesIO(cover_bytes))
             final_small = dither_image(img_obj.copy(), target_size=(83, 83))
             final_large = dither_image(img_obj.copy(), target_size=(112, 112))
+
+            # Cache the processed images
+            if final_small:
+                _save_cached_cover(cache_key, "small", final_small)
+            if final_large:
+                _save_cached_cover(cache_key, "large", final_large)
         except Exception:
             pass
 

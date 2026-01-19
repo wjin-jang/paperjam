@@ -323,7 +323,14 @@ class LibraryManager:
         if cfg.RECENTS_FILE.exists():
             try:
                 with open(cfg.RECENTS_FILE, 'r') as f:
-                    self.recents = [Path(p) for p in json.load(f) if Path(p).exists()]
+                    all_paths = json.load(f)
+                valid_paths = [Path(p) for p in all_paths if Path(p).exists()]
+                self.recents = valid_paths
+                # Save back if invalid paths were filtered out
+                if len(valid_paths) != len(all_paths):
+                    logger.info(f"Removed {len(all_paths) - len(valid_paths)} invalid recent paths")
+                    with open(cfg.RECENTS_FILE, 'w') as f:
+                        json.dump([str(p) for p in self.recents], f)
             except (OSError, json.JSONDecodeError):
                 self.recents = []
 
@@ -371,12 +378,15 @@ class LibraryManager:
         self._save_favs()
 
     def _save_favs(self):
-        with open(cfg.FAVS_FILE, 'w') as f:
-            json.dump({
-                "tracks": list(self.fav_tracks),
-                "albums": list(self.fav_albums),
-                "artists": list(self.fav_artists)
-            }, f)
+        try:
+            with open(cfg.FAVS_FILE, 'w') as f:
+                json.dump({
+                    "tracks": list(self.fav_tracks),
+                    "albums": list(self.fav_albums),
+                    "artists": list(self.fav_artists)
+                }, f)
+        except OSError as e:
+            logger.error(f"Error saving favorites: {e}")
 
     def get_fav_tracks_list(self):
         tracks = []

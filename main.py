@@ -53,7 +53,7 @@ class MainApp:
         
         # Display State
         self.first_render = True
-        self._last_frame_hash = None  # For change detection
+        self._last_frame_bytes = None  # For change detection (stores raw bytes)
         self._partial_refresh_count = 0  # Track partial refreshes for periodic full refresh
         self._max_partial_refreshes = 120  # Max partials before forced full refresh
         self._display_sleeping = False  # Track display sleep state for screensaver
@@ -503,11 +503,15 @@ class MainApp:
             from PIL import ImageOps
             img = ImageOps.invert(img.convert('L')).convert('1')
 
-        # Check if frame changed (skip refresh if identical)
-        frame_hash = hash(img.tobytes())
-        if not full_refresh and not self.first_render and frame_hash == self._last_frame_hash:
+        # Rotate image once (for 180° mounted display) - do this BEFORE hashing
+        img = img.rotate(180)
+
+        # Check if frame changed using image bytes comparison
+        # Store bytes reference to avoid recomputing
+        img_bytes = img.tobytes()
+        if not full_refresh and not self.first_render and img_bytes == self._last_frame_bytes:
             return  # No change, skip display update
-        self._last_frame_hash = frame_hash
+        self._last_frame_bytes = img_bytes
 
         # Check if periodic full refresh is needed (Waveshare e-paper precaution)
         needs_periodic_full = self._partial_refresh_count >= self._max_partial_refreshes
@@ -515,7 +519,7 @@ class MainApp:
         epd = self.sys.get_display()
         if epd:
             try:
-                buffer = epd.getbuffer(img.rotate(180))
+                buffer = epd.getbuffer(img)
                 if self.first_render or full_refresh or needs_periodic_full:
                     epd.init()
                     epd.displayPartBaseImage(buffer)
