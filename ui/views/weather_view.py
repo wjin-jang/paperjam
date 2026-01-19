@@ -163,14 +163,12 @@ def render_current_section(weather: WeatherData, width: int, height: int,
 
 
 def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
-                     value_fn, format_fn, label: str = None,
-                     is_percentage: bool = False,
+                     value_fn, format_fn, is_percentage: bool = False,
                      scroll_offset: int = 0, visible_hours: int = 8,
                      min_range: float = 10.0) -> Image.Image:
     """Render bar chart as an image.
 
     Args:
-        label: Label to draw in top left corner (e.g., "TEMPERATURE")
         min_range: Minimum range for scaling (prevents over-exaggeration of small differences)
     """
     img = Image.new('1', (width, height), cfg.WHITE)
@@ -184,7 +182,7 @@ def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
         return img
 
     bar_w = width // visible_hours
-    bar_area_h = height - 8  # Only time at bottom (8)
+    bar_area_h = height - 12  # Only time at bottom (8)
     bar_area_y = 0  # Bar area starts from top
 
     all_values = [value_fn(h) for h in hourly]
@@ -209,7 +207,8 @@ def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
 
     val_range = max_val - min_val if max_val != min_val else 1
 
-    # Draw all bars first
+    # First pass: draw all bars
+    bar_positions = []
     for i, (h, val) in enumerate(zip(visible, values)):
         bx = i * bar_w
         center = bx + bar_w // 2
@@ -231,28 +230,30 @@ def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
         # Time at bottom - use full format (12:00)
         hour_text = h.hour
         hour_w = cfg.FONT_MAIN.getbbox(hour_text)[2]
-        draw.text((center - hour_w // 2, height - 8), hour_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+        draw.text((center - hour_w // 2, height - 10), hour_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
-    # Draw label in top left corner with partial inversion
-    if label:
-        label_text = label.upper()
-        text_bbox = cfg.FONT_MAIN.getbbox(label_text)
+        bar_positions.append((bx, bar_y, bar_x1, bar_x2, center, val))
+
+    # Second pass: draw value text on top of bars with partial inversion
+    for bx, bar_y, bar_x1, bar_x2, center, val in bar_positions:
+        val_text = format_fn(val)
+        text_bbox = cfg.FONT_MAIN.getbbox(val_text)
         text_w = text_bbox[2]
         text_h = text_bbox[3]
-        text_x = 2
+        text_x = center - text_w // 2
         text_y = 0
 
         # Create text image
         text_img = Image.new('1', (text_w, text_h), cfg.WHITE)
         text_draw = ImageDraw.Draw(text_img)
-        text_draw.text((0, 0), label_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+        text_draw.text((0, 0), val_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
         # Draw each pixel, inverting where it overlaps with black (bar)
         for py in range(text_h):
             for px in range(text_w):
                 img_x = text_x + px
                 img_y = text_y + py
-                if img_x < width and img_y < height:
+                if 0 <= img_x < width and 0 <= img_y < height:
                     text_pixel = text_img.getpixel((px, py))
                     bg_pixel = img.getpixel((img_x, img_y))
                     if text_pixel == 0:  # Text is black
@@ -365,31 +366,33 @@ class WeatherViewRenderer:
         # Get hourly data for selected day
         hourly = self._get_hourly(weather.hourly, day_offset)
 
-        # Temperature chart (label drawn on chart)
+        # Temperature section
+        items.append(Item(text=t('weather.temperature'), heading=True,
+                         id={'section': SECTION_TEMPERATURE}))
+
         temp_chart = render_bar_chart(
             hourly, content_w, self.CHART_H,
             value_fn=lambda h: h.temperature,
             format_fn=lambda v: f"{int(v)}",
-            label=t('weather.temperature'),
             scroll_offset=chart_scroll,
             min_range=10.0  # Minimum 10 degree range
         )
-        temp_item = Item(image=temp_chart, show_image=True, selectable=True,
-                        id={'section': SECTION_TEMPERATURE})
+        temp_item = Item(image=temp_chart, show_image=True, selectable=False)
         temp_item.set_height(self.CHART_H)
         items.append(temp_item)
 
-        # Precipitation chart (label drawn on chart)
+        # Precipitation section
+        items.append(Item(text=t('weather.precipitation'), heading=True,
+                         id={'section': SECTION_PRECIPITATION}))
+
         precip_chart = render_bar_chart(
             hourly, content_w, self.CHART_H,
             value_fn=lambda h: h.precipitation_probability,
             format_fn=lambda v: f"{int(v)}",
-            label=t('weather.precipitation'),
             is_percentage=True,
             scroll_offset=chart_scroll
         )
-        precip_item = Item(image=precip_chart, show_image=True, selectable=True,
-                          id={'section': SECTION_PRECIPITATION})
+        precip_item = Item(image=precip_chart, show_image=True, selectable=False)
         precip_item.set_height(self.CHART_H)
         items.append(precip_item)
 
@@ -408,8 +411,8 @@ class WeatherViewRenderer:
         row_map = {
             SECTION_DAY: 0,
             SECTION_TEMPERATURE: 1,
-            SECTION_PRECIPITATION: 2,
-            SECTION_WEEKLY: 3,
+            SECTION_PRECIPITATION: 3,
+            SECTION_WEEKLY: 5,
         }
         menu.cursor.row = row_map.get(selected_section, 0)
         menu._ensure_visible()
@@ -418,7 +421,12 @@ class WeatherViewRenderer:
         return self.canvas
 
     def _get_hourly(self, hourly: List[HourlyForecast], day_offset: int) -> List[HourlyForecast]:
-        """Get hourly data for selected day."""
+        """Get hourly data for selected day.
+
+        Returns up to 24 hours starting from:
+        - Today: current hour
+        - Tomorrow/later: midnight (0:00) of that day
+        """
         if not hourly:
             return []
 
@@ -428,7 +436,7 @@ class WeatherViewRenderer:
             # Today: start from current hour
             start_idx = now.hour
         else:
-            # Future days: start from beginning of that day
+            # Future days: start from midnight of that day
             # Day 1 = tomorrow = hours 24-47
             # Day 2 = day after = hours 48-71
             start_idx = day_offset * 24
@@ -437,7 +445,8 @@ class WeatherViewRenderer:
         if start_idx >= len(hourly):
             return []
 
-        end_idx = min(start_idx + self.TOTAL_HOURS, len(hourly))
+        # Return up to 24 hours
+        end_idx = min(start_idx + 24, len(hourly))
         return hourly[start_idx:end_idx]
 
     def render_location_setup(self, results: List[dict], selected_idx: int,

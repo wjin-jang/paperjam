@@ -95,7 +95,8 @@ class WeatherApp(AppBase):
             # Change day up
             if self.day_offset > 0:
                 self.day_offset -= 1
-                self.chart_scroll = 0
+                # Today starts at current hour (scroll 0), future days start at 6:00
+                self.chart_scroll = 0 if self.day_offset == 0 else 6
         else:
             # Move to previous section
             section_order = [SECTION_DAY, SECTION_TEMPERATURE, SECTION_PRECIPITATION, SECTION_WEEKLY]
@@ -109,7 +110,8 @@ class WeatherApp(AppBase):
             # Change day down
             if self.day_offset < self.MAX_DAY_OFFSET:
                 self.day_offset += 1
-                self.chart_scroll = 0
+                # Future days start at 6:00, can scroll back to 0:00
+                self.chart_scroll = 6
         else:
             # Move to next section
             section_order = [SECTION_DAY, SECTION_TEMPERATURE, SECTION_PRECIPITATION, SECTION_WEEKLY]
