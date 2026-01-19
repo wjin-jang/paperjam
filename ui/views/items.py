@@ -296,7 +296,7 @@ def calc_menu_column_widths(items, total_width):
         return []
 
     # Build widths using max for each column, with minimum default
-    default_col_width = 50
+    default_col_width = 32
     right_widths = []
     for i in range(max_cols):
         width = max(default_col_width, col_max_widths.get(i, default_col_width))
