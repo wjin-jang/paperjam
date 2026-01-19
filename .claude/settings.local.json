@@ -15,7 +15,8 @@
       "Bash(cd:*)",
       "Bash(git commit:*)",
       "Bash(python -m py_compile:*)",
-      "Bash(python generate_icons.py:*)"
+      "Bash(python generate_icons.py:*)",
+      "Bash(git push)"
     ]
   }
 }

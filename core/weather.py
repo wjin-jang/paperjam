@@ -393,11 +393,11 @@ class WeatherManager:
                 precipitation_probability=current_precip
             )
 
-            # Hourly forecasts (next 24 hours)
-            hourly_times = hourly_data.get('time', [])[:24]
-            hourly_temps = hourly_data.get('temperature_2m', [])[:24]
-            hourly_precip = hourly_data.get('precipitation_probability', [])[:24]
-            hourly_codes = hourly_data.get('weather_code', [])[:24]
+            # Hourly forecasts (next 72 hours / 3 days)
+            hourly_times = hourly_data.get('time', [])[:72]
+            hourly_temps = hourly_data.get('temperature_2m', [])[:72]
+            hourly_precip = hourly_data.get('precipitation_probability', [])[:72]
+            hourly_codes = hourly_data.get('weather_code', [])[:72]
 
             for i, t in enumerate(hourly_times):
                 weather.hourly.append(HourlyForecast(
