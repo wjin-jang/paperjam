@@ -308,9 +308,9 @@ class Item:
             self._render_volume(draw, x, y, w, h)
             return
 
-        # Text input with underline cursor
+        # Text input with underline cursor (always render as selected/inverted for visibility)
         if self.text_input is not None:
-            self.text_input.render(draw, x, y, w, h, selected=selected,
+            self.text_input.render(draw, x, y, w, h, selected=True,
                                    font=self.font, padding=self.padding,
                                    prefix=self.text)
             return

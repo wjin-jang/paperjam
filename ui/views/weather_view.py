@@ -115,10 +115,10 @@ def render_current_section(weather: WeatherData, width: int, height: int,
         img.paste(icon, (2, 2))
 
     temp_text = f"{int(temp)}°"
-    draw.text((40, 4), temp_text, font=cfg.FONT_HEADER, fill=cfg.BLACK)
+    draw.text((32, 4), temp_text, font=cfg.FONT_HEADER, fill=cfg.BLACK)
 
     cond_text = SHORT_CONDITIONS.get(condition_name, '???').upper()
-    draw.text((40, 16), cond_text, font=cfg.FONT_HEADER, fill=cfg.BLACK)
+    draw.text((32, 16), cond_text, font=cfg.FONT_HEADER, fill=cfg.BLACK)
 
     # Vertical divider
     draw.line((col_w, 0, col_w, height - 1), fill=cfg.BLACK)

@@ -629,7 +629,9 @@ class SettingsApp(AppBase):
             return frame
 
         elif self.view == 'SUBMENU':
-            frame, scroll = self.renderer.render_menu(self.current_category, **self.submenu_controller.get_render_args())
+            cat = self.categories.get(self.current_category)
+            title = cat.name if cat else self.current_category
+            frame, scroll = self.renderer.render_menu(title, **self.submenu_controller.get_render_args())
             self.submenu_controller.scroll_offset = scroll
             return frame
 
