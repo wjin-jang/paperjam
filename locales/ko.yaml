@@ -8,6 +8,7 @@ menu:
   music: "음악"
   weather: "날씨"
   settings: "설정"
+  power: "전원"
   reboot: "재부팅"
   shutdown: "시스템 종료"
 

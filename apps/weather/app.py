@@ -64,7 +64,8 @@ class WeatherApp(AppBase):
             self.search_results = []
         else:
             self.view = 'MAIN'
-            if self.weather.needs_update():
+            # Always attempt refresh when app opens
+            if not self.weather.is_updating:
                 self.weather.update_async()
 
     def get_callbacks(self) -> Dict[str, Callable]:

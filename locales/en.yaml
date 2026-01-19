@@ -8,6 +8,7 @@ menu:
   music: "Music"
   weather: "Weather"
   settings: "Settings"
+  power: "Power"
   reboot: "Reboot"
   shutdown: "Shut Down"
 

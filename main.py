@@ -48,12 +48,11 @@ class MainApp:
 
         # UI State
         self.current_app = None
-        self.view = 'HOME' # HOME, APP, CONFIRM
+        self.view = 'HOME' # HOME, APP, POWER
         
         # Menu Controllers
         self.home_menu = MenuController([])
-        self.confirm_menu = MenuController([])
-        self.confirm_target = None
+        self.power_menu = MenuController([])
         
         # Display State
         self.first_render = True
@@ -104,9 +103,8 @@ class MainApp:
         for app_id, name in self.registry.get_app_names():
             items.append(Item(text=name, id=app_id))
 
-        # Add system actions
-        items.append(Item(text=t('menu.reboot'), id='REBOOT'))
-        items.append(Item(text=t('menu.shutdown'), id='SHUTDOWN'))
+        # Add power option
+        items.append(Item(text=t('menu.power'), id='POWER'))
 
         self.home_menu.set_items(items, reset_index=False)
 
@@ -209,8 +207,8 @@ class MainApp:
                     self.inputs.set_callbacks(popup_callbacks)
                 elif self.current_app:
                     self.inputs.set_callbacks(self.current_app.get_callbacks())
-                elif self.view == 'CONFIRM':
-                    self.inputs.set_callbacks(self._get_confirm_callbacks())
+                elif self.view == 'POWER':
+                    self.inputs.set_callbacks(self._get_power_callbacks())
                 else:
                     self.inputs.set_callbacks(self._get_home_callbacks())
 
@@ -246,8 +244,8 @@ class MainApp:
                             **self.home_menu.get_render_args()
                         )
                         self.home_menu.scroll_offset = scroll
-                    elif self.view == 'CONFIRM':
-                        frame = self._render_confirm()
+                    elif self.view == 'POWER':
+                        frame = self._render_power_menu()
 
                 if frame:
                     # Render popups on top of frame
@@ -352,61 +350,52 @@ class MainApp:
     def _handle_home_selection(self):
         item = self.home_menu.get_selected_item()
         if not item: return
-        
+
         item_id = item.id
-        
-        if item_id == "REBOOT":
-            self._start_confirm("REBOOT")
-        elif item_id == "SHUTDOWN":
-            self._start_confirm("SHUTDOWN")
+
+        if item_id == "POWER":
+            self._show_power_menu()
         else:
             self.launch_app(item_id)
 
-    # --- Confirmation Dialog ---
-    def _start_confirm(self, target):
-        self.view = 'CONFIRM'
-        self.confirm_target = target
-
-        # Build confirm menu
+    # --- Power Menu ---
+    def _show_power_menu(self):
+        self.view = 'POWER'
         items = [
-            Item(text=t('general.no'), id=False),
-            Item(text=t('general.yes'), id=True)
+            Item(text=t('menu.reboot'), id='REBOOT'),
+            Item(text=t('menu.shutdown'), id='SHUTDOWN')
         ]
-        self.confirm_menu.set_items(items)
-        self.inputs.set_callbacks(self._get_confirm_callbacks())
+        self.power_menu.set_items(items)
+        self.inputs.set_callbacks(self._get_power_callbacks())
 
-    def _get_confirm_callbacks(self):
+    def _get_power_callbacks(self):
         return {
-            'up': lambda: self.confirm_menu.move_selection(-1),
-            'down': lambda: self.confirm_menu.move_selection(1),
-            'enter': self._handle_confirm,
-            'back': self._cancel_confirm,
+            'up': lambda: self.power_menu.move_selection(-1),
+            'down': lambda: self.power_menu.move_selection(1),
+            'enter': self._handle_power_selection,
+            'back': self._close_power_menu,
             'vol_up': self._vol_up,
             'vol_down': self._vol_down
         }
 
-    def _render_confirm(self):
-        target_display = t('menu.shutdown') if self.confirm_target == "SHUTDOWN" else t('menu.reboot')
-        title = t('system_messages.confirm', target=target_display)
-        
+    def _render_power_menu(self):
         frame, scroll = self.renderer.render_menu(
-            title,
-            **self.confirm_menu.get_render_args()
+            t('menu.power'),
+            **self.power_menu.get_render_args()
         )
-        self.confirm_menu.scroll_offset = scroll
+        self.power_menu.scroll_offset = scroll
         return frame
 
-    def _handle_confirm(self):
-        item = self.confirm_menu.get_selected_item()
-        if item and item.id is True:
-            if self.confirm_target == "REBOOT":
-                self._perform_system_action(t('system_messages.rebooting'), self.sys.reboot)
-            elif self.confirm_target == "SHUTDOWN":
-                self._perform_shutdown()
-        else:
-            self._cancel_confirm()
+    def _handle_power_selection(self):
+        item = self.power_menu.get_selected_item()
+        if not item:
+            return
+        if item.id == 'REBOOT':
+            self._perform_system_action(t('system_messages.rebooting'), self.sys.reboot)
+        elif item.id == 'SHUTDOWN':
+            self._perform_shutdown()
 
-    def _cancel_confirm(self):
+    def _close_power_menu(self):
         self.view = 'HOME'
         self.inputs.set_callbacks(self._get_home_callbacks())
 
