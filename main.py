@@ -14,6 +14,7 @@ import time
 from apps.music import MusicPlayerApp
 from apps.settings import SettingsApp
 from apps.welcome import WelcomeApp
+from apps.weather import WeatherApp
 
 logger = setup_logger()
 
@@ -32,14 +33,17 @@ class MainApp:
         self.music_app = MusicPlayerApp(self.audio, self.inputs)
         # Give settings app access to library
         self.settings_app = SettingsApp(self.music_app.lib, self.audio, self.inputs)
-        
+        self.weather_app = WeatherApp()
+
         # Link settings to music app (for endless playback, etc)
         self.music_app.set_settings(self.settings_app.settings)
-        
+
         # Register Apps
         self.music_app.name = t('menu.music')
+        self.weather_app.name = t('menu.weather')
         self.settings_app.name = t('menu.settings')
         self.registry.register("music", self.music_app)
+        self.registry.register("weather", self.weather_app)
         self.registry.register("settings", self.settings_app)
 
         # UI State
