@@ -164,7 +164,60 @@ ROW_HEIGHT: int = 12 # Height of each menu row in pixels
 WHITE: int = 255
 BLACK: int = 0
 
-# --- UI Constants ---
+# --- UI Layout Constants ---
+# Standard spacing and margins (in pixels)
+UI_MARGIN: int = 8                # Standard margin/padding around elements
+UI_MARGIN_SMALL: int = 4          # Small margin for tight layouts
+BORDER_WIDTH: int = 1             # Panel border thickness
+
+# Scrollbar dimensions
+SCROLLBAR_WIDTH: int = 8          # Width of scrollbar track
+SCROLLBAR_MIN_HANDLE: int = 6     # Minimum scrollbar handle height
+SCROLLBAR_MIN_PANEL_WIDTH: int = 20  # Minimum panel width to show scrollbar
+
+# Album art panel (left side of music view)
+# Size = COVER_SIZE_SMALL[0] + BORDER_WIDTH = 83 + 1 = 84
+ART_PANEL_SIZE: int = 84
+ART_PANEL_X: int = UI_MARGIN      # 8px from left edge
+ART_PANEL_Y: int = UI_MARGIN      # 8px from top
+
+# Status bar (below album art)
+# Y position = ART_PANEL_Y + ART_PANEL_SIZE + UI_MARGIN = 8 + 84 + 8 = 100
+STATUS_BAR_Y: int = ART_PANEL_Y + ART_PANEL_SIZE + UI_MARGIN
+STATUS_BAR_WIDTH: int = ART_PANEL_SIZE
+STATUS_BAR_HEIGHT: int = ROW_HEIGHT
+
+# Screensaver track info panel
+# X offset reserves space for track info panel (width 96 + margins)
+TRACK_INFO_PANEL_WIDTH: int = 96
+SCREENSAVER_PANEL_OFFSET: int = TRACK_INFO_PANEL_WIDTH + ROW_HEIGHT  # ~108
+
+# Popup/overlay panel widths
+MENU_PANEL_WIDTH: int = 160       # Standard menu panel width
+CONTEXT_MENU_WIDTH: int = 120     # Context menu overlay width
+CONTEXT_MENU_MAX_HEIGHT: int = 96 # Max height for context menu
+MESSAGE_POPUP_WIDTH: int = 200    # Message popup width
+LOADING_OVERLAY_WIDTH: int = 100  # Loading message width
+IDLE_PANEL_WIDTH: int = 100       # Screensaver idle text panel
+WELCOME_PANEL_WIDTH: int = 130    # Welcome dialog panel
+POWER_OFF_TEXT_WIDTH: int = 48    # Shutdown text panel
+
+# Confirm dialog dimensions
+CONFIRM_POPUP_WIDTH: int = 160
+CONFIRM_POPUP_HEIGHT: int = 80
+
+# Loading popup dimensions
+LOADING_POPUP_WIDTH: int = 140
+LOADING_POPUP_HEIGHT: int = 50
+
+# Popup timeouts (in seconds)
+POPUP_DEFAULT_TIMEOUT: float = 2.0
+VOLUME_POPUP_TIMEOUT: float = 1.5
+
+# Battery indicator
+BATTERY_ICON_STEPS: int = 8       # Number of battery level icons
+
+# --- UI Behavior Constants ---
 CONTROLS_BUTTON_COUNT: int = 4    # Buttons in controls bar (back, shuffle, loop, action)
 ALPHABETICAL_HEADING_THRESHOLD: int = 24  # Min items before showing A-Z section headings
 QUEUE_VIEW_MAX_ITEMS: int = 20    # Max items visible in queue view

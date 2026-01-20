@@ -23,9 +23,9 @@ class ScreensaverRenderer:
         # If no image, show simple IDLE text
         if not state.screensaver_image:
             panel = Panel(
-                (cfg.SCREEN_WIDTH - 100) // 2,
+                (cfg.SCREEN_WIDTH - cfg.IDLE_PANEL_WIDTH) // 2,
                 (cfg.SCREEN_HEIGHT - cfg.ROW_HEIGHT) // 2,
-                100, cfg.ROW_HEIGHT
+                cfg.IDLE_PANEL_WIDTH, cfg.ROW_HEIGHT
             )
             menu = panel.create_menu()
             menu.items = [Item(text=t('player.status.idle'), selectable=False)]
@@ -36,11 +36,12 @@ class ScreensaverRenderer:
         img = state.screensaver_image
         img_w, img_h = img.size
 
-        # Calculate panel size to fit image
-        panel_w = img_w + 1
-        panel_h = img_h + 1
+        # Calculate panel size to fit image (add border)
+        panel_w = img_w + cfg.BORDER_WIDTH
+        panel_h = img_h + cfg.BORDER_WIDTH
 
-        x = cfg.SCREEN_WIDTH - panel_w - 108
+        # Position panel leaving space for track info on right
+        x = cfg.SCREEN_WIDTH - panel_w - cfg.SCREENSAVER_PANEL_OFFSET
         y = (cfg.SCREEN_HEIGHT - panel_h) // 2
 
         # Create panel
@@ -71,10 +72,10 @@ class ScreensaverRenderer:
         album = state.playing_album or ""
 
         # Panel dimensions
-        info_w = 96
+        info_w = cfg.TRACK_INFO_PANEL_WIDTH
         info_h = cfg.ROW_HEIGHT * 3
-        info_x = cfg.SCREEN_WIDTH - info_w - 4
-        info_y = cfg.SCREEN_HEIGHT - info_h - 4
+        info_x = cfg.SCREEN_WIDTH - info_w - cfg.UI_MARGIN_SMALL
+        info_y = cfg.SCREEN_HEIGHT - info_h - cfg.UI_MARGIN_SMALL
 
         # Create panel
         info_panel = Panel(info_x, info_y, info_w, info_h)
@@ -95,18 +96,18 @@ class ScreensaverRenderer:
 
         # Draw power off text
         text = t('general.power_off')
-        w, h = 48, cfg.ROW_HEIGHT
-        x = (cfg.SCREEN_WIDTH - w) - 4
-        
+        w, h = cfg.POWER_OFF_TEXT_WIDTH, cfg.ROW_HEIGHT
+        x = cfg.SCREEN_WIDTH - w - cfg.UI_MARGIN_SMALL
+
         # If image provided, put text at bottom, image above
         if image:
-            y_text = cfg.SCREEN_HEIGHT - h - 4
+            y_text = cfg.SCREEN_HEIGHT - h - cfg.UI_MARGIN_SMALL
             # Image panel
             img_w, img_h = image.size
-            img_x = (cfg.SCREEN_WIDTH - img_w - 2) // 2
-            img_y = (cfg.SCREEN_HEIGHT - img_h - 2) // 2
-            
-            panel_img = Panel(img_x, img_y, img_w + 1, img_h + 1)
+            img_x = (cfg.SCREEN_WIDTH - img_w - cfg.BORDER_WIDTH * 2) // 2
+            img_y = (cfg.SCREEN_HEIGHT - img_h - cfg.BORDER_WIDTH * 2) // 2
+
+            panel_img = Panel(img_x, img_y, img_w + cfg.BORDER_WIDTH, img_h + cfg.BORDER_WIDTH)
             menu_img = panel_img.create_menu()
             art_item = Item(show_image=True, image=image)
             art_item.set_height(img_h)
@@ -160,7 +161,7 @@ class ScreensaverRenderer:
                     break
 
         # 2. Draw small panel with header
-        panel_w = 130
+        panel_w = cfg.WELCOME_PANEL_WIDTH
         panel_h = cfg.ROW_HEIGHT * 2  # Header + one item row
         x = (cfg.SCREEN_WIDTH - panel_w) // 2
         y = (cfg.SCREEN_HEIGHT - panel_h) // 2

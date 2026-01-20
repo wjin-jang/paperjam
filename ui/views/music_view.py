@@ -177,25 +177,22 @@ class MusicViewRenderer:
         self.clear()
 
         # === Album Art Panel ===
-        art_size = 84
-        art_x, art_y = 8, 8
-        art_panel = Panel(art_x, art_y, art_size, art_size)
+        art_panel = Panel(cfg.ART_PANEL_X, cfg.ART_PANEL_Y,
+                         cfg.ART_PANEL_SIZE, cfg.ART_PANEL_SIZE)
         art_menu = art_panel.create_menu()
 
         # Get appropriate cover art
         art = state.playing_cover_s if state.playing_path else state.browsing_cover_s
         # Create image item
         art_item = Item(show_image=True, image=art, placeholder=t('player.browse.no_image'))
-        art_item.set_height(art_size)  # Account for border
+        art_item.set_height(cfg.ART_PANEL_SIZE)  # Account for border
         art_menu.items = [art_item]
 
         art_panel.render(self.canvas)
 
         # === Status Bar Panel ===
-        status_x, status_y = 8, 100
-        status_w, status_h = art_size, cfg.ROW_HEIGHT
-
-        status_panel = Panel(status_x, status_y, status_w, status_h)
+        status_panel = Panel(cfg.ART_PANEL_X, cfg.STATUS_BAR_Y,
+                            cfg.STATUS_BAR_WIDTH, cfg.STATUS_BAR_HEIGHT)
         status_menu = status_panel.create_menu()
 
         # Get status key and look up icon from STATUS_ICONS
@@ -261,8 +258,8 @@ class MusicViewRenderer:
         Args:
             state: Player state with context_options and context_index
         """
-        w = 120
-        max_h = 96
+        w = cfg.CONTEXT_MENU_WIDTH
+        max_h = cfg.CONTEXT_MENU_MAX_HEIGHT
         header_h = cfg.ROW_HEIGHT
 
         num_opts = len(state.context_options)
@@ -288,7 +285,7 @@ class MusicViewRenderer:
         Args:
             message: Loading message to display
         """
-        w = 100
+        w = cfg.LOADING_OVERLAY_WIDTH
         h = cfg.ROW_HEIGHT
 
         x = (cfg.SCREEN_WIDTH - w) // 2

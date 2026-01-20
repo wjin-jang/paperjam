@@ -26,7 +26,7 @@ class OverlayRenderer:
 
         if icons:
             draw = ImageDraw.Draw(img)
-            draw.text((8, 0), icons, font=cfg.FONT_ICONS, fill=cfg.BLACK)
+            draw.text((cfg.UI_MARGIN, 0), icons, font=cfg.FONT_ICONS, fill=cfg.BLACK)
 
         return img
 
@@ -38,12 +38,12 @@ class OverlayRenderer:
 
         if cfg.FONT_ICONS:
             adjusted_pct = pct - cfg.BATTERY_SHUTDOWN_THRESHOLD
-            steps = ((100-cfg.BATTERY_SHUTDOWN_THRESHOLD)/8) # 8 battery icons
-            
-            icon_num = min(8, max(0, round(adjusted_pct / steps)))
-            if icon_num == 0: 
+            steps = (100 - cfg.BATTERY_SHUTDOWN_THRESHOLD) / cfg.BATTERY_ICON_STEPS
+
+            icon_num = min(cfg.BATTERY_ICON_STEPS, max(0, round(adjusted_pct / steps)))
+            if icon_num == 0:
                 icon_num = 1  # Avoid empty unless critical
-            
+
             icon = str(icon_num)
             if self.battery.charging:
                 icon = "C" + icon
@@ -51,16 +51,16 @@ class OverlayRenderer:
             draw = ImageDraw.Draw(img)
             bbox = draw.textbbox((0, 0), icon, font=cfg.FONT_ICONS)
             text_w = bbox[2] - bbox[0]
-            x = cfg.SCREEN_WIDTH - text_w - 8
-            
+            x = cfg.SCREEN_WIDTH - text_w - cfg.UI_MARGIN
+
             draw.text((x, 0), icon, font=cfg.FONT_ICONS, fill=cfg.BLACK)
         else:
             text = f"{int(pct)}%"
             draw = ImageDraw.Draw(img)
             bbox = draw.textbbox((0, 0), text, font=cfg.FONT_MAIN)
             text_w = bbox[2] - bbox[0]
-            x = cfg.SCREEN_WIDTH - text_w - 4
-            
+            x = cfg.SCREEN_WIDTH - text_w - cfg.UI_MARGIN_SMALL
+
             draw.text((x, 0), text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
         return img

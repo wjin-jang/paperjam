@@ -12,7 +12,7 @@ class PopupPanel(Panel):
     """
     Specialized panel for popups.
     """
-    def __init__(self, x, y, w, h, title=None, dismiss_mode='INPUT', timeout=2.0):
+    def __init__(self, x, y, w, h, title=None, dismiss_mode='INPUT', timeout=cfg.POPUP_DEFAULT_TIMEOUT):
         super().__init__(x, y, w, h, header=title)
         self.dismiss_mode = dismiss_mode
         self.timeout = timeout
@@ -139,15 +139,15 @@ class PopupManager:
 
     # --- Factory Methods ---
 
-    def show_message(self, title, text, timeout=2.0):
+    def show_message(self, title, text, timeout=cfg.POPUP_DEFAULT_TIMEOUT):
         """Show a temporary message popup."""
-        w = 200
-        # Estimate height
-        lines = len(text.split('\n')) # Simple estimation
+        w = cfg.MESSAGE_POPUP_WIDTH
+        # Estimate height based on line count
+        lines = len(text.split('\n'))
         h = (lines * cfg.ROW_HEIGHT) + cfg.ROW_HEIGHT
         x = (cfg.SCREEN_WIDTH - w) // 2
         y = (cfg.SCREEN_HEIGHT - h) // 2
-        
+
         panel = PopupPanel(x, y, w, h, title=title, dismiss_mode='TIMER', timeout=timeout)
         menu = panel.create_menu()
         
@@ -162,11 +162,11 @@ class PopupManager:
 
     def show_confirm(self, title, on_yes, on_no=None):
         """Show a confirmation dialog."""
-        w = 160
-        h = 80
+        w = cfg.CONFIRM_POPUP_WIDTH
+        h = cfg.CONFIRM_POPUP_HEIGHT
         x = (cfg.SCREEN_WIDTH - w) // 2
         y = (cfg.SCREEN_HEIGHT - h) // 2
-        
+
         panel = PopupPanel(x, y, w, h, title=title, dismiss_mode='INPUT')
         menu = panel.create_menu()
         
@@ -201,11 +201,11 @@ class PopupManager:
 
     def show_loading(self, title=None):
         """Show a loading spinner/text (programmatic dismiss)."""
-        w = 140
-        h = 50
+        w = cfg.LOADING_POPUP_WIDTH
+        h = cfg.LOADING_POPUP_HEIGHT
         x = (cfg.SCREEN_WIDTH - w) // 2
         y = (cfg.SCREEN_HEIGHT - h) // 2
-        
+
         panel = PopupPanel(x, y, w, h, title=title or t('general.loading'), dismiss_mode='PROGRAMMATIC')
         # No menu items needed really, or just static text
         self.push(panel)
@@ -213,13 +213,13 @@ class PopupManager:
 
     def show_volume(self, title, level):
         """Show volume overlay."""
-        w = 160
+        w = cfg.MENU_PANEL_WIDTH
         h = cfg.ROW_HEIGHT * 2
         x = (cfg.SCREEN_WIDTH - w) // 2
         y = (cfg.SCREEN_HEIGHT - h) // 2
-        
+
         header = f"{title} {int(level)}%"
-        panel = PopupPanel(x, y, w, h, title=header, dismiss_mode='TIMER', timeout=1.5)
+        panel = PopupPanel(x, y, w, h, title=header, dismiss_mode='TIMER', timeout=cfg.VOLUME_POPUP_TIMEOUT)
         menu = panel.create_menu()
         menu.items = [Item(show_volume=True, value=level)]
         

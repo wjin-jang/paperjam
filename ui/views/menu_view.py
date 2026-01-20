@@ -31,7 +31,7 @@ class MenuViewRenderer:
         self.clear()
 
         # Calculate panel dimensions
-        box_w = 160
+        box_w = cfg.MENU_PANEL_WIDTH
 
         # Ensure all items are Item objects first (needed for height calculation)
         new_items = []
@@ -87,7 +87,7 @@ class MenuViewRenderer:
         """
         self.clear()
 
-        panel_w = 160
+        panel_w = cfg.MENU_PANEL_WIDTH
         panel_h = cfg.ROW_HEIGHT * 2
         x = (cfg.SCREEN_WIDTH - panel_w) // 2
         y = (cfg.SCREEN_HEIGHT - panel_h) // 2

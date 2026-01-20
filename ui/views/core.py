@@ -340,7 +340,7 @@ class Panel:
     def content_width(self) -> int:
         """Width of content area (accounting for scrollbar if needed)."""
         if self.menu and self.menu.needs_scrollbar():
-            return self.width - 8  # Scrollbar width
+            return self.width - cfg.SCROLLBAR_WIDTH
         return self.width
 
     def set_menu(self, menu: Menu):
@@ -394,19 +394,19 @@ class Panel:
             self.menu.height = self.content_height
             
             # First pass: check if scrollbar needed with full width
-            self.menu.width = self.width 
-            
-            if self.menu.needs_scrollbar() and self.width > 20:
+            self.menu.width = self.width
+
+            if self.menu.needs_scrollbar() and self.width > cfg.SCROLLBAR_MIN_PANEL_WIDTH:
                 # Needs scrollbar -> reduce width
                 self.menu.width = self.content_width
-                
+
             frame = self.menu.render()
             content_x = self.x
             content_y = self.y + self.content_y
             canvas.paste(frame, (content_x, content_y))
 
             # Render scrollbar if needed
-            if self.menu.needs_scrollbar() and self.width > 20:
+            if self.menu.needs_scrollbar() and self.width > cfg.SCROLLBAR_MIN_PANEL_WIDTH:
                 self._render_scrollbar(canvas, draw)
 
     def _render_scrollbar(self, canvas: Image.Image, draw: ImageDraw.Draw):
@@ -414,10 +414,10 @@ class Panel:
         if not self.menu:
             return
 
-        sb_x = self.x + self.width - 8
+        sb_w = cfg.SCROLLBAR_WIDTH
+        sb_x = self.x + self.width - sb_w
         sb_y = self.y + self.content_y
         sb_h = self.content_height
-        sb_w = 8
 
         # Dithered background
         strip = create_dithered_strip(sb_w + 1, sb_h)
@@ -430,7 +430,7 @@ class Panel:
 
         # Handle size proportional to visible area
         visible_ratio = self.content_height / total_h
-        handle_h = max(6, int(sb_h * visible_ratio))
+        handle_h = max(cfg.SCROLLBAR_MIN_HANDLE, int(sb_h * visible_ratio))
 
         # Handle position based on scroll offset (already in pixels)
         max_scroll = max(1, total_h - self.content_height)
