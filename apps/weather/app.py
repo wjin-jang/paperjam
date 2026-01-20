@@ -39,6 +39,7 @@ class WeatherApp(AppBase):
         # Navigation state
         self.selected_section = SECTION_DAY
         self.day_offset = 0
+        self.day_hover = 0  # Hover index within day selector
         self.chart_scroll = 0
         self.menu_scroll = 0
 
@@ -52,6 +53,7 @@ class WeatherApp(AppBase):
         super().on_enter()
         self.selected_section = SECTION_DAY
         self.day_offset = 0
+        self.day_hover = 0
         self.chart_scroll = 0
         self.menu_scroll = 0
 
@@ -88,22 +90,22 @@ class WeatherApp(AppBase):
         }
 
     def _nav_up(self):
-        """Navigate up - change day or move to previous section.
+        """Navigate up - change hover or move to previous section.
 
-        Day selector uses hover+select: up/down changes highlighted day,
+        Day selector uses hover+select: up/down changes hovered day,
         wrapping to THIS WEEK when moving up from first row.
         """
         if self.selected_section == SECTION_DAY:
-            if self.day_offset > 0:
-                # Move to previous day
-                self.day_offset -= 1
-                self.chart_scroll = 0 if self.day_offset == 0 else cfg.WEATHER_FUTURE_DAY_START_HOUR
+            if self.day_hover > 0:
+                # Move hover to previous day
+                self.day_hover -= 1
             else:
                 # At first day row - wrap to THIS WEEK section
                 self.selected_section = SECTION_WEEKLY
         elif self.selected_section == SECTION_TEMPERATURE:
-            # Move back to day selector (preserves current day_offset)
+            # Move back to day selector (preserves current day_offset, sync hover)
             self.selected_section = SECTION_DAY
+            self.day_hover = self.day_offset
         else:
             # Move to previous section
             section_order = [SECTION_DAY, SECTION_TEMPERATURE, SECTION_PRECIPITATION, SECTION_WEEKLY]
@@ -112,24 +114,22 @@ class WeatherApp(AppBase):
                 self.selected_section = section_order[idx - 1]
 
     def _nav_down(self):
-        """Navigate down - change day or move to next section.
+        """Navigate down - change hover or move to next section.
 
-        Day selector uses hover+select: up/down changes highlighted day,
+        Day selector uses hover+select: up/down changes hovered day,
         moving to TEMPERATURE when moving down from last row.
         """
         if self.selected_section == SECTION_DAY:
-            if self.day_offset < self.MAX_DAY_OFFSET:
-                # Move to next day
-                self.day_offset += 1
-                self.chart_scroll = cfg.WEATHER_FUTURE_DAY_START_HOUR
+            if self.day_hover < self.MAX_DAY_OFFSET:
+                # Move hover to next day
+                self.day_hover += 1
             else:
                 # At last day row - move to TEMPERATURE section
                 self.selected_section = SECTION_TEMPERATURE
         elif self.selected_section == SECTION_WEEKLY:
-            # Wrap from THIS WEEK back to day selector at first row
+            # Wrap from THIS WEEK back to day selector (sync hover to selected)
             self.selected_section = SECTION_DAY
-            self.day_offset = 0
-            self.chart_scroll = 0
+            self.day_hover = self.day_offset
         else:
             # Move to next section
             section_order = [SECTION_DAY, SECTION_TEMPERATURE, SECTION_PRECIPITATION, SECTION_WEEKLY]
@@ -156,9 +156,11 @@ class WeatherApp(AppBase):
                 self.chart_scroll += 1
 
     def _nav_action(self):
-        """Action on current selection."""
-        # Day selector uses hover+select - no action needed on enter
-        pass
+        """Action on current selection - select the hovered day."""
+        if self.selected_section == SECTION_DAY:
+            # Select the hovered day
+            self.day_offset = self.day_hover
+            self.chart_scroll = 0 if self.day_offset == 0 else cfg.WEATHER_FUTURE_DAY_START_HOUR
 
     def _open_setup(self):
         self.view = 'SETUP'
@@ -202,6 +204,7 @@ class WeatherApp(AppBase):
             self.search_results = []
             self.selected_section = SECTION_DAY
             self.day_offset = 0
+            self.day_hover = 0
             self.chart_scroll = 0
         else:
             self.search_input.confirm_char()
@@ -251,6 +254,7 @@ class WeatherApp(AppBase):
             title,
             selected_section=self.selected_section,
             day_offset=self.day_offset,
+            day_hover=self.day_hover,
             chart_scroll=self.chart_scroll,
             menu_scroll=self.menu_scroll,
             updating=self.weather.is_updating,

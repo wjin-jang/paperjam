@@ -84,8 +84,15 @@ def load_icon(condition: str, small: bool = False) -> Optional[Image.Image]:
 
 
 def render_current_section(weather: WeatherData, width: int, height: int,
-                           day_offset: int, selected: bool) -> Image.Image:
-    """Render the current conditions section as an image."""
+                           day_offset: int, day_hover: int,
+                           section_focused: bool) -> Image.Image:
+    """Render the current conditions section as an image.
+
+    Args:
+        day_offset: Currently selected day (shown inverted)
+        day_hover: Currently hovered day (shown with inner border when section focused)
+        section_focused: Whether the day selector section has focus
+    """
     img = Image.new('1', (width, height), cfg.WHITE)
     draw = ImageDraw.Draw(img)
 
@@ -154,21 +161,30 @@ def render_current_section(weather: WeatherData, width: int, height: int,
 
     for i, label in enumerate(day_labels):
         row_y = i * cfg.ROW_HEIGHT
-        is_day_selected = (i == day_offset)
-        is_hovered = selected and is_day_selected  # Section focused + this day
+        is_selected = (i == day_offset)
+        is_hovered = section_focused and (i == day_hover)
 
-        # Draw row: inverted when selected, inner border when also hovered
-        if is_day_selected:
+        # Draw row: inverted when selected, inner border when hovered
+        if is_selected:
             # Inverted: black background, white text
             draw.rectangle((day_x, row_y, day_x + day_col_w, row_y + cfg.ROW_HEIGHT),
                           fill=cfg.BLACK, outline=cfg.BLACK)
             if is_hovered:
-                # Add inner border (white) when section is focused
+                # Add inner border (white) when also hovered
                 draw.rectangle((day_x + 1, row_y + 1,
-                               day_x + day_col_w, row_y + cfg.ROW_HEIGHT),
+                               day_x + day_col_w - 1, row_y + cfg.ROW_HEIGHT - 1),
                               fill=cfg.BLACK, outline=cfg.WHITE)
             draw.text((day_x + font_pad[0], row_y + font_pad[1]), label,
                      font=cfg.FONT_MAIN, fill=cfg.WHITE)
+        elif is_hovered:
+            # Hovered but not selected: white background with inner black border
+            draw.rectangle((day_x, row_y, day_x + day_col_w, row_y + cfg.ROW_HEIGHT),
+                          fill=cfg.WHITE, outline=cfg.BLACK)
+            draw.rectangle((day_x + 1, row_y + 1,
+                           day_x + day_col_w - 2, row_y + cfg.ROW_HEIGHT - 2),
+                          fill=cfg.WHITE, outline=cfg.BLACK)
+            draw.text((day_x + font_pad[0], row_y + font_pad[1]), label,
+                     font=cfg.FONT_MAIN, fill=cfg.BLACK)
         else:
             # Normal: white background, black text
             draw.rectangle((day_x, row_y, day_x + day_col_w, row_y + cfg.ROW_HEIGHT),
@@ -345,7 +361,7 @@ class WeatherViewRenderer:
 
     def render(self, weather: Optional[WeatherData], title: str,
                selected_section: int = 0, day_offset: int = 0,
-               chart_scroll: int = 0, menu_scroll: int = 0,
+               day_hover: int = 0, chart_scroll: int = 0, menu_scroll: int = 0,
                updating: bool = False,
                error: Optional[str] = None) -> tuple:
         """Render weather view."""
@@ -380,7 +396,7 @@ class WeatherViewRenderer:
         # Current conditions section (3-column layout)
         current_img = render_current_section(
             weather, content_w, self.CURRENT_H,
-            day_offset, selected=selected_section == SECTION_DAY
+            day_offset, day_hover, section_focused=selected_section == SECTION_DAY
         )
         current_item = Item(image=current_img, show_image=True, selectable=True,
                            id={'section': SECTION_DAY})
