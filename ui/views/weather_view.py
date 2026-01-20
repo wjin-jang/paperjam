@@ -152,14 +152,27 @@ def render_current_section(weather: WeatherData, width: int, height: int,
 
     for i, label in enumerate(day_labels):
         row_y = i * cfg.ROW_HEIGHT
-        is_selected = (i == day_offset)
+        is_day_selected = (i == day_offset)
+        is_hovered = selected and is_day_selected  # Section focused + this day
 
-        # Draw row with border
-        bg = cfg.BLACK if is_selected else cfg.WHITE
-        fg = cfg.WHITE if is_selected else cfg.BLACK
-        draw.rectangle((day_x, row_y, day_x + day_col_w, row_y + cfg.ROW_HEIGHT),
-                      fill=bg, outline=cfg.BLACK)
-        draw.text((day_x + cfg.UI_MARGIN_SMALL + 1, row_y), label, font=cfg.FONT_MAIN, fill=fg)
+        # Draw row: inverted when selected, inner border when also hovered
+        if is_day_selected:
+            # Inverted: black background, white text
+            draw.rectangle((day_x, row_y, day_x + day_col_w, row_y + cfg.ROW_HEIGHT),
+                          fill=cfg.BLACK, outline=cfg.BLACK)
+            if is_hovered:
+                # Add inner border (white) when section is focused
+                draw.rectangle((day_x + 2, row_y + 2,
+                               day_x + day_col_w - 2, row_y + cfg.ROW_HEIGHT - 2),
+                              fill=cfg.BLACK, outline=cfg.WHITE)
+            draw.text((day_x + cfg.UI_MARGIN_SMALL + 1, row_y), label,
+                     font=cfg.FONT_MAIN, fill=cfg.WHITE)
+        else:
+            # Normal: white background, black text
+            draw.rectangle((day_x, row_y, day_x + day_col_w, row_y + cfg.ROW_HEIGHT),
+                          fill=cfg.WHITE, outline=cfg.BLACK)
+            draw.text((day_x + cfg.UI_MARGIN_SMALL + 1, row_y), label,
+                     font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
     return img
 
