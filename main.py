@@ -1,44 +1,107 @@
-from apps.base import AppRegistry
-from core.i18n import t
-from ui.renderer import UIRenderer
-from ui.menu import MenuController
-from ui.views.items import Item
+"""
+PaperJam - E-ink Music Player for Raspberry Pi.
+
+This is the main entry point for the PaperJam application. It initializes all
+subsystems and runs the main event loop.
+
+Architecture:
+    MainApp orchestrates all components:
+    - SystemManager: Hardware control (display, battery, shutdown)
+    - AudioEngine: VLC-based audio playback
+    - InputHandler: GPIO button input processing
+    - UIRenderer: E-paper display rendering
+    - AppRegistry: Pluggable application management
+
+Display Management:
+    The e-paper display requires special handling:
+    - Full refresh: Clears ghosting but causes visible flash
+    - Partial refresh: Fast but accumulates ghosting over time
+    - Solution: Track partial refresh count, force full refresh periodically
+    - Sleep mode: Put display in low-power mode during screensaver
+
+Main Loop:
+    1. Check for pending input (wake display if sleeping)
+    2. Route input to active popup, app, or home menu
+    3. Process input via InputHandler
+    4. Update current app or render home/power menu
+    5. Render popups on top of frame
+    6. Display frame with change detection (skip if unchanged)
+    7. Run background tasks (music playback, data flush)
+
+Usage:
+    python main.py
+
+    Or via systemd service on Raspberry Pi.
+"""
+from __future__ import annotations
+
+import time
+from typing import Any
+
+from PIL import Image, ImageOps
 
 import config as cfg
-from core.audio import AudioEngine
-from core.inputs import InputHandler
-from core.system import SystemManager
-from config import setup_logger
-import time
-
+from apps.base import AppRegistry
 from apps.music import MusicPlayerApp
 from apps.settings import SettingsApp
-from apps.welcome import WelcomeApp
 from apps.weather import WeatherApp
+from apps.welcome import WelcomeApp
+from config import setup_logger
+from core.audio import AudioEngine
+from core.i18n import t
+from core.inputs import InputHandler
+from core.system import SystemManager
+from ui.menu import MenuController
+from ui.renderer import UIRenderer
+from ui.views.items import Item
 
 logger = setup_logger()
 
 class MainApp:
-    def __init__(self):
+    """Main application controller for PaperJam.
+
+    Orchestrates all subsystems, manages the application lifecycle, and runs
+    the main event loop. Handles navigation between apps and system operations.
+
+    Attributes:
+        sys: SystemManager for hardware control.
+        audio: AudioEngine for music playback.
+        inputs: InputHandler for GPIO button processing.
+        renderer: UIRenderer for e-paper display output.
+        registry: AppRegistry for app management.
+        current_app: Currently active app, or None for home screen.
+        view: Current view state ('HOME', 'APP', 'POWER').
+    """
+
+    # --- Display Refresh Configuration ---
+    # E-paper displays accumulate ghosting with partial refreshes.
+    # Force a full refresh after this many partial updates to clear artifacts.
+    MAX_PARTIAL_REFRESHES: int = 120
+
+    # Status icons (WiFi, Bluetooth, audio) don't change often.
+    # Cache them for this many seconds to avoid repeated system calls.
+    STATUS_CACHE_INTERVAL: int = 5
+
+    def __init__(self) -> None:
+        """Initialize all subsystems and apps."""
         logger.info("Initializing PaperJam...")
-        
-        # Core Systems
+
+        # --- Core Systems ---
         self.sys = SystemManager()
         self.audio = AudioEngine()
         self.inputs = InputHandler()
         self.renderer = UIRenderer()
         self.registry = AppRegistry()
 
-        # Apps
+        # --- Applications ---
         self.music_app = MusicPlayerApp(self.audio, self.inputs)
-        # Give settings app access to library
         self.settings_app = SettingsApp(self.music_app.lib, self.audio, self.inputs)
         self.weather_app = WeatherApp()
 
         # Link settings to music app (for endless playback, etc)
         self.music_app.set_settings(self.settings_app.settings)
 
-        # Register Apps
+        # Register apps with the registry
         self._refresh_app_names()
         self.registry.register("music", self.music_app)
         self.registry.register("weather", self.weather_app)
@@ -47,48 +110,51 @@ class MainApp:
         # Connect locale change callback
         self.settings_app.categories['DISPLAY'].set_locale_callback(self._on_locale_change)
 
-        # UI State
-        self.current_app = None
-        self.view = 'HOME' # HOME, APP, POWER
-        
+        # --- UI State ---
+        self.current_app: Any = None  # Active app instance or None
+        self.view: str = 'HOME'  # HOME, APP, POWER
+
         # Menu Controllers
         self.home_menu = MenuController([])
         self.power_menu = MenuController([])
-        
-        # Display State
-        self.first_render = True
-        self._last_frame_bytes = None  # For change detection (stores raw bytes)
-        self._partial_refresh_count = 0  # Track partial refreshes for periodic full refresh
-        self._max_partial_refreshes = 120  # Max partials before forced full refresh
-        self._display_sleeping = False  # Track display sleep state for screensaver
 
-        # Status cache (avoid checking system status every frame)
-        self._status_cache = (None, None, None)  # (audio, wifi, bluetooth)
-        self._status_cache_time = 0
-        self._status_cache_interval = 5  # Seconds between status checks
+        # --- Display State ---
+        self.first_render: bool = True  # Force full refresh on first frame
+        self._last_frame_bytes: bytes | None = None  # For change detection
+        self._partial_refresh_count: int = 0  # Partials since last full refresh
+        self._max_partial_refreshes: int = self.MAX_PARTIAL_REFRESHES
+        self._display_sleeping: bool = False  # True when in low-power mode
 
-        # Setup Global Callbacks
+        # --- Status Icon Cache ---
+        # Avoid checking WiFi/Bluetooth/audio status every frame
+        self._status_cache: tuple[Any, Any, Any] = (None, None, None)
+        self._status_cache_time: float = 0
+        self._status_cache_interval: int = self.STATUS_CACHE_INTERVAL
+
+        # --- Setup Global Callbacks ---
         self.sys.on_shutdown_request = self._handle_shutdown_request
-        self.settings_app.categories['SYSTEM'].set_screen_clear_callback(self._perform_screen_clear_shutdown)
+        self.settings_app.categories['SYSTEM'].set_screen_clear_callback(
+            self._perform_screen_clear_shutdown
+        )
         self.settings_app.categories['SYSTEM'].set_update_callback(self._perform_update)
         self.settings_app.categories['SYSTEM'].set_reset_callback(self._perform_reset)
 
-        # Music App Display Callback
+        # Music app needs display access for screensaver
         self.music_app.set_display_callback(lambda img: self._display(img))
-        
-        # Volume Callbacks (Global)
+
+        # Volume callbacks (global - work from any screen)
         self.music_app.set_volume_callbacks(self._vol_up, self._vol_down)
 
-        # Initial Input Setup
+        # --- Initial Setup ---
         self._refresh_home_menu()
         self.inputs.set_callbacks(self._get_home_callbacks())
 
-        # Welcome App (for first run)
+        # Welcome app for first-run setup
         self.welcome_app = WelcomeApp(self.music_app.lib, self.inputs)
         self.welcome_app.set_shutdown_callback(self._welcome_shutdown)
         self.welcome_app.set_display_callback(lambda img: self._display(img))
 
-        # First Run
+        # --- First Run Handling ---
         if self.music_app.lib.is_first_run():
             self._run_first_startup()
         else:
@@ -97,26 +163,31 @@ class MainApp:
             # Check if version requires library rescan
             self._check_needs_rescan()
 
-    def _refresh_app_names(self):
-        """Refresh app names with current locale."""
+    def _refresh_app_names(self) -> None:
+        """Refresh app display names with current locale translations."""
         self.music_app.name = t('menu.music')
         self.weather_app.name = t('menu.weather')
         self.settings_app.name = t('menu.settings')
 
-    def _on_locale_change(self, new_locale):
-        """Called when locale changes - refresh all localized text."""
+    def _on_locale_change(self, new_locale: str) -> None:
+        """Handle locale change - refresh all localized text.
+
+        Args:
+            new_locale: New locale code (e.g., 'en', 'ko', 'ja').
+        """
         self._refresh_app_names()
         self._refresh_home_menu()
         self.settings_app.on_locale_change()
 
-    def _refresh_home_menu(self):
-        """Rebuild home menu items."""
-        items = []
+    def _refresh_home_menu(self) -> None:
+        """Rebuild home menu items with current locale."""
+        items: list[Item] = []
+
         # Add registered apps
         for app_id, name in self.registry.get_app_names():
             items.append(Item(text=name, id=app_id))
 
-        # Add power option
+        # Add power option at the end
         items.append(Item(text=t('menu.power'), id='POWER'))
 
         self.home_menu.set_items(items, reset_index=False)
@@ -203,18 +274,28 @@ class MainApp:
         else:
             logger.info(f"Auto-update check: {msg}")
 
-    def run(self):
+    def run(self) -> None:
+        """Main event loop.
+
+        Runs until interrupted or an unrecoverable error occurs.
+        Handles input routing, app updates, rendering, and display output.
+        """
         logger.info("Entering main loop")
         try:
             while True:
-                # Wake display if sleeping and there was input
+                # --- Input Handling ---
+                # Wake display from sleep if user pressed a button
                 if self._display_sleeping and self.inputs.has_pending_input():
                     self._wake_display()
 
-                # Check for popup input routing first
+                # Route input to the appropriate handler:
+                # 1. Active popup (e.g., volume overlay) takes priority
+                # 2. Current app if one is running
+                # 3. Power menu if showing
+                # 4. Home menu otherwise
                 popup_callbacks = self.renderer.get_popup_callbacks()
                 if popup_callbacks:
-                    # Merge volume callbacks with popup callbacks
+                    # Volume callbacks always available even during popups
                     popup_callbacks['vol_up'] = self._vol_up
                     popup_callbacks['vol_down'] = self._vol_down
                     self.inputs.set_callbacks(popup_callbacks)
@@ -225,32 +306,37 @@ class MainApp:
                 else:
                     self.inputs.set_callbacks(self._get_home_callbacks())
 
+                # Process pending inputs (returns False on shutdown signal)
                 if not self.inputs.check_inputs():
                     break
 
+                # Check battery level (may trigger shutdown)
                 self.sys.check_battery()
 
-                frame = None
-                force_full = False
+                # --- Frame Rendering ---
+                frame: Image.Image | None = None
+                force_full: bool = False
 
-                # Update Running App
                 if self.current_app:
+                    # Update the active app
                     is_running = False
                     try:
                         is_running = self.current_app.update()
                     except Exception as e:
                         logger.exception(f"App Update Error: {e}")
 
-                    if hasattr(self.current_app, 'state') and getattr(self.current_app.state, 'needs_refresh', False):
-                        force_full = True
-                        self.current_app.state.needs_refresh = False
+                    # Check if app requested a full refresh (e.g., view change)
+                    if hasattr(self.current_app, 'state'):
+                        if getattr(self.current_app.state, 'needs_refresh', False):
+                            force_full = True
+                            self.current_app.state.needs_refresh = False
 
                     if not is_running:
                         self.close_app()
                     else:
                         frame = self.current_app.get_frame()
                 else:
-                    # Home Menu Logic
+                    # Render home or power menu
                     if self.view == 'HOME':
                         frame, scroll = self.renderer.render_menu(
                             t('menu.home'),
@@ -260,27 +346,32 @@ class MainApp:
                     elif self.view == 'POWER':
                         frame = self._render_power_menu()
 
+                # --- Display Output ---
                 if frame:
-                    # Render popups on top of frame
+                    # Render any active popups on top of the frame
                     frame = self.renderer.render_with_popups(frame)
-                    # Force refresh if a popup just expired
+
+                    # Force full refresh if a popup just expired (clears artifacts)
                     if self.renderer.popup_needs_refresh():
                         force_full = True
+
                     self._display(frame, force_full)
 
-                    # Sleep display if screensaver is active (saves power)
+                    # Put display to sleep during screensaver to save power
                     if (self.current_app == self.music_app and
                         self.music_app.state.screensaver_image is not None and
                         not self._display_sleeping):
                         self._sleep_display()
 
-                # Background updates
+                # --- Background Tasks ---
+                # Keep music playing even when in settings
                 if self.current_app != self.music_app:
                     self.music_app.update()
 
-                # Periodic flush of dirty data
+                # Periodically flush favorites to disk (lazy persistence)
                 self.music_app.lib.flush_favs()
 
+                # Target ~20 FPS (50ms per frame)
                 time.sleep(0.05)
 
         except KeyboardInterrupt:
@@ -288,10 +379,16 @@ class MainApp:
         except Exception as e:
             logger.critical(f"Critical Error: {e}", exc_info=True)
         finally:
-            self.music_app.lib.flush_favs()  # Save any pending favorites
+            # Ensure data is saved on exit
+            self.music_app.lib.flush_favs()
             self.sys.sleep_display()
 
-    def launch_app(self, app_id):
+    def launch_app(self, app_id: str) -> None:
+        """Launch an app by its registry ID.
+
+        Args:
+            app_id: App identifier (e.g., 'music', 'settings').
+        """
         app = self.registry.get_app(app_id)
         if app:
             logger.info(f"Launching app: {app_id}")
@@ -301,27 +398,36 @@ class MainApp:
                 app.on_enter()
             if hasattr(app, 'refresh_list'):
                 app.refresh_list()
-            self.first_render = True
+            self.first_render = True  # Force full refresh on app launch
 
-    def close_app(self):
+    def close_app(self) -> None:
+        """Close the current app and return to home screen."""
         if self.current_app:
             if hasattr(self.current_app, 'on_exit'):
                 self.current_app.on_exit()
         self.current_app = None
         self.view = 'HOME'
         self.inputs.set_callbacks(self._get_home_callbacks())
-        self.first_render = True
+        self.first_render = True  # Force full refresh on return to home
 
-    def _wake_display(self):
-        """Wake display from sleep mode."""
+    def _wake_display(self) -> None:
+        """Wake display from low-power sleep mode.
+
+        Called when user input is detected while the display is sleeping
+        (e.g., during screensaver).
+        """
         if self._display_sleeping:
             self.sys.wake_display()
             self._display_sleeping = False
-            self.first_render = True  # Force full refresh on wake
+            self.first_render = True  # Force full refresh to clear any artifacts
             logger.debug("Display awakened from sleep")
 
-    def _sleep_display(self):
-        """Put display into sleep mode."""
+    def _sleep_display(self) -> None:
+        """Put display into low-power sleep mode.
+
+        Called when screensaver activates. Reduces power consumption
+        significantly on the Pi Zero.
+        """
         if not self._display_sleeping:
             self.sys.sleep_display()
             self._display_sleeping = True
@@ -501,11 +607,42 @@ class MainApp:
         time.sleep(1)
         self.sys.reboot()
 
-    # --- Display Wrapper ---
-    def _display(self, img, full_refresh=False, skip_battery=False, skip_status=False):
-        # Apply Overlays
+    # --- Display Output ---
+    def _display(
+        self,
+        img: Image.Image,
+        full_refresh: bool = False,
+        skip_battery: bool = False,
+        skip_status: bool = False
+    ) -> None:
+        """Send a frame to the e-paper display.
+
+        Handles overlay rendering, color inversion, change detection, and
+        the partial/full refresh strategy for optimal e-paper performance.
+
+        Args:
+            img: PIL Image to display (1-bit or grayscale).
+            full_refresh: Force a full refresh (clears ghosting).
+            skip_battery: Don't render battery indicator.
+            skip_status: Don't render status icons (WiFi, Bluetooth, audio).
+
+        Display Refresh Strategy:
+            E-paper displays have two refresh modes:
+            - Full refresh: Complete screen clear + redraw. Slow (~1s) but removes
+              all ghosting artifacts. Causes visible flash.
+            - Partial refresh: Fast (~0.3s) update of changed pixels only. Leaves
+              slight ghosting that accumulates over time.
+
+            We use partial refresh for speed but periodically force a full refresh
+            (every MAX_PARTIAL_REFRESHES frames) to clear accumulated ghosting.
+
+        Change Detection:
+            Compares frame bytes to avoid redundant display updates when nothing
+            changed. This saves power and reduces display wear.
+        """
+        # --- Apply Overlays ---
         if not skip_status:
-            # Use cached status values (refresh every few seconds)
+            # Cache status checks to avoid expensive system calls every frame
             now = time.time()
             if now - self._status_cache_time > self._status_cache_interval:
                 self._status_cache = (
@@ -515,36 +652,41 @@ class MainApp:
                 )
                 self._status_cache_time = now
             img = self.renderer.overlays.draw_status_icons(img, *self._status_cache)
+
         if not skip_battery:
             img = self.renderer.overlays.draw_battery(img)
 
+        # Apply color inversion if enabled in settings
         if self.settings_app.invert_colors:
-            from PIL import ImageOps
             img = ImageOps.invert(img.convert('L')).convert('1')
 
-        # Rotate image once (for 180° mounted display) - do this BEFORE hashing
+        # Rotate for 180° mounted display (do BEFORE change detection)
         img = img.rotate(180)
 
-        # Check if frame changed using image bytes comparison
-        # Store bytes reference to avoid recomputing
+        # --- Change Detection ---
+        # Skip display update if frame hasn't changed (saves power)
         img_bytes = img.tobytes()
         if not full_refresh and not self.first_render and img_bytes == self._last_frame_bytes:
-            return  # No change, skip display update
+            return
         self._last_frame_bytes = img_bytes
 
-        # Check if periodic full refresh is needed (Waveshare e-paper precaution)
+        # --- Determine Refresh Type ---
+        # Force full refresh periodically to clear ghosting artifacts
         needs_periodic_full = self._partial_refresh_count >= self._max_partial_refreshes
 
+        # --- Send to Display ---
         epd = self.sys.get_display()
         if epd:
             try:
                 buffer = epd.getbuffer(img)
                 if self.first_render or full_refresh or needs_periodic_full:
+                    # Full refresh: reinitialize display and clear
                     epd.init()
                     epd.displayPartBaseImage(buffer)
                     self.first_render = False
                     self._partial_refresh_count = 0
                 else:
+                    # Partial refresh: fast update
                     epd.displayPartial(buffer)
                     self._partial_refresh_count += 1
             except Exception as e:

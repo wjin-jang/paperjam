@@ -1,45 +1,80 @@
 """
 Menu item classes for the UI rendering system.
 
-This module provides the building blocks for menu-based UIs.
-All items are now instances of the unified Item class, configured via parameters.
+This module provides the building blocks for menu-based UIs on the e-paper display.
+The main class is `Item`, a unified renderable item that supports:
+
+- Simple text labels with optional icons
+- Multi-column layouts (for controls bars, settings)
+- Multi-line content (for info panels)
+- Text wrapping for long content
+- Volume sliders
+- Text input fields with character cycling
+- Section headings
+
+Item Configuration:
+    Items are configured via constructor parameters rather than subclassing.
+    This allows flexible composition of rendering behaviors.
+
+Rendering Modes:
+    - **Heading**: Inverted background, uppercase text
+    - **Column navigation**: Horizontal button bar with selection highlight
+    - **Info columns**: Key-value display with right-aligned values
+    - **Text input**: Character-by-character entry with underline cursor
+    - **Volume slider**: Horizontal bar with +/- buttons
+    - **Image display**: Dithered image with placeholder text
+
+Example:
+    >>> # Simple menu item
+    >>> item = Item(text="Play All", icon="▶")
+    >>>
+    >>> # Settings item with value column
+    >>> item = Item(columns=["Volume", "50%"], selectable=True)
+    >>>
+    >>> # Section heading
+    >>> item = Item(text="Library", heading=True, selectable=False)
 """
 from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import List, Union, Optional, Any, Callable
-from PIL import Image, ImageDraw, ImageOps
+from typing import Any
+
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 import config as cfg
 from core.i18n import t
 from ui.graphics import draw_text_with_cjk, get_text_width_with_cjk
 
 
-def get_font_padding(font) -> tuple:
-    """Get default padding for a font.
+def get_font_padding(font: ImageFont.FreeTypeFont) -> tuple[int, int]:
+    """Get the default padding for a font.
+
+    Padding values compensate for font metrics that don't render well at
+    small sizes on the e-paper display.
 
     Args:
-        font: The font to get padding for
+        font: The PIL font object.
 
     Returns:
-        (x, y) padding tuple
+        (x, y) padding tuple in pixels.
     """
     return cfg.FONT_PADDING.get(font, (5, 0))
 
 
-def get_cjk_y_offset(font) -> int:
+def get_cjk_y_offset(font: ImageFont.FreeTypeFont) -> int:
     """Get the Y offset for CJK characters relative to the main font.
 
+    CJK fonts often have different baselines than Latin fonts. This offset
+    aligns them properly when rendering mixed-script text.
+
     Args:
-        font: The main font being used
+        font: The main (Latin) font being used.
 
     Returns:
-        Y offset in pixels for CJK characters
+        Y offset in pixels to apply to CJK characters.
     """
     # Determine which CJK font pairs with this font
-    if font == cfg.FONT_HEADER:
-        cjk_font = cfg.FONT_CJK_HEADER
-    else:
-        cjk_font = cfg.FONT_CJK_MAIN
+    cjk_font = cfg.FONT_CJK_HEADER if font == cfg.FONT_HEADER else cfg.FONT_CJK_MAIN
 
     main_pad = get_font_padding(font)
     cjk_pad = get_font_padding(cjk_font)
@@ -48,107 +83,130 @@ def get_cjk_y_offset(font) -> int:
     return cjk_pad[1] - main_pad[1]
 
 
-# Default character sets for text input
-CHARSET_PASSWORD = (
+# --- Character Sets for Text Input ---
+# Password entry: full alphanumeric plus common symbols
+CHARSET_PASSWORD: list[str] = (
     list('abcdefghijklmnopqrstuvwxyz') +
     list('ABCDEFGHIJKLMNOPQRSTUVWXYZ') +
     list('0123456789') +
     list('!@#$%^&*()-_=+[]{}|;:,.<>?/~` ')
 )
 
-CHARSET_LOCATION = list(
+# Location entry: letters, numbers, and common punctuation for place names
+CHARSET_LOCATION: list[str] = list(
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz -'.,0123456789"
 )
 
 
 class TextInput:
-    """
-    Reusable text input component with character-by-character entry.
+    """Reusable text input component with character-by-character entry.
 
-    Uses underline to indicate the current character position.
+    Designed for devices without a keyboard (like the e-paper music player).
+    Users cycle through characters using up/down buttons and confirm each
+    character to build the text. An underline cursor indicates the current
+    character position.
+
+    Attributes:
+        charset: Available characters to cycle through.
+        chars: List of confirmed characters (the entered text).
+        char_idx: Index into charset for the current character selection.
     """
 
-    def __init__(self, charset: List[str] = None, initial_text: str = ""):
-        """
-        Initialize text input.
+    def __init__(self, charset: list[str] | None = None, initial_text: str = "") -> None:
+        """Initialize text input.
 
         Args:
             charset: List of characters to cycle through. Defaults to CHARSET_PASSWORD.
             initial_text: Starting text value.
         """
-        self.charset = charset or CHARSET_PASSWORD
-        self.chars: List[str] = list(initial_text)
+        self.charset: list[str] = charset or CHARSET_PASSWORD
+        self.chars: list[str] = list(initial_text)
         self.char_idx: int = 0
 
-    def reset(self, initial_text: str = ""):
-        """Reset input state."""
+    def reset(self, initial_text: str = "") -> None:
+        """Reset input state to initial text."""
         self.chars = list(initial_text)
         self.char_idx = 0
 
     @property
     def text(self) -> str:
-        """Get the current entered text."""
+        """Get the current entered text (confirmed characters only)."""
         return ''.join(self.chars)
 
     @property
     def current_char(self) -> str:
-        """Get the currently selected character."""
+        """Get the currently selected character (not yet confirmed)."""
         return self.charset[self.char_idx]
 
-    def next_char(self):
-        """Move to next character in the charset."""
+    def next_char(self) -> None:
+        """Move to next character in the charset (wraps around)."""
         self.char_idx = (self.char_idx + 1) % len(self.charset)
 
-    def prev_char(self):
-        """Move to previous character in the charset."""
+    def prev_char(self) -> None:
+        """Move to previous character in the charset (wraps around)."""
         self.char_idx = (self.char_idx - 1) % len(self.charset)
 
-    def confirm_char(self):
-        """Add current character to text."""
+    def confirm_char(self) -> None:
+        """Add current character to text and reset selection to first char."""
         self.chars.append(self.charset[self.char_idx])
         self.char_idx = 0
 
     def delete_char(self) -> bool:
-        """Delete last character. Returns True if a char was deleted."""
+        """Delete last confirmed character.
+
+        Returns:
+            True if a character was deleted, False if text was empty.
+        """
         if self.chars:
             self.chars.pop()
             return True
         return False
 
     def get_display_text(self, show_cursor: bool = True) -> str:
-        """
-        Get text for simple display (without underline rendering).
+        """Get text for simple display (without underline rendering).
 
         Args:
-            show_cursor: If True, append current char. If False, append underscore placeholder.
+            show_cursor: If True, append current char. If False, append underscore.
+
+        Returns:
+            Display string including cursor indicator.
         """
         if show_cursor:
             return self.text + self.current_char
         return self.text + "_"
 
-    def render(self, draw: ImageDraw.Draw, x: int, y: int, w: int, h: int,
-               selected: bool = True, font=None, padding: tuple = None,
-               prefix: str = None):
-        """
-        Render the text input with underline cursor.
+    def render(
+        self,
+        draw: ImageDraw.ImageDraw,
+        x: int,
+        y: int,
+        w: int,
+        h: int,
+        selected: bool = True,
+        font: ImageFont.FreeTypeFont | None = None,
+        padding: tuple[int, int] | None = None,
+        prefix: str | None = None
+    ) -> None:
+        """Render the text input with underline cursor.
 
         Args:
-            draw: PIL ImageDraw object
-            x, y, w, h: Bounding box
-            selected: Whether this input is currently selected (shows cursor)
-            font: Font to use (defaults to cfg.FONT_MAIN)
-            padding: (x, y) custom padding tuple (added to font padding)
-            prefix: Optional prefix text to display before input
+            draw: PIL ImageDraw object to render onto.
+            x, y, w, h: Bounding box for the input field.
+            selected: Whether this input is currently selected (shows cursor).
+            font: Font to use (defaults to cfg.FONT_MAIN).
+            padding: (x, y) custom padding tuple (added to font padding).
+            prefix: Optional prefix text to display before input (e.g., "Name: ").
         """
         font = font or cfg.FONT_MAIN
         cjk_font = cfg.FONT_CJK_HEADER if font == cfg.FONT_HEADER else cfg.FONT_CJK_MAIN
-        # Get font padding, then add custom padding on top
+
+        # Combine font padding with custom padding
         font_pad = get_font_padding(font)
         custom_pad = padding or (0, 0)
         padding_x = font_pad[0] + custom_pad[0]
         padding_y = font_pad[1] + custom_pad[1]
 
-        # Draw background box
+        # Draw background box (inverted when selected)
         bg = cfg.BLACK if selected else cfg.WHITE
         fg = cfg.WHITE if selected else cfg.BLACK
         draw.rectangle((x, y, x + w, y + h), fill=bg, outline=cfg.BLACK)
@@ -168,38 +226,53 @@ class TextInput:
             text_x += get_text_width_with_cjk(entered_text, font, cjk_font)
 
         if selected:
-            # Draw current character with underline
+            # Draw current character with underline cursor
             current = self.current_char
             char_width = get_text_width_with_cjk(current, font, cjk_font)
 
-            # Draw the character
             draw_text_with_cjk(draw, (text_x, text_y), current, font, cjk_font, fill=fg)
 
-            # Draw underline beneath the character
+            # Underline beneath the character indicates cursor position
             underline_y = y + h - 1
             draw.line((text_x, underline_y, text_x + char_width, underline_y), fill=fg)
 
 
 @dataclass
 class Column:
-    """A single column within a multi-column layout."""
-    content: Union[str, Image.Image]  # Text string or PIL Image
-    width: Optional[int] = None  # None = auto-calculate
-    align: str = 'left'  # 'left', 'center', 'right'
-    active: bool = False  # For toggle states (e.g., shuffle on)
+    """A single column within a multi-column layout.
 
+    Used for controls bars and settings items where content is arranged
+    horizontally with individual column selection.
 
-def extract_item_props(item) -> dict:
+    Attributes:
+        content: Text string or PIL Image to display.
+        width: Column width in pixels, or None for auto-calculation.
+        align: Text alignment ('left', 'center', 'right').
+        active: Whether this column is in an active state (e.g., shuffle on).
     """
-    Extract properties from an Item or legacy dict in a unified way.
 
-    This eliminates repeated isinstance checks throughout the codebase.
+    content: str | Image.Image
+    width: int | None = None
+    align: str = 'left'
+    active: bool = False
+
+
+# Type alias for Item properties dict
+ItemProps = dict[str, Any]
+
+
+def extract_item_props(item: "Item | dict[str, Any] | None") -> ItemProps:
+    """Extract properties from an Item or legacy dict in a unified way.
+
+    This helper eliminates repeated isinstance checks throughout the codebase
+    when working with mixed Item/dict item lists.
 
     Args:
-        item: An Item instance or a legacy dict
+        item: An Item instance, a legacy dict, or None.
 
     Returns:
-        Dict with keys: kind, path, mode, heading, column_nav, selectable, text
+        Dict with keys: kind, path, mode, heading, column_nav, selectable, text.
+        All values are None/False/True defaults if the item doesn't provide them.
     """
     if item is None:
         return {
@@ -242,30 +315,75 @@ def extract_item_props(item) -> dict:
 
 
 class Item:
-    """Unified renderable item for menus."""
+    """Unified renderable item for menus and UI panels.
 
-    def __init__(self,
-                 text: str = None,
-                 icon: Union[str, Image.Image] = None,
-                 columns: List[Union[str, Column]] = None,
-                 lines: List = None,
-                 image: Image.Image = None,
-                 placeholder: str = None,
-                 value: int = 0,
-                 # Rendering flags
-                 heading: bool = False,
-                 show_volume: bool = False,
-                 show_image: bool = False,
-                 column_nav: bool = False,
-                 # Behavior
-                 selectable: bool = True,
-                 pinned: bool = False,
-                 wrap_text: bool = False,
-                 font=None,
-                 padding: tuple = None,
-                 id: Any = None,
-                 # Text input support
-                 text_input: 'TextInput' = None):
+    This is the core building block for all menu-based UIs. Items can display
+    various types of content (text, icons, columns, images) and have different
+    behaviors (selectable, heading, text input).
+
+    Content Types:
+        - text: Simple label text
+        - icon: Leading icon (string for text icon, Image for bitmap)
+        - columns: Multi-column layout (list of strings or Column objects)
+        - lines: Multi-line content (list of strings or nested lists)
+        - image: Dithered image to display
+        - text_input: TextInput instance for character entry
+
+    Rendering Modes (mutually exclusive, checked in this order):
+        1. show_volume: Volume slider bar
+        2. text_input: Text input field with cursor
+        3. show_image: Image display with border
+        4. column_nav: Horizontal column navigation (controls bar)
+        5. Info style: Non-selectable text/columns/lines
+        6. Default: Simple text with optional icon, inverted when selected
+    """
+
+    def __init__(
+        self,
+        text: str | None = None,
+        icon: str | Image.Image | None = None,
+        columns: list[str | Column] | None = None,
+        lines: list[str | list[str]] | None = None,
+        image: Image.Image | None = None,
+        placeholder: str | None = None,
+        value: int = 0,
+        # Rendering flags
+        heading: bool = False,
+        show_volume: bool = False,
+        show_image: bool = False,
+        column_nav: bool = False,
+        # Behavior
+        selectable: bool = True,
+        pinned: bool = False,
+        wrap_text: bool = False,
+        font: ImageFont.FreeTypeFont | None = None,
+        padding: tuple[int, int] | None = None,
+        id: Any = None,
+        # Text input support
+        text_input: TextInput | None = None
+    ) -> None:
+        """Initialize a menu item.
+
+        Args:
+            text: Primary label text.
+            icon: Leading icon (string char or PIL Image).
+            columns: Column content for multi-column layouts.
+            lines: Multi-line content.
+            image: Image to display (for show_image mode).
+            placeholder: Text shown when image is None.
+            value: Numeric value (used for volume slider 0-100).
+            heading: Render as section heading (inverted, uppercase).
+            show_volume: Render as volume slider.
+            show_image: Render as image display.
+            column_nav: Enable horizontal column navigation.
+            selectable: Whether this item can be selected.
+            pinned: Keep item visible when scrolling.
+            wrap_text: Enable text wrapping for long content.
+            font: Custom font (defaults to FONT_MAIN).
+            padding: Additional (x, y) padding beyond font default.
+            id: Arbitrary identifier dict (typically has 'kind', 'path', 'mode').
+            text_input: TextInput instance for character entry mode.
+        """
         # Content
         self.text = text
         self.icon = icon
@@ -290,19 +408,29 @@ class Item:
         self.padding = padding
         self.id = id
 
-        self._wrapped_lines: List[str] = []
+        # Internal caching for wrapped text
+        self._wrapped_lines: list[str] = []
         self._last_width: int = 0
-        self._height: Optional[int] = None
+        self._height: int | None = None
 
     @property
-    def kind(self) -> Optional[str]:
-        """Get content kind from id dict."""
+    def kind(self) -> str | None:
+        """Get content kind from id dict (convenience accessor)."""
         return self.id.get('kind') if isinstance(self.id, dict) else None
 
-    def set_height(self, h: int):
+    def set_height(self, h: int) -> None:
+        """Override the calculated height for this item."""
         self._height = h
 
-    def get_height(self, width: Optional[int] = None) -> int:
+    def get_height(self, width: int | None = None) -> int:
+        """Calculate the height of this item in pixels.
+
+        Args:
+            width: Available width (needed for text wrapping calculation).
+
+        Returns:
+            Height in pixels (multiple of ROW_HEIGHT for most items).
+        """
         if self._height is not None:
             return self._height
 
@@ -312,7 +440,7 @@ class Item:
                 return len(self.lines) * cfg.ROW_HEIGHT
             if self.text and not self.columns:
                 if self.wrap_text:
-                    # Eagerly compute wrapped lines if width is provided
+                    # Compute wrapped lines if width changed
                     if width and width != self._last_width:
                         self._wrapped_lines = self._wrap_text(self.text, width)
                         self._last_width = width
@@ -323,6 +451,7 @@ class Item:
         return cfg.ROW_HEIGHT
 
     def get_column_count(self) -> int:
+        """Get the number of navigable columns in this item."""
         if self.column_nav and self.columns:
             return len(self.columns)
         return 1

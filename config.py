@@ -1,27 +1,48 @@
 """
 Configuration management for PaperJam.
 
-Loads settings from ~/.config/paperjam/config.json with sensible defaults.
-Provides global constants for:
+This module serves as the central configuration hub for the entire application.
+It loads user settings from ~/.config/paperjam/config.json and provides:
+
 - Display dimensions and colors
-- Font loading
-- File paths (music, data, cache)
-- UI layout parameters
-- Status and menu icons
-- Logging setup
+- Font loading and padding configuration
+- File paths (music library, data storage, cache)
+- UI layout parameters (panel dimensions, row heights)
+- Status and menu icons for the e-paper display
+- Logging setup with file and console output
+
+Configuration values are loaded at module import time and can be updated
+at runtime via save_config(). Some values (like MUSIC_PATH) are computed
+once at startup and require a restart to reflect changes.
+
+Example:
+    >>> from config import MUSIC_PATH, SCREEN_WIDTH
+    >>> print(f"Music library: {MUSIC_PATH}")
+    >>> print(f"Display width: {SCREEN_WIDTH}px")
 """
+from __future__ import annotations
+
 import json
 import logging
 import sys
 from pathlib import Path
+from typing import Any
+
 from PIL import ImageFont
 
 logger = logging.getLogger(__name__)
 
 
 # --- Logging ---
-def setup_logger():
-    """Configure logging for the application."""
+def setup_logger() -> logging.Logger:
+    """Configure application-wide logging with file and console output.
+
+    Creates a log file at ~/.cache/paperjam/paperjam.log and also outputs
+    to stdout. Sets PIL and VLC loggers to WARNING level to reduce noise.
+
+    Returns:
+        The configured 'paperjam' logger instance.
+    """
     log_dir = Path.home() / ".cache" / "paperjam"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "paperjam.log"
@@ -35,142 +56,199 @@ def setup_logger():
         ]
     )
 
-    # Quiet down some noisy libraries
+    # Quiet down noisy libraries to reduce log spam
     logging.getLogger("PIL").setLevel(logging.WARNING)
     logging.getLogger("vlc").setLevel(logging.WARNING)
 
     return logging.getLogger("paperjam")
 
 # --- Defaults ---
-DEFAULT_CONFIG = {
-    "music_path": str(Path.home() / "Music"),
-    "screensaver_timeout": 60,
-    "long_press_duration": 0.5,
-    "recents_limit": 50,
-    "invert_colors": False,
-    "locale": "en",
-    "font_main": "BMmini.ttf",
-    "font_header": "Nintendo-DS-BIOS.ttf",
-    "font_icons": "Icons.ttf"
+# Default configuration values used when no user config exists or values are missing
+DEFAULT_CONFIG: dict[str, Any] = {
+    "music_path": str(Path.home() / "Music"),   # Root directory for music library
+    "screensaver_timeout": 60,                   # Seconds of inactivity before screensaver (0 = disabled)
+    "long_press_duration": 0.5,                  # Seconds to trigger long-press action
+    "recents_limit": 50,                         # Maximum recently played tracks to remember
+    "invert_colors": False,                      # Invert display colors (for e-paper visibility)
+    "locale": "en",                              # UI language code
+    "font_main": "BMmini.ttf",                   # Primary pixel font for menu items
+    "font_header": "Nintendo-DS-BIOS.ttf",       # Header/title font
+    "font_icons": "Icons.ttf"                    # Icon font for status indicators
 }
 
 # --- Paths ---
-CONFIG_DIR = Path.home() / ".config" / "paperjam"
-CONFIG_FILE = CONFIG_DIR / "config.json"
-DATA_DIR = Path("data")
-PLAYLIST_DIR = DATA_DIR / "playlists"
-CACHE_FILE = DATA_DIR / "library_cache.json"
-RECENTS_FILE = DATA_DIR / "recents.json"
-FAVS_FILE = DATA_DIR / "favorites.json"
+# User configuration directory (persistent across updates)
+CONFIG_DIR: Path = Path.home() / ".config" / "paperjam"
+CONFIG_FILE: Path = CONFIG_DIR / "config.json"
 
-# Create directories
+# Application data directory (relative to working directory)
+DATA_DIR: Path = Path("data")
+PLAYLIST_DIR: Path = DATA_DIR / "playlists"
+CACHE_FILE: Path = DATA_DIR / "library_cache.json"
+RECENTS_FILE: Path = DATA_DIR / "recents.json"
+FAVS_FILE: Path = DATA_DIR / "favorites.json"
+
+# Ensure required directories exist at startup
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(exist_ok=True)
 PLAYLIST_DIR.mkdir(exist_ok=True)
 
+
 # --- Load Config ---
-def load_config():
+def load_config() -> dict[str, Any]:
+    """Load configuration from disk, merging with defaults.
+
+    Reads user configuration from CONFIG_FILE and merges it with DEFAULT_CONFIG.
+    Default values are used for any missing keys.
+
+    Returns:
+        Configuration dictionary with all settings.
+    """
     if CONFIG_FILE.exists():
         try:
-            with open(CONFIG_FILE, 'r') as f:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                 return {**DEFAULT_CONFIG, **json.load(f)}
-        except Exception as e:
+        except (json.JSONDecodeError, OSError) as e:
             logger.error(f"Error loading config: {e}")
-    return DEFAULT_CONFIG
+    return DEFAULT_CONFIG.copy()
 
-_config = load_config()
 
-def save_config(updates):
+# Module-level configuration state (loaded once at import)
+_config: dict[str, Any] = load_config()
+
+
+def save_config(updates: dict[str, Any]) -> None:
+    """Save configuration updates to disk.
+
+    Merges the provided updates into the current configuration and persists
+    the entire config to CONFIG_FILE.
+
+    Args:
+        updates: Dictionary of configuration keys and values to update.
+    """
     global _config
     _config.update(updates)
     try:
-        with open(CONFIG_FILE, 'w') as f:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(_config, f, indent=4)
-    except Exception as e:
+    except OSError as e:
         logger.error(f"Error saving config: {e}")
 
 # --- Exported Constants ---
-MUSIC_PATH = Path(_config["music_path"])
-# Note: Music directory is created in welcome app if it doesn't exist
+# Music library root path (created by welcome app if missing)
+MUSIC_PATH: Path = Path(_config["music_path"])
 
 # --- Volume Persistence ---
-VOLUME_FILE = DATA_DIR / "volume.json"
-DEFAULT_VOLUME = 30
+VOLUME_FILE: Path = DATA_DIR / "volume.json"
+DEFAULT_VOLUME: int = 30  # Default volume level (0-100)
 
-SCREENSAVER_TIMEOUT = _config["screensaver_timeout"]
-LONG_PRESS_DURATION = _config["long_press_duration"]
-RECENTS_LIMIT = _config["recents_limit"]
+# User-configurable behavior settings
+SCREENSAVER_TIMEOUT: int = _config["screensaver_timeout"]
+LONG_PRESS_DURATION: float = _config["long_press_duration"]
+RECENTS_LIMIT: int = _config["recents_limit"]
 
 # --- Display ---
-SCREEN_WIDTH = 250
-SCREEN_HEIGHT = 122
-PANEL_X = 100
-PANEL_Y = 8
-PANEL_W = 140
-PANEL_H = 104
-ROW_HEIGHT = 12
+# Waveshare 2.13" e-paper display dimensions (landscape orientation)
+SCREEN_WIDTH: int = 250
+SCREEN_HEIGHT: int = 122
+
+# Main content panel position and size (right side of screen)
+PANEL_X: int = 100   # Panel left edge (leaves room for cover art on left)
+PANEL_Y: int = 8     # Panel top margin
+PANEL_W: int = 140   # Panel width
+PANEL_H: int = 104   # Panel height
+ROW_HEIGHT: int = 12 # Height of each menu row in pixels
 
 # --- Colors ---
-WHITE = 255
-BLACK = 0
+# E-paper uses 8-bit grayscale (0=black, 255=white)
+WHITE: int = 255
+BLACK: int = 0
 
 # --- UI Constants ---
-CONTROLS_BUTTON_COUNT = 4  # Number of buttons in controls bar (back, shuffle, loop, action)
-ALPHABETICAL_HEADING_THRESHOLD = 24  # Min items before showing alphabetical headings
-QUEUE_VIEW_MAX_ITEMS = 20  # Max items to show in queue view
+CONTROLS_BUTTON_COUNT: int = 4    # Buttons in controls bar (back, shuffle, loop, action)
+ALPHABETICAL_HEADING_THRESHOLD: int = 24  # Min items before showing A-Z section headings
+QUEUE_VIEW_MAX_ITEMS: int = 20    # Max items visible in queue view
 
 # --- Cover Art ---
-COVER_SIZE_SMALL = (83, 83)
-COVER_SIZE_LARGE = (113, 113)
-COVER_CACHE_MAX_SIZE_MB = 100  # Max cache size before eviction
-COVER_CACHE_MAX_AGE_DAYS = 30  # Max age before cache entry is eligible for eviction
+# Cover art dimensions for small (list) and large (now playing) views
+COVER_SIZE_SMALL: tuple[int, int] = (83, 83)
+COVER_SIZE_LARGE: tuple[int, int] = (113, 113)
 
-# --- Behavior ---
-SCREENSAVER_OPTIONS = [10, 30, 60, 300, 1800, 0] 
-LONG_PRESS_OPTIONS = [0.3, 0.5, 0.8, 1.0, 1.5, 2.0]
-RECENTS_LIMIT_OPTIONS = [10, 30, 50, 100]
-VALID_EXTS = {'.mp3', '.flac', '.wav', '.m4a'}
+# Cover art cache eviction settings (LRU-based cleanup)
+COVER_CACHE_MAX_SIZE_MB: int = 100  # Trigger eviction when cache exceeds this size
+COVER_CACHE_MAX_AGE_DAYS: int = 30  # Only evict entries older than this
 
-# --- Sys Constants ---
-BATTERY_SHUTDOWN_THRESHOLD = 12
+# --- Behavior Options ---
+# Available values for user-configurable settings (used in settings UI)
+SCREENSAVER_OPTIONS: list[int] = [10, 30, 60, 300, 1800, 0]  # 0 = disabled
+LONG_PRESS_OPTIONS: list[float] = [0.3, 0.5, 0.8, 1.0, 1.5, 2.0]
+RECENTS_LIMIT_OPTIONS: list[int] = [10, 30, 50, 100]
+
+# Supported audio file extensions (case-insensitive matching)
+VALID_EXTS: set[str] = {'.mp3', '.flac', '.wav', '.m4a'}
+
+# --- System Constants ---
+# Battery level (%) below which device initiates safe shutdown
+BATTERY_SHUTDOWN_THRESHOLD: int = 12
 
 # --- Fonts ---
-def load_fonts():
+def load_fonts() -> tuple[ImageFont.FreeTypeFont, ...]:
+    """Load all application fonts from the assets directory.
+
+    Loads pixel fonts with BASIC layout engine (no HarfBuzz) for consistent
+    rendering on e-paper displays. Falls back to PIL default font if assets
+    are missing.
+
+    Returns:
+        Tuple of (main, header, icons, cjk_main, cjk_header) font objects.
+    """
     base_path = Path(__file__).parent / "assets"
 
-    def get_font(name, size):
+    def get_font(name: str, size: int) -> ImageFont.FreeTypeFont:
+        """Load a font file or fall back to default."""
         path = base_path / name
         if not path.exists():
             return ImageFont.load_default()
-        # Use BASIC layout engine (no harfbuzz) for pixel fonts
+        # Use BASIC layout engine (no HarfBuzz) for pixel-perfect rendering
         return ImageFont.truetype(str(path), size, layout_engine=ImageFont.Layout.BASIC)
 
     main = get_font(_config.get("font_main", "BMmini.ttf"), 10)
     header = get_font(_config.get("font_header", "Nintendo-DS-BIOS.ttf"), 13)
 
-    # CJK fonts (Galmuri)
+    # CJK fonts (Galmuri family) for Chinese/Japanese/Korean text
     cjk_main = get_font("Galmuri7.ttf", 8)
     cjk_header = get_font("Galmuri9.ttf", 10)
 
+    # Icon font for status indicators and menu icons
     icons_path = base_path / _config.get("font_icons", "Icons.ttf")
-    icons = ImageFont.truetype(str(icons_path), 6, layout_engine=ImageFont.Layout.BASIC) if icons_path.exists() else None
+    icons = (
+        ImageFont.truetype(str(icons_path), 6, layout_engine=ImageFont.Layout.BASIC)
+        if icons_path.exists() else None
+    )
 
     return main, header, icons, cjk_main, cjk_header
 
+
+# Load fonts at module import time
 FONT_MAIN, FONT_HEADER, FONT_ICONS, FONT_CJK_MAIN, FONT_CJK_HEADER = load_fonts()
 
-# --- Font Padding ---
-# Default padding (x, y) for each font, applied before custom padding
-FONT_PADDING = {}  # Populated after fonts are loaded
 
-def _init_font_padding():
+# --- Font Padding ---
+# Pixel offset (x, y) applied to text rendering for each font to correct baseline alignment.
+# These values compensate for font metrics that don't render well at small sizes.
+FONT_PADDING: dict[ImageFont.FreeTypeFont, tuple[int, int]] = {}
+
+
+def _init_font_padding() -> None:
+    """Initialize font padding map after fonts are loaded."""
     global FONT_PADDING
     FONT_PADDING = {
-        FONT_MAIN: (5, 1),
-        FONT_HEADER: (2, -1),
-        FONT_CJK_MAIN: (5, 3),
-        FONT_CJK_HEADER: (2, 1),
+        FONT_MAIN: (5, 1),       # BMmini needs slight right/down offset
+        FONT_HEADER: (2, -1),    # Nintendo DS BIOS needs slight up offset
+        FONT_CJK_MAIN: (5, 3),   # Galmuri7 needs more vertical offset
+        FONT_CJK_HEADER: (2, 1), # Galmuri9 needs slight adjustments
     }
+
 
 _init_font_padding()
 
@@ -203,13 +281,22 @@ MENU_ICONS = {
 }
 
 # --- Version ---
-import subprocess
 import os
+import subprocess
 
-VERSION = "1.0"
-NEEDS_RESCAN = False  # Set True when update requires library rescan
+VERSION: str = "1.0"
+NEEDS_RESCAN: bool = False  # Set True when update requires library rescan
 
-def _get_version_date():
+
+def _get_version_date() -> str:
+    """Get the date of the most recent git commit.
+
+    Used to display version info in the settings/about screen.
+    Falls back to a hardcoded date if git is unavailable.
+
+    Returns:
+        Date string in 'YYYY-MM-DD HH:MM' format.
+    """
     try:
         dir_path = os.path.dirname(os.path.abspath(__file__))
         return subprocess.check_output(
@@ -219,7 +306,8 @@ def _get_version_date():
             stderr=subprocess.DEVNULL,
             timeout=5
         ).strip()
-    except Exception:
+    except (subprocess.SubprocessError, OSError):
         return "2026-01-15"
 
-VERSION_DATE = _get_version_date()
+
+VERSION_DATE: str = _get_version_date()
