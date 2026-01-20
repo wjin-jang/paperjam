@@ -34,7 +34,7 @@ import config as cfg
 from core.i18n import t
 from core.weather import WeatherData, HourlyForecast, DailyForecast
 from ui.views.core import Panel, Menu
-from ui.views.items import Item, TextInput
+from ui.views.items import Item, TextInput, get_font_padding
 
 # Icon directories
 WEATHER_ICONS_DIR = Path(__file__).parent.parent.parent / "assets" / "weather"
@@ -150,6 +150,8 @@ def render_current_section(weather: WeatherData, width: int, height: int,
     else:
         day_labels.append("???")
 
+    font_pad = get_font_padding(cfg.FONT_MAIN)
+
     for i, label in enumerate(day_labels):
         row_y = i * cfg.ROW_HEIGHT
         is_day_selected = (i == day_offset)
@@ -162,16 +164,16 @@ def render_current_section(weather: WeatherData, width: int, height: int,
                           fill=cfg.BLACK, outline=cfg.BLACK)
             if is_hovered:
                 # Add inner border (white) when section is focused
-                draw.rectangle((day_x + 2, row_y + 2,
-                               day_x + day_col_w - 2, row_y + cfg.ROW_HEIGHT - 2),
+                draw.rectangle((day_x + 1, row_y + 1,
+                               day_x + day_col_w, row_y + cfg.ROW_HEIGHT),
                               fill=cfg.BLACK, outline=cfg.WHITE)
-            draw.text((day_x + cfg.UI_MARGIN_SMALL + 1, row_y), label,
+            draw.text((day_x + font_pad[0], row_y + font_pad[1]), label,
                      font=cfg.FONT_MAIN, fill=cfg.WHITE)
         else:
             # Normal: white background, black text
             draw.rectangle((day_x, row_y, day_x + day_col_w, row_y + cfg.ROW_HEIGHT),
                           fill=cfg.WHITE, outline=cfg.BLACK)
-            draw.text((day_x + cfg.UI_MARGIN_SMALL + 1, row_y), label,
+            draw.text((day_x + font_pad[0], row_y + font_pad[1]), label,
                      font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
     return img
