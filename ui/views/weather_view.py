@@ -404,7 +404,7 @@ class WeatherViewRenderer:
         temp_chart = render_bar_chart(
             hourly, content_w, self.CHART_H,
             value_fn=lambda h: h.temperature,
-            format_fn=lambda v: f"{int(v)}",
+            format_fn=lambda v: f"{int(v)}°",
             scroll_offset=chart_scroll,
             min_range=10.0  # Minimum 10 degree range
         )
@@ -419,7 +419,7 @@ class WeatherViewRenderer:
         precip_chart = render_bar_chart(
             hourly, content_w, self.CHART_H,
             value_fn=lambda h: h.precipitation_probability,
-            format_fn=lambda v: f"{int(v)}",
+            format_fn=lambda v: f"{int(v)}%",
             is_percentage=True,
             scroll_offset=chart_scroll
         )
