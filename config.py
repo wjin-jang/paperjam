@@ -222,6 +222,33 @@ CONTROLS_BUTTON_COUNT: int = 4    # Buttons in controls bar (back, shuffle, loop
 ALPHABETICAL_HEADING_THRESHOLD: int = 24  # Min items before showing A-Z section headings
 QUEUE_VIEW_MAX_ITEMS: int = 20    # Max items visible in queue view
 
+# --- Weather View Constants ---
+# Chart dimensions (height = 3 rows - time text space)
+WEATHER_CHART_TIME_HEIGHT: int = 8        # Space reserved for time labels at bottom
+WEATHER_CHART_HEIGHT: int = ROW_HEIGHT * 3 - WEATHER_CHART_TIME_HEIGHT  # 28px
+WEATHER_WEEKLY_HEIGHT: int = WEATHER_CHART_HEIGHT  # Same height for consistency
+WEATHER_CURRENT_HEIGHT: int = ROW_HEIGHT * 3      # Current conditions section
+
+# Chart layout
+WEATHER_CHART_VISIBLE_HOURS: int = 8      # Number of hours visible in chart
+WEATHER_CHART_TOTAL_HOURS: int = 24       # Total hours per day
+WEATHER_CHART_BAR_PADDING: int = 2        # Padding on each side of bars
+WEATHER_CHART_MIN_RANGE: float = 10.0     # Minimum temperature range for scaling
+
+# Weather icon positioning
+WEATHER_ICON_SIZE: int = 28               # Large weather icon size
+WEATHER_ICON_MARGIN: int = 2              # Margin around icons
+WEATHER_TEMP_X_OFFSET: int = 32           # X offset for temperature text after icon
+
+# Day navigation
+WEATHER_FUTURE_DAY_START_HOUR: int = 6    # Future days start display at 6:00 AM
+WEATHER_MAX_FORECAST_DAYS: int = 7        # Maximum days in weekly forecast
+
+# Update intervals
+WEATHER_UPDATE_CHECK_INTERVAL: int = 60   # Seconds between update checks
+WEATHER_MIN_SEARCH_LENGTH: int = 2        # Minimum characters for location search
+WEATHER_LOCATION_NAME_MAX: int = 30       # Max length for location display name
+
 # --- Cover Art ---
 # Cover art dimensions for small (list) and large (now playing) views
 COVER_SIZE_SMALL: tuple[int, int] = (83, 83)

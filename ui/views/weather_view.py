@@ -112,19 +112,21 @@ def render_current_section(weather: WeatherData, width: int, height: int,
     # Column 1: Icon, temperature, condition
     icon = load_icon(condition_name)
     if icon:
-        img.paste(icon, (2, 2))
+        img.paste(icon, (cfg.WEATHER_ICON_MARGIN, cfg.WEATHER_ICON_MARGIN))
 
     temp_text = f"{int(temp)}°"
-    draw.text((32, 4), temp_text, font=cfg.FONT_HEADER, fill=cfg.BLACK)
+    draw.text((cfg.WEATHER_TEMP_X_OFFSET, cfg.UI_MARGIN_SMALL), temp_text,
+              font=cfg.FONT_HEADER, fill=cfg.BLACK)
 
     cond_text = SHORT_CONDITIONS.get(condition_name, '???').upper()
-    draw.text((32, 16), cond_text, font=cfg.FONT_HEADER, fill=cfg.BLACK)
+    draw.text((cfg.WEATHER_TEMP_X_OFFSET, cfg.ROW_HEIGHT + cfg.UI_MARGIN_SMALL), cond_text,
+              font=cfg.FONT_HEADER, fill=cfg.BLACK)
 
     # Vertical divider
     draw.line((col_w, 0, col_w, height - 1), fill=cfg.BLACK)
 
     # Column 2: Stats (using row heights)
-    stats_x = col_w + 5
+    stats_x = col_w + cfg.UI_MARGIN_SMALL + 1
     stats = [
         (t('weather.precip'), f"{precip}%"),
         (t('weather.humidity'), f"{humid}%"),
@@ -157,15 +159,16 @@ def render_current_section(weather: WeatherData, width: int, height: int,
         fg = cfg.WHITE if is_selected else cfg.BLACK
         draw.rectangle((day_x, row_y, day_x + day_col_w, row_y + cfg.ROW_HEIGHT),
                       fill=bg, outline=cfg.BLACK)
-        draw.text((day_x + 5, row_y), label, font=cfg.FONT_MAIN, fill=fg)
+        draw.text((day_x + cfg.UI_MARGIN_SMALL + 1, row_y), label, font=cfg.FONT_MAIN, fill=fg)
 
     return img
 
 
 def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
                      value_fn, format_fn, is_percentage: bool = False,
-                     scroll_offset: int = 0, visible_hours: int = 8,
-                     min_range: float = 10.0) -> Image.Image:
+                     scroll_offset: int = 0,
+                     visible_hours: int = cfg.WEATHER_CHART_VISIBLE_HOURS,
+                     min_range: float = cfg.WEATHER_CHART_MIN_RANGE) -> Image.Image:
     """Render bar chart as an image.
 
     Args:
@@ -182,7 +185,7 @@ def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
         return img
 
     bar_w = width // visible_hours
-    bar_area_h = height - 12  # Only time at bottom (8)
+    bar_area_h = height - cfg.WEATHER_CHART_TIME_HEIGHT - cfg.UI_MARGIN_SMALL  # Space for time labels
     bar_area_y = 0  # Bar area starts from top
 
     all_values = [value_fn(h) for h in hourly]
@@ -221,16 +224,17 @@ def render_bar_chart(hourly: List[HourlyForecast], width: int, height: int,
 
         bar_h = max(1, int(normalized * bar_area_h))
         bar_y = bar_area_y + bar_area_h - bar_h
-        bar_x1 = bx + 2
-        bar_x2 = bx + bar_w - 3
+        bar_x1 = bx + cfg.WEATHER_CHART_BAR_PADDING
+        bar_x2 = bx + bar_w - cfg.WEATHER_CHART_BAR_PADDING - 1
 
         # Draw bar
         draw.rectangle((bar_x1, bar_y, bar_x2, bar_area_y + bar_area_h), fill=cfg.BLACK)
 
-        # Time at bottom - use full format (12:00)
+        # Time at bottom
         hour_text = h.hour
         hour_w = cfg.FONT_MAIN.getbbox(hour_text)[2]
-        draw.text((center - hour_w // 2, height - 10), hour_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+        time_y = height - cfg.WEATHER_CHART_TIME_HEIGHT - cfg.WEATHER_CHART_BAR_PADDING
+        draw.text((center - hour_w // 2, time_y), hour_text, font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
         bar_positions.append((bx, bar_y, bar_x1, bar_x2, center, val))
 
@@ -271,7 +275,7 @@ def render_weekly(daily: List[DailyForecast], width: int, height: int) -> Image.
     if not daily:
         return img
 
-    days = daily[:7]
+    days = daily[:cfg.WEATHER_MAX_FORECAST_DAYS]
     day_w = width // len(days)
 
     for i, d in enumerate(days):
@@ -286,17 +290,21 @@ def render_weekly(daily: List[DailyForecast], width: int, height: int) -> Image.
 
         # Calculate total width of icon + day name
         icon_w = icon.width if icon else 0
-        total_w = icon_w + 2 + name_w  # 2px gap between icon and text
+        icon_text_gap = cfg.WEATHER_ICON_MARGIN
+        total_w = icon_w + icon_text_gap + name_w
         start_x = center - total_w // 2
 
+        icon_y = 1
         if icon:
-            img.paste(icon, (start_x, 1))
-        draw.text((start_x + icon_w + 2, 1), day_name, font=cfg.FONT_MAIN, fill=cfg.BLACK)
+            img.paste(icon, (start_x, icon_y))
+        draw.text((start_x + icon_w + icon_text_gap, icon_y), day_name,
+                  font=cfg.FONT_MAIN, fill=cfg.BLACK)
 
         # Row 2: Temperature (FONT_HEADER)
         temp_text = f"{int(d.avg_temperature)}°"
         temp_w = cfg.FONT_HEADER.getbbox(temp_text)[2]
-        draw.text((center - temp_w // 2, 12), temp_text, font=cfg.FONT_HEADER, fill=cfg.BLACK)
+        draw.text((center - temp_w // 2, cfg.ROW_HEIGHT), temp_text,
+                  font=cfg.FONT_HEADER, fill=cfg.BLACK)
 
     return img
 
@@ -304,17 +312,17 @@ def render_weekly(daily: List[DailyForecast], width: int, height: int) -> Image.
 class WeatherViewRenderer:
     """Renderer for weather display."""
 
-    PANEL_X = 8
-    PANEL_Y = 8
-    PANEL_W = cfg.SCREEN_WIDTH - 16
-    PANEL_H = cfg.SCREEN_HEIGHT - 16
+    PANEL_X = cfg.UI_MARGIN
+    PANEL_Y = cfg.UI_MARGIN
+    PANEL_W = cfg.SCREEN_WIDTH - cfg.UI_MARGIN * 2
+    PANEL_H = cfg.SCREEN_HEIGHT - cfg.UI_MARGIN * 2
 
-    CURRENT_H = cfg.ROW_HEIGHT * 3
-    CHART_H = 28
-    WEEKLY_H = 28
+    CURRENT_H = cfg.WEATHER_CURRENT_HEIGHT
+    CHART_H = cfg.WEATHER_CHART_HEIGHT
+    WEEKLY_H = cfg.WEATHER_WEEKLY_HEIGHT
 
-    CHART_HOURS = 8
-    TOTAL_HOURS = 24
+    CHART_HOURS = cfg.WEATHER_CHART_VISIBLE_HOURS
+    TOTAL_HOURS = cfg.WEATHER_CHART_TOTAL_HOURS
 
     def __init__(self):
         self.canvas = Image.new('1', (cfg.SCREEN_WIDTH, cfg.SCREEN_HEIGHT), cfg.WHITE)

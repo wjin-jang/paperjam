@@ -23,8 +23,9 @@ import config as cfg
 class WeatherApp(AppBase):
     """Weather application displaying forecasts."""
 
-    MAX_CHART_SCROLL = 16
-    MAX_DAY_OFFSET = 2
+    # Navigation limits
+    MAX_CHART_SCROLL = cfg.WEATHER_CHART_TOTAL_HOURS - cfg.WEATHER_CHART_VISIBLE_HOURS  # 16
+    MAX_DAY_OFFSET = 2  # Today, tomorrow, day after
 
     def __init__(self):
         super().__init__(name=t('menu.weather'))
@@ -33,7 +34,7 @@ class WeatherApp(AppBase):
 
         self.view = 'MAIN'
         self.last_update_check = 0
-        self.update_check_interval = 60
+        self.update_check_interval = cfg.WEATHER_UPDATE_CHECK_INTERVAL
 
         # Navigation state
         self.selected_section = SECTION_DAY
@@ -87,13 +88,22 @@ class WeatherApp(AppBase):
         }
 
     def _nav_up(self):
-        """Navigate up - change day or move to previous section."""
+        """Navigate up - change day or move to previous section.
+
+        Day selector uses hover+select: up/down changes highlighted day,
+        wrapping to THIS WEEK when moving up from first row.
+        """
         if self.selected_section == SECTION_DAY:
-            # Change day up
             if self.day_offset > 0:
+                # Move to previous day
                 self.day_offset -= 1
-                # Today starts at current hour (scroll 0), future days start at 6:00
-                self.chart_scroll = 0 if self.day_offset == 0 else 6
+                self.chart_scroll = 0 if self.day_offset == 0 else cfg.WEATHER_FUTURE_DAY_START_HOUR
+            else:
+                # At first day row - wrap to THIS WEEK section
+                self.selected_section = SECTION_WEEKLY
+        elif self.selected_section == SECTION_TEMPERATURE:
+            # Move back to day selector (preserves current day_offset)
+            self.selected_section = SECTION_DAY
         else:
             # Move to previous section
             section_order = [SECTION_DAY, SECTION_TEMPERATURE, SECTION_PRECIPITATION, SECTION_WEEKLY]
@@ -102,13 +112,24 @@ class WeatherApp(AppBase):
                 self.selected_section = section_order[idx - 1]
 
     def _nav_down(self):
-        """Navigate down - change day or move to next section."""
+        """Navigate down - change day or move to next section.
+
+        Day selector uses hover+select: up/down changes highlighted day,
+        moving to TEMPERATURE when moving down from last row.
+        """
         if self.selected_section == SECTION_DAY:
-            # Change day down
             if self.day_offset < self.MAX_DAY_OFFSET:
+                # Move to next day
                 self.day_offset += 1
-                # Future days start at 6:00, can scroll back to 0:00
-                self.chart_scroll = 6
+                self.chart_scroll = cfg.WEATHER_FUTURE_DAY_START_HOUR
+            else:
+                # At last day row - move to TEMPERATURE section
+                self.selected_section = SECTION_TEMPERATURE
+        elif self.selected_section == SECTION_WEEKLY:
+            # Wrap from THIS WEEK back to day selector at first row
+            self.selected_section = SECTION_DAY
+            self.day_offset = 0
+            self.chart_scroll = 0
         else:
             # Move to next section
             section_order = [SECTION_DAY, SECTION_TEMPERATURE, SECTION_PRECIPITATION, SECTION_WEEKLY]
@@ -136,9 +157,8 @@ class WeatherApp(AppBase):
 
     def _nav_action(self):
         """Action on current selection."""
-        if self.selected_section == SECTION_DAY:
-            # Confirm day selection - move to temperature section
-            self.selected_section = SECTION_TEMPERATURE
+        # Day selector uses hover+select - no action needed on enter
+        pass
 
     def _open_setup(self):
         self.view = 'SETUP'
@@ -171,7 +191,7 @@ class WeatherApp(AppBase):
                 display_name += f", {result['country']}"
 
             self.weather.set_location(
-                display_name[:30],
+                display_name[:cfg.WEATHER_LOCATION_NAME_MAX],
                 result['latitude'],
                 result['longitude']
             )
@@ -187,7 +207,7 @@ class WeatherApp(AppBase):
             self.search_input.confirm_char()
 
     def _setup_search(self):
-        if len(self.search_input.text) >= 2:
+        if len(self.search_input.text) >= cfg.WEATHER_MIN_SEARCH_LENGTH:
             self.is_searching = True
             self.search_results = self.weather.search_location(self.search_input.text)
             self.is_searching = False
