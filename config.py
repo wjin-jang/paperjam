@@ -247,7 +247,7 @@ WEATHER_MAX_FORECAST_DAYS: int = 7        # Maximum days in weekly forecast
 # Update intervals
 WEATHER_UPDATE_CHECK_INTERVAL: int = 60   # Seconds between update checks
 WEATHER_MIN_SEARCH_LENGTH: int = 2        # Minimum characters for location search
-WEATHER_LOCATION_NAME_MAX: int = 30       # Max length for location display name
+WEATHER_LOCATION_NAME_MAX: int = 40       # Max length for location display name
 
 # --- Cover Art ---
 # Cover art dimensions for small (list) and large (now playing) views

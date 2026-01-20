@@ -193,7 +193,7 @@ class WeatherApp(AppBase):
                 display_name += f", {result['country']}"
 
             self.weather.set_location(
-                display_name[:cfg.WEATHER_LOCATION_NAME_MAX],
+                display_name,
                 result['latitude'],
                 result['longitude']
             )
