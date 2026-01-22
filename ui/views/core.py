@@ -265,7 +265,7 @@ class Menu:
         frame = Image.new('1', (self.width, self.height), cfg.WHITE)
         draw = ImageDraw.Draw(frame)
 
-        draw.rectangle((0, 0, self.width - 1, self.height - 1), fill=cfg.WHITE, outline=cfg.BLACK)
+        draw.rectangle((0, 0, self.width, self.height), fill=cfg.WHITE, outline=cfg.BLACK)
 
         # Calculate column widths (grouped by similarity)
         column_widths_map = calc_menu_column_widths(self.items, self.width)
