@@ -6,9 +6,10 @@ Supports:
 - MP3: ID3 tags (TALB, TPE1/2, TIT2, TRCK, TPOS, TDRC/TYER)
 """
 import os
+import re
 from pathlib import Path
-from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from dataclasses import dataclass, field
+from typing import Optional, Dict, Any, List
 from mutagen import File
 from mutagen.flac import FLAC
 from mutagen.mp3 import MP3
@@ -26,6 +27,73 @@ def clean_tag(text):
         return text.split(';')[0].strip()
     return text
 
+
+# Patterns for detecting featured artists
+_FEAT_PATTERNS = [
+    r'\s*[\(\[]\s*(?:feat\.?|ft\.?|featuring)\s+(.+?)[\)\]]',  # (feat. X) or [feat. X]
+    r'\s+(?:feat\.?|ft\.?|featuring)\s+(.+?)(?:\s*[\(\[]|$)',  # feat. X at end or before (
+]
+_FEAT_REGEX = re.compile('|'.join(_FEAT_PATTERNS), re.IGNORECASE)
+
+# Patterns for splitting multiple artists
+_ARTIST_SPLIT_PATTERN = re.compile(r'\s*[,&;]\s*|\s+(?:and|with|x)\s+', re.IGNORECASE)
+
+
+def parse_artists(artist_str: str, title_str: str = None) -> tuple:
+    """
+    Parse primary artist and featured artists from artist and title strings.
+
+    Args:
+        artist_str: The artist tag value
+        title_str: The title tag value (optional, checked for feat. patterns)
+
+    Returns:
+        Tuple of (primary_artist, list of featured_artists)
+    """
+    if not artist_str:
+        return ("Unknown Artist", [])
+
+    featured = []
+    primary = artist_str.strip()
+
+    # Extract featured artists from title
+    if title_str:
+        for match in _FEAT_REGEX.finditer(title_str):
+            feat_str = match.group(1) or match.group(2)
+            if feat_str:
+                # Split multiple featured artists
+                for artist in _ARTIST_SPLIT_PATTERN.split(feat_str):
+                    artist = artist.strip()
+                    if artist and artist.lower() not in [f.lower() for f in featured]:
+                        featured.append(artist)
+
+    # Check if primary artist string contains multiple artists
+    # Only split if there's a clear separator and it's not part of band name
+    artists = _ARTIST_SPLIT_PATTERN.split(primary)
+    if len(artists) > 1:
+        primary = artists[0].strip()
+        for artist in artists[1:]:
+            artist = artist.strip()
+            if artist and artist.lower() not in [f.lower() for f in featured]:
+                featured.append(artist)
+
+    return (primary if primary else "Unknown Artist", featured)
+
+
+def clean_title(title_str: str) -> str:
+    """
+    Remove featured artist annotations from title for cleaner display.
+
+    Args:
+        title_str: The title tag value
+
+    Returns:
+        Title with feat./ft. portions removed
+    """
+    if not title_str:
+        return title_str
+    return _FEAT_REGEX.sub('', title_str).strip()
+
 def parse_num(val):
     if not val: return 0
     try:
@@ -37,14 +105,15 @@ def parse_num(val):
 def get_metadata(file_path):
     """
     Fast extraction of text-only metadata.
-    Returns: (album, artist, title, track_number, disc_number, year, duration)
+    Returns: (album, artist, title, track_number, disc_number, year, duration, featured_artists)
     """
     if not os.path.exists(file_path):
-        return ("Unknown Album", "Unknown Artist", format_track_name(file_path), 0, 0, "", 0)
+        return ("Unknown Album", "Unknown Artist", format_track_name(file_path), 0, 0, "", 0, [])
 
     album, album_artist, title, year = None, None, None, None
     track_num, disc_num = 0, 0
     duration = 0
+    raw_artist = None  # Track artist (for featured detection)
 
     try:
         audio = File(file_path)
@@ -54,7 +123,9 @@ def get_metadata(file_path):
         if isinstance(audio, FLAC):
             album = audio.get("album", [None])[0]
             album_artist = audio.get("albumartist", [None])[0]
-            if not album_artist: album_artist = audio.get("artist", [None])[0]
+            raw_artist = audio.get("artist", [None])[0]
+            if not album_artist:
+                album_artist = raw_artist
             title = audio.get("title", [None])[0]
 
             track_num = parse_num(audio.get("tracknumber", [0])[0])
@@ -72,7 +143,9 @@ def get_metadata(file_path):
             if tags:
                 if 'TALB' in tags: album = tags['TALB'].text[0]
                 if 'TPE2' in tags: album_artist = tags['TPE2'].text[0]
-                if not album_artist and 'TPE1' in tags: album_artist = tags['TPE1'].text[0]
+                if 'TPE1' in tags: raw_artist = tags['TPE1'].text[0]
+                if not album_artist:
+                    album_artist = raw_artist
                 if 'TIT2' in tags: title = tags['TIT2'].text[0]
                 if 'TRCK' in tags: track_num = parse_num(tags['TRCK'].text[0])
                 if 'TPOS' in tags: disc_num = parse_num(tags['TPOS'].text[0])
@@ -87,6 +160,9 @@ def get_metadata(file_path):
     album_artist = clean_tag(album_artist)
     if not title: title = format_track_name(file_path)
 
+    # Parse featured artists from title and track artist
+    _, featured = parse_artists(raw_artist or "", title)
+
     return (
         album or "Unknown Album",
         album_artist or "Unknown Artist",
@@ -94,7 +170,8 @@ def get_metadata(file_path):
         track_num,
         disc_num,
         str(year) if year else "",
-        duration
+        duration,
+        featured
     )
 
 
@@ -121,6 +198,7 @@ class TrackInfo:
     track_num: int
     disc_num: int
     duration: int = 0
+    featured: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for compatibility with existing code."""
@@ -132,7 +210,8 @@ class TrackInfo:
             'year': self.year,
             'track': self.track_num,
             'disc': self.disc_num,
-            'duration': self.duration
+            'duration': self.duration,
+            'featured': self.featured
         }
 
 
@@ -159,7 +238,8 @@ def extract_track_info(file_path: Path) -> TrackInfo:
         track_num=meta[3] if meta[3] else 0,
         disc_num=meta[4] if meta[4] else 0,
         year=meta[5] if meta[5] else "",
-        duration=meta[6] if len(meta) > 6 else 0
+        duration=meta[6] if len(meta) > 6 else 0,
+        featured=meta[7] if len(meta) > 7 else []
     )
 
 

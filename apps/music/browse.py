@@ -162,15 +162,17 @@ class BrowseHandler:
         return self._process_track_list(playlist_path.stem, tracks)
 
     def get_artist_tracks(self, artist: str) -> Tuple[str, List[dict], str, str, Optional[object]]:
-        """Get tracks by an artist, organized by album with headings."""
+        """Get tracks by an artist, organized by album with headings, plus featured tracks."""
         tracks = self.lib.get_artist_tracks(artist)
+        featured_tracks = self.lib.get_featured_tracks(artist)
         cover = None
+        tracks_with_headings = []
+
         if tracks:
             covers = get_cover(Path(tracks[0]['path']))
             cover = covers[0] if covers else None
 
             # Group tracks by album and insert headings
-            tracks_with_headings = []
             current_album = None
             for track in tracks:
                 album = track.get('album', t('player.browse.unknown'))
@@ -181,12 +183,23 @@ class BrowseHandler:
                         'name': album
                     })
                 tracks_with_headings.append(track)
-            tracks = tracks_with_headings
+
+        # Add "Featured on" section if there are featured tracks
+        if featured_tracks:
+            tracks_with_headings.append({
+                'heading': True,
+                'name': t('player.browse.featured_on', default='Featured on')
+            })
+            for track in featured_tracks:
+                tracks_with_headings.append(track)
+
+        tracks = tracks_with_headings
 
         # Count only actual tracks (not headings)
-        actual_tracks = [t for t in tracks if not t.get('heading')]
-        track_count = t('player.browse.track_count', count=len(actual_tracks))
-        duration = format_duration(LibraryManager.get_total_duration(actual_tracks))
+        actual_tracks = [tr for tr in tracks if not tr.get('heading')]
+        own_tracks = [tr for tr in self.lib.get_artist_tracks(artist)]
+        track_count = t('player.browse.track_count', count=len(own_tracks))
+        duration = format_duration(LibraryManager.get_total_duration(own_tracks))
 
         # Add pinned info item at the beginning
         info_item = {

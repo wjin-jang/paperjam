@@ -55,6 +55,7 @@ player:
     disc: "Disc {num}"
     no_image: "NO IMAGE"
     track_count: "{count} tracks"
+    featured_on: "Featured on"
 
   context:
     options: "OPTIONS"

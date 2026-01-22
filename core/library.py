@@ -91,6 +91,7 @@ class LibraryManager:
         # Primary library data (protected by _lock)
         self.artists: dict[str, list[TrackDict]] = {}
         self.albums: dict[str, list[TrackDict]] = {}
+        self.featured_on: dict[str, list[TrackDict]] = {}  # Tracks each artist is featured on
 
         # User collections
         self.recents: list[Path] = []
@@ -258,6 +259,7 @@ class LibraryManager:
         """
         temp_artists: dict[str, list[TrackDict]] = {}
         temp_albums: dict[str, list[TrackDict]] = {}
+        temp_featured: dict[str, list[TrackDict]] = {}  # Track featured artist appearances
 
         # Case normalization maps (lowercase -> first-seen casing)
         artist_case_map: dict[str, str] = {}
@@ -291,6 +293,13 @@ class LibraryManager:
                     temp_artists.setdefault(canonical_artist, []).append(data)
                     temp_albums.setdefault(canonical_album, []).append(data)
 
+                    # Track featured artist appearances
+                    for feat_artist in track.featured:
+                        canonical_feat = self._normalize_name(feat_artist, artist_case_map)
+                        # Don't add to featured if it's the same as primary artist
+                        if canonical_feat.lower() != canonical_artist.lower():
+                            temp_featured.setdefault(canonical_feat, []).append(data)
+
                     # Update counters for progress display
                     with self._scan_lock:
                         self._scan_track_count += 1
@@ -312,10 +321,20 @@ class LibraryManager:
         for tracks in temp_albums.values():
             tracks.sort(key=lambda x: (x.get('disc', 0), x.get('track', 0)))
 
+        # Sort featured tracks by artist then album
+        for tracks in temp_featured.values():
+            tracks.sort(key=lambda x: (
+                x.get('artist', '').lower(),
+                x.get('album', '').lower(),
+                x.get('disc', 0),
+                x.get('track', 0)
+            ))
+
         # Commit results to main library (protected by lock)
         with self._lock:
             self.artists = dict(sorted(temp_artists.items(), key=lambda x: get_full_sort_key(x[0])))
             self.albums = dict(sorted(temp_albums.items(), key=lambda x: get_full_sort_key(x[0])))
+            self.featured_on = dict(sorted(temp_featured.items(), key=lambda x: get_full_sort_key(x[0])))
             self._all_tracks_cache = None
             self._track_count_cache = None
             self._save_cache()
@@ -336,7 +355,11 @@ class LibraryManager:
         """Persist the library cache to disk."""
         try:
             with open(cfg.CACHE_FILE, 'w', encoding='utf-8') as f:
-                json.dump({'artists': self.artists, 'albums': self.albums}, f)
+                json.dump({
+                    'artists': self.artists,
+                    'albums': self.albums,
+                    'featured_on': self.featured_on
+                }, f)
         except OSError as e:
             logger.error(f"Cache save error: {e}")
 
@@ -344,6 +367,7 @@ class LibraryManager:
         """Load library data from a deserialized cache dict."""
         self.artists = data.get('artists', {})
         self.albums = data.get('albums', {})
+        self.featured_on = data.get('featured_on', {})
 
     def get_playlists(self) -> list[Path]:
         """Get all user playlists sorted by name.
@@ -441,6 +465,17 @@ class LibraryManager:
             List of track dicts, or empty list if artist not found.
         """
         return self.artists.get(artist, [])
+
+    def get_featured_tracks(self, artist: str) -> list[TrackDict]:
+        """Get all tracks where an artist is featured.
+
+        Args:
+            artist: Artist name to look up.
+
+        Returns:
+            List of track dicts where the artist is featured, or empty list if none.
+        """
+        return self.featured_on.get(artist, [])
 
     def get_album_tracks(self, album: str) -> list[TrackDict]:
         """Get all tracks for an album (pre-sorted by disc, track).

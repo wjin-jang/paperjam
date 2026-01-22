@@ -55,6 +55,7 @@ player:
     disc: "디스크 {num}"
     no_image: "이미지 없음"
     track_count: "{count}곡"
+    featured_on: "참여곡"
 
   context:
     options: "옵션"
