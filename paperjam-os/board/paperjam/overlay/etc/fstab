@@ -1,0 +1,21 @@
+# PaperJam OS - Filesystem Mount Table
+# /etc/fstab
+
+# <file system>  <mount point>  <type>   <options>                      <dump> <pass>
+
+# Boot partition (read-only to protect firmware)
+/dev/mmcblk0p1   /boot          vfat     ro,defaults                    0      2
+
+# Root filesystem (noatime to reduce SD card writes)
+/dev/mmcblk0p2   /              ext4     defaults,noatime,commit=120    0      1
+
+# tmpfs mounts (RAM-based to eliminate SD card wear)
+tmpfs            /tmp           tmpfs    nosuid,nodev,size=50M          0      0
+tmpfs            /var/log       tmpfs    nosuid,nodev,size=10M          0      0
+tmpfs            /var/run       tmpfs    nosuid,nodev,size=5M           0      0
+tmpfs            /var/tmp       tmpfs    nosuid,nodev,size=10M          0      0
+
+# Proc and sys (standard Linux virtual filesystems)
+proc             /proc          proc     defaults                       0      0
+sysfs            /sys           sysfs    defaults                       0      0
+devpts           /dev/pts       devpts   defaults,gid=5,mode=620        0      0

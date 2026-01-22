@@ -51,6 +51,7 @@ from core.audio import AudioEngine
 from core.i18n import t
 from core.inputs import InputHandler
 from core.mpris import MPRISAdapter
+from core.power import get_power_manager, PowerState
 from core.system import SystemManager
 from ui.menu import MenuController
 from ui.renderer import UIRenderer
@@ -83,6 +84,10 @@ class MainApp:
     # Cache them for this many seconds to avoid repeated system calls.
     STATUS_CACHE_INTERVAL: int = 5
 
+    # --- Power Management ---
+    # Enable low power mode when battery falls below this percentage
+    LOW_POWER_THRESHOLD: int = 15
+
     def __init__(self) -> None:
         """Initialize all subsystems and apps."""
         logger.info("Initializing PaperJam...")
@@ -92,6 +97,7 @@ class MainApp:
         self.audio = AudioEngine()
         self.inputs = InputHandler()
         self.mpris = MPRISAdapter()
+        self.power = get_power_manager()
         self.renderer = UIRenderer()
         self.registry = AppRegistry()
 
@@ -262,6 +268,9 @@ class MainApp:
         frame, _ = self.renderer.render_menu(t('settings.system.auto_update'), [Item(text=t('updates.checking'), selectable=False)], -1, 0)
         self._display(frame, full_refresh=True)
 
+        # Set network power state for update check
+        self.power.set_state(PowerState.NETWORK)
+
         # Check for updates
         has_updates, msg = self.sys.check_for_updates()
 
@@ -279,6 +288,9 @@ class MainApp:
             # If successful, perform_update will restart the app
         else:
             logger.info(f"Auto-update check: {msg}")
+
+        # Restore browsing power state
+        self.power.set_state(PowerState.BROWSING)
 
     def run(self) -> None:
         """Main event loop.
@@ -318,6 +330,13 @@ class MainApp:
 
                 # Check battery level (may trigger shutdown)
                 self.sys.check_battery()
+
+                # Enable/disable low power mode based on battery level
+                battery_pct = self.sys.battery.percentage
+                if 0 <= battery_pct <= self.LOW_POWER_THRESHOLD and not self.sys.battery.charging:
+                    self.power.set_low_power_mode(True)
+                elif battery_pct > self.LOW_POWER_THRESHOLD or self.sys.battery.charging:
+                    self.power.set_low_power_mode(False)
 
                 # --- Frame Rendering ---
                 frame: Image.Image | None = None
@@ -377,6 +396,18 @@ class MainApp:
                 # Periodically flush favorites to disk (lazy persistence)
                 self.music_app.lib.flush_favs()
 
+                # --- Power Management ---
+                # Update power state based on current activity
+                if not self._display_sleeping:
+                    # Check for network activity (weather updates)
+                    if (self.current_app == self.weather_app and
+                        self.weather_app.weather.is_updating):
+                        self.power.set_state(PowerState.NETWORK)
+                    elif self.music_app.state.is_playing:
+                        self.power.set_state(PowerState.PLAYBACK)
+                    else:
+                        self.power.set_state(PowerState.BROWSING)
+
                 # Target ~20 FPS (50ms per frame)
                 time.sleep(0.05)
 
@@ -426,6 +457,11 @@ class MainApp:
             self.sys.wake_display()
             self._display_sleeping = False
             self.first_render = True  # Force full refresh to clear any artifacts
+            # Set appropriate power state based on audio playback
+            if self.music_app.state.is_playing:
+                self.power.set_state(PowerState.PLAYBACK)
+            else:
+                self.power.set_state(PowerState.BROWSING)
             logger.debug("Display awakened from sleep")
 
     def _sleep_display(self) -> None:
@@ -437,6 +473,8 @@ class MainApp:
         if not self._display_sleeping:
             self.sys.sleep_display()
             self._display_sleeping = True
+            # Set idle power state when entering screensaver
+            self.power.set_state(PowerState.IDLE)
             logger.debug("Display entering sleep mode")
 
     def _vol_up(self):
@@ -577,6 +615,9 @@ class MainApp:
         frame, _ = self.renderer.render_menu(t('settings.system.check_updates'), [Item(text=t('updates.checking'), selectable=False)], -1, 0)
         self._display(frame, full_refresh=True)
 
+        # Set network power state for update
+        self.power.set_state(PowerState.NETWORK)
+
         # Check for updates
         has_updates, msg = self.sys.check_for_updates()
 
@@ -593,6 +634,9 @@ class MainApp:
             frame, _ = self.renderer.render_menu(t('settings.system.check_updates'), [Item(text=msg, selectable=False)], -1, 0)
             self._display(frame, full_refresh=True)
             time.sleep(1.5)
+
+        # Restore browsing power state
+        self.power.set_state(PowerState.BROWSING)
 
     def _perform_reset(self):
         """Reset all data files and reboot."""

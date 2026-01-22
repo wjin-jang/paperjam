@@ -1,0 +1,15 @@
+config BR2_PACKAGE_WAVESHARE_EPD
+	bool "waveshare-epd"
+	depends on BR2_PACKAGE_PYTHON3
+	select BR2_PACKAGE_PYTHON_PILLOW
+	select BR2_PACKAGE_PYTHON_SPIDEV
+	select BR2_PACKAGE_PYTHON_LIBGPIOD
+	help
+	  Waveshare e-Paper display driver library for Python.
+
+	  Supports:
+	  - 2.13" V4 e-Paper (250x122)
+	  - SPI interface
+	  - Partial and full refresh modes
+
+	  https://github.com/waveshare/e-Paper

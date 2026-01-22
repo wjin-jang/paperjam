@@ -1,0 +1,18 @@
+#!/bin/sh
+# PaperJam OS - Shutdown script
+# Runs all K* scripts in reverse order
+
+# Stop all services in reverse order
+for script in $(ls -r /etc/init.d/S??*); do
+    [ -x "$script" ] || continue
+
+    name=$(basename "$script")
+
+    case "$script" in
+        *.sh)
+            ;;
+        *)
+            "$script" stop
+            ;;
+    esac
+done

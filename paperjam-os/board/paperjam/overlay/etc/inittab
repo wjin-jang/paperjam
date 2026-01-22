@@ -1,0 +1,30 @@
+# PaperJam OS - BusyBox init configuration
+# /etc/inittab
+
+# Set runlevel
+::sysinit:/bin/mount -t proc proc /proc
+::sysinit:/bin/mount -o remount,rw /
+::sysinit:/bin/mkdir -p /dev/pts /dev/shm
+::sysinit:/bin/mount -a
+::sysinit:/sbin/swapon -a
+
+# Set hostname
+null::sysinit:/bin/hostname -F /etc/hostname
+
+# Run init scripts
+null::sysinit:/etc/init.d/rcS
+
+# Respawn getty (only on ttyAMA0 for serial console, disabled by default)
+# Uncomment for debugging
+#ttyAMA0::respawn:/sbin/getty -L ttyAMA0 115200 vt100
+
+# Shutdown handling
+::shutdown:/etc/init.d/rcK
+::shutdown:/sbin/swapoff -a
+::shutdown:/bin/umount -a -r
+
+# Ctrl-Alt-Del handling
+::ctrlaltdel:/sbin/reboot
+
+# Restart init on SIGHUP
+::restart:/sbin/init

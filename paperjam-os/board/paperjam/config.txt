@@ -1,0 +1,73 @@
+# PaperJam OS - Raspberry Pi Zero 2 W Boot Configuration
+# Optimized for power efficiency with e-paper display
+
+# ============================================================
+# Hardware Configuration
+# ============================================================
+arm_64bit=0
+kernel=zImage
+
+# Disable HDMI (saves ~25mA)
+hdmi_blanking=2
+hdmi_ignore_hotplug=1
+hdmi_ignore_composite=1
+hdmi_force_hotplug=0
+
+# Minimal GPU memory (no display needed)
+gpu_mem=16
+start_x=0
+
+# Disable camera/video
+start_debug=0
+disable_camera=1
+
+# ============================================================
+# CPU Power Management
+# ============================================================
+# Reduce voltage and frequency for power savings
+arm_freq_min=250
+arm_freq=600
+over_voltage=-2
+over_voltage_min=-2
+
+# Force turbo disabled for thermal/power management
+force_turbo=0
+
+# ============================================================
+# Disable Onboard LEDs
+# ============================================================
+dtparam=act_led_trigger=none
+dtparam=act_led_activelow=off
+dtparam=pwr_led_trigger=none
+dtparam=pwr_led_activelow=off
+
+# ============================================================
+# Enable Required Interfaces
+# ============================================================
+# I2C (for PiSugar 3 battery @ 0x57)
+dtparam=i2c_arm=on
+dtparam=i2c_arm_baudrate=100000
+
+# SPI (for Waveshare e-Paper display)
+dtparam=spi=on
+
+# Disable unused interfaces
+dtparam=audio=off
+
+# ============================================================
+# Bluetooth Configuration
+# ============================================================
+# Use mini UART for Bluetooth (frees PL011 for GPS if needed)
+dtoverlay=miniuart-bt
+enable_uart=0
+
+# ============================================================
+# Boot Configuration
+# ============================================================
+# Reduce boot time
+boot_delay=0
+disable_splash=1
+avoid_warnings=1
+
+# Device tree
+dtoverlay=disable-wifi-powersave

@@ -1,0 +1,89 @@
+#!/bin/sh
+# PaperJam OS - Network Configuration
+# S40network - WiFi and basic networking
+
+DAEMON="/usr/sbin/wpa_supplicant"
+PIDFILE="/var/run/wpa_supplicant.pid"
+INTERFACE="wlan0"
+
+start() {
+    printf "Starting network: "
+
+    # Bring up loopback
+    ip link set lo up
+
+    # Load WiFi modules
+    modprobe brcmfmac 2>/dev/null || true
+
+    # Wait for wlan0 to appear
+    for i in 1 2 3 4 5; do
+        if ip link show "$INTERFACE" >/dev/null 2>&1; then
+            break
+        fi
+        sleep 1
+    done
+
+    # Configure wlan0
+    if ip link show "$INTERFACE" >/dev/null 2>&1; then
+        ip link set "$INTERFACE" up
+
+        # Enable power save by default
+        iw "$INTERFACE" set power_save on 2>/dev/null || true
+
+        # Start wpa_supplicant if config exists
+        if [ -f /etc/wpa_supplicant.conf ]; then
+            start-stop-daemon -S -q -b \
+                -m -p "$PIDFILE" \
+                -x "$DAEMON" -- \
+                -i "$INTERFACE" \
+                -c /etc/wpa_supplicant.conf \
+                -B
+
+            # Wait for connection
+            sleep 3
+
+            # Get IP via DHCP if connected
+            if wpa_cli -i "$INTERFACE" status | grep -q "wpa_state=COMPLETED"; then
+                dhcpcd -b "$INTERFACE" 2>/dev/null || udhcpc -i "$INTERFACE" -b -q &
+            fi
+        fi
+
+        printf "OK\n"
+    else
+        printf "SKIP (no WiFi)\n"
+    fi
+}
+
+stop() {
+    printf "Stopping network: "
+
+    # Stop DHCP client
+    killall dhcpcd 2>/dev/null || true
+    killall udhcpc 2>/dev/null || true
+
+    # Stop wpa_supplicant
+    start-stop-daemon -K -q -p "$PIDFILE"
+    rm -f "$PIDFILE"
+
+    # Bring down interface
+    if ip link show "$INTERFACE" >/dev/null 2>&1; then
+        ip link set "$INTERFACE" down
+    fi
+
+    printf "OK\n"
+}
+
+restart() {
+    stop
+    sleep 1
+    start
+}
+
+case "$1" in
+    start|stop|restart)
+        "$1"
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+esac
