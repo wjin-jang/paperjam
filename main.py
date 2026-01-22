@@ -50,6 +50,7 @@ from config import setup_logger
 from core.audio import AudioEngine
 from core.i18n import t
 from core.inputs import InputHandler
+from core.mpris import MPRISAdapter
 from core.system import SystemManager
 from ui.menu import MenuController
 from ui.renderer import UIRenderer
@@ -90,6 +91,7 @@ class MainApp:
         self.sys = SystemManager()
         self.audio = AudioEngine()
         self.inputs = InputHandler()
+        self.mpris = MPRISAdapter()
         self.renderer = UIRenderer()
         self.registry = AppRegistry()
 
@@ -162,6 +164,10 @@ class MainApp:
             self._check_auto_update()
             # Check if version requires library rescan
             self._check_needs_rescan()
+
+        # --- MPRIS for Bluetooth Media Controls ---
+        self.mpris.set_callbacks(self._get_mpris_callbacks())
+        self.mpris.start()
 
     def _refresh_app_names(self) -> None:
         """Refresh app display names with current locale translations."""
@@ -380,7 +386,7 @@ class MainApp:
             logger.critical(f"Critical Error: {e}", exc_info=True)
         finally:
             # Ensure data is saved on exit
-            self.music_app.lib.flush_favs()
+            self.music_app.lib.flush_all()
             self.sys.sleep_display()
 
     def launch_app(self, app_id: str) -> None:
@@ -442,6 +448,16 @@ class MainApp:
         self.settings_app.categories['AUDIO'].set_volume(-5)
         vol = self.settings_app.categories['AUDIO'].volume_level
         self._show_volume_popup(vol)
+
+    def _get_mpris_callbacks(self):
+        """Get callbacks for MPRIS (Bluetooth media controls)."""
+        return {
+            'play_pause': self.music_app.toggle_play,
+            'next': self.music_app.next_track,
+            'prev': self.music_app.prev_track,
+            'vol_up': self._vol_up,
+            'vol_down': self._vol_down
+        }
 
     def _show_volume_popup(self, level):
         """Show or update volume popup."""

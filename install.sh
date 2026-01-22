@@ -52,7 +52,9 @@ sudo apt install -y \
     alsa-utils \
     wireless-tools \
     swig \
-    python3-lgpio
+    python3-lgpio \
+    python3-dbus \
+    python3-gi
 
 # --- Enable Interfaces ---
 echo
@@ -122,11 +124,15 @@ source venv/bin/activate
 pip install --upgrade pip
 pip install pillow mutagen python-vlc smbus2 evdev numpy spidev RPi.GPIO gpiozero pyyaml
 
-# Symlink system lgpio into venv (can't be pip installed)
+# Symlink system packages into venv (can't be pip installed)
 PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 VENV_SITE="$INSTALL_DIR/venv/lib/python$PYTHON_VERSION/site-packages"
 ln -sf /usr/lib/python3/dist-packages/lgpio.py "$VENV_SITE/"
 ln -sf /usr/lib/python3/dist-packages/_lgpio*.so "$VENV_SITE/" 2>/dev/null || true
+# D-Bus and GLib for MPRIS (Bluetooth media controls)
+ln -sf /usr/lib/python3/dist-packages/dbus "$VENV_SITE/"
+ln -sf /usr/lib/python3/dist-packages/_dbus*.so "$VENV_SITE/" 2>/dev/null || true
+ln -sf /usr/lib/python3/dist-packages/gi "$VENV_SITE/"
 echo "  Python dependencies installed"
 
 # --- Configuration ---
