@@ -10,6 +10,9 @@
 #include "sys/heap.h"
 #include "fatfs/ff.h"
 
+/* Define size_t for bare-metal */
+typedef unsigned long size_t;
+
 /* dr_flac configuration */
 #define DR_FLAC_NO_STDIO
 #define DR_FLAC_NO_OGG
@@ -109,9 +112,8 @@ static int flac_open(decoder_context_t* ctx, FIL* file) {
     flac->sample_rate = ((header[18] << 12) | (header[19] << 4) | (header[20] >> 4));
     flac->channels = ((header[20] >> 1) & 0x07) + 1;
 
-    /* Total samples (36 bits at bytes 21-25) */
-    flac->total_samples = ((u32)(header[21] & 0x0F) << 32) |
-                          ((u32)header[22] << 24) |
+    /* Total samples (36 bits at bytes 21-25, we only use lower 32 bits) */
+    flac->total_samples = ((u32)header[22] << 24) |
                           ((u32)header[23] << 16) |
                           ((u32)header[24] << 8) |
                           header[25];
