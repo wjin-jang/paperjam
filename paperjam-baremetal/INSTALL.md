@@ -35,14 +35,19 @@ aarch64-none-elf-gcc --version
 ### Linux (Ubuntu/Debian)
 
 ```bash
-# Install toolchain
+# Option 1: Install Linux cross-compiler (easiest, works for bare-metal)
 sudo apt update
-sudo apt install gcc-aarch64-none-elf binutils-aarch64-none-elf
+sudo apt install gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
 
-# Or download from ARM
+# Option 2: Download ARM's official bare-metal toolchain
+cd /tmp
 wget https://developer.arm.com/-/media/Files/downloads/gnu/13.2.rel1/binrel/arm-gnu-toolchain-13.2.rel1-x86_64-aarch64-none-elf.tar.xz
-tar -xf arm-gnu-toolchain-13.2.rel1-x86_64-aarch64-none-elf.tar.xz
-export PATH=$PATH:$(pwd)/arm-gnu-toolchain-13.2.Rel1-x86_64-aarch64-none-elf/bin
+sudo tar -xf arm-gnu-toolchain-13.2.rel1-x86_64-aarch64-none-elf.tar.xz -C /opt/
+echo 'export PATH=$PATH:/opt/arm-gnu-toolchain-13.2.Rel1-x86_64-aarch64-none-elf/bin' >> ~/.bashrc
+source ~/.bashrc
+
+# If using Option 2, build with:
+make CROSS=aarch64-none-elf-
 ```
 
 ### macOS

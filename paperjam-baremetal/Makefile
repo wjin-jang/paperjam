@@ -2,7 +2,9 @@
 # Target: Raspberry Pi Zero 2 W (BCM2710, ARM Cortex-A53)
 
 # Cross-compiler toolchain
-CROSS = aarch64-none-elf-
+# Use aarch64-none-elf- if you have ARM's bare-metal toolchain
+# Use aarch64-linux-gnu- if using the Linux cross-compiler from apt
+CROSS ?= aarch64-linux-gnu-
 CC = $(CROSS)gcc
 AS = $(CROSS)gcc
 LD = $(CROSS)ld
