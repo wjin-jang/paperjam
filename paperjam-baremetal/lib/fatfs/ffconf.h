@@ -1,9 +1,9 @@
-/*
- * FatFS Configuration for PaperJam Bare-Metal OS
- */
+/*---------------------------------------------------------------------------/
+/  Configurations of FatFs Module R0.16
+/---------------------------------------------------------------------------*/
 
-#ifndef FFCONF_H
-#define FFCONF_H
+#ifndef FFCONF_DEF
+#define FFCONF_DEF	80386	/* Revision ID */
 
 /* Function Configurations */
 #define FF_FS_READONLY      0   /* Read/write */
