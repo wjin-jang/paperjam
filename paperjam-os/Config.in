@@ -1,9 +1,0 @@
-# PaperJam OS External Configuration
-
-menu "PaperJam OS packages"
-
-source "$BR2_EXTERNAL_PAPERJAM_PATH/package/paperjam/Config.in"
-source "$BR2_EXTERNAL_PAPERJAM_PATH/package/waveshare-epd/Config.in"
-source "$BR2_EXTERNAL_PAPERJAM_PATH/package/python-evdev/Config.in"
-
-endmenu

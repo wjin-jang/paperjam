@@ -1,1 +1,0 @@
-root=/dev/mmcblk0p2 rootfstype=ext4 rootwait quiet loglevel=3 logo.nologo consoleblank=0 vt.global_cursor_default=0 mitigations=off nowatchdog audit=0 fsck.repair=yes init=/sbin/init
