@@ -5,8 +5,8 @@
  * Connects FatFS to our SD card driver
  */
 
-#include "lib/fatfs/ff.h"
-#include "lib/fatfs/diskio.h"
+#include "fatfs/ff.h"
+#include "fatfs/diskio.h"
 #include "hal/mmc.h"
 #include "hal/timer.h"
 

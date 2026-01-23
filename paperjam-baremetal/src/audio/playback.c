@@ -10,7 +10,7 @@
 #include "decoder.h"
 #include "playback.h"
 #include "sys/heap.h"
-#include "lib/fatfs/ff.h"
+#include "fatfs/ff.h"
 
 /* Playback state */
 static decoder_context_t decoder;

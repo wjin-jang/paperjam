@@ -5,7 +5,7 @@
 #include "hal/bcm2837.h"
 #include "playlist.h"
 #include "library.h"
-#include "lib/fatfs/ff.h"
+#include "fatfs/ff.h"
 #include "sys/heap.h"
 
 /* Queue configuration */

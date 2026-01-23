@@ -6,7 +6,7 @@
 #define DECODER_H
 
 #include "hal/bcm2837.h"
-#include "lib/fatfs/ff.h"
+#include "fatfs/ff.h"
 
 /* Audio format types */
 typedef enum {

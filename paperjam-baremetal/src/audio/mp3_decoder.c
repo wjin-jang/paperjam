@@ -11,7 +11,7 @@
 #include "hal/bcm2837.h"
 #include "decoder.h"
 #include "sys/heap.h"
-#include "lib/fatfs/ff.h"
+#include "fatfs/ff.h"
 
 /* MP3 frame constants */
 #define MP3_BUFFER_SIZE     8192

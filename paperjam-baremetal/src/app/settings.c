@@ -6,7 +6,7 @@
 
 #include "hal/bcm2837.h"
 #include "settings.h"
-#include "lib/fatfs/ff.h"
+#include "fatfs/ff.h"
 #include "sys/heap.h"
 
 /* Settings file path */

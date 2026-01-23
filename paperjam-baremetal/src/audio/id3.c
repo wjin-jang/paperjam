@@ -7,7 +7,7 @@
 
 #include "hal/bcm2837.h"
 #include "id3.h"
-#include "lib/fatfs/ff.h"
+#include "fatfs/ff.h"
 #include "sys/heap.h"
 
 /* ID3v2 frame IDs */

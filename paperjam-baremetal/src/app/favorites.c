@@ -4,7 +4,7 @@
 
 #include "hal/bcm2837.h"
 #include "favorites.h"
-#include "lib/fatfs/ff.h"
+#include "fatfs/ff.h"
 #include "sys/heap.h"
 
 /* Favorites configuration */

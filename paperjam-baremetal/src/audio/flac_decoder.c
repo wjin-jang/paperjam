@@ -8,7 +8,7 @@
 #include "hal/bcm2837.h"
 #include "decoder.h"
 #include "sys/heap.h"
-#include "lib/fatfs/ff.h"
+#include "fatfs/ff.h"
 
 /* dr_flac configuration */
 #define DR_FLAC_NO_STDIO

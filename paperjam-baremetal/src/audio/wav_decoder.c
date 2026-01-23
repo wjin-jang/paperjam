@@ -7,7 +7,7 @@
 #include "hal/bcm2837.h"
 #include "decoder.h"
 #include "sys/heap.h"
-#include "lib/fatfs/ff.h"
+#include "fatfs/ff.h"
 
 /* WAV file constants */
 #define RIFF_ID     0x46464952  /* "RIFF" */

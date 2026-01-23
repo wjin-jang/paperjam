@@ -13,7 +13,7 @@
 #include "app/library.h"
 #include "app/playlist.h"
 #include "app/player.h"
-#include "lib/fatfs/ff.h"
+#include "fatfs/ff.h"
 #include "sys/heap.h"
 
 /* Browse modes */

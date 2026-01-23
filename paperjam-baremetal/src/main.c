@@ -25,7 +25,7 @@
 #include "drivers/pisugar3.h"
 #include "drivers/buttons.h"
 #include "drivers/audio.h"
-#include "lib/fatfs/ff.h"
+#include "fatfs/ff.h"
 #include "gfx/framebuffer.h"
 #include "gfx/fonts.h"
 #include "gfx/text.h"
