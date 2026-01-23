@@ -1,0 +1,28 @@
+# PaperJam Bare-Metal OS Configuration
+# Raspberry Pi Zero 2 W
+
+# Boot configuration
+arm_64bit=1
+kernel=kernel8.img
+
+# GPU memory (minimum for bare-metal)
+gpu_mem=16
+
+# Enable I2C for battery monitor
+dtparam=i2c_arm=on
+
+# Enable SPI for e-paper display
+dtparam=spi=on
+
+# Disable unused peripherals for power saving
+dtoverlay=disable-bt
+dtoverlay=disable-wifi
+
+# CPU configuration
+arm_freq=1000
+
+# Disable splash screen
+disable_splash=1
+
+# Boot quietly
+boot_delay=0
