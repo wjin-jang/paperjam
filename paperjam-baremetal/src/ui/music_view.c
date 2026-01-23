@@ -13,6 +13,7 @@
 #include "audio/playback.h"
 #include "drivers/pisugar3.h"
 #include "drivers/audio.h"
+#include "drivers/buttons.h"
 #include "sys/heap.h"
 
 /* Layout constants */

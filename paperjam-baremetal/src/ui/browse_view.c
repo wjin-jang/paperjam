@@ -14,6 +14,7 @@
 #include "app/playlist.h"
 #include "app/player.h"
 #include "fatfs/ff.h"
+#include "drivers/buttons.h"
 #include "sys/heap.h"
 
 /* Browse modes */

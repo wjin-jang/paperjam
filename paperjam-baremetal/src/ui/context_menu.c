@@ -12,6 +12,7 @@
 #include "app/favorites.h"
 #include "app/playlist.h"
 #include "app/player.h"
+#include "drivers/buttons.h"
 #include "sys/heap.h"
 
 /* Layout constants */
