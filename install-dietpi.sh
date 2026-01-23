@@ -8,6 +8,12 @@
 
 set -e
 
+# Must run as root
+if [ "$EUID" -ne 0 ]; then
+    echo "Please run as root: sudo $0"
+    exit 1
+fi
+
 echo "=========================================="
 echo "  PaperJam DietPi Installer"
 echo "  E-ink Music Player for Raspberry Pi"
@@ -15,8 +21,24 @@ echo "=========================================="
 echo
 
 # Get username and paths (dietpi user by default)
-USER_NAME=${SUDO_USER:-dietpi}
-HOME_DIR=$(eval echo ~$USER_NAME)
+if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+    USER_NAME="$SUDO_USER"
+else
+    USER_NAME="dietpi"
+fi
+
+# Verify user exists
+if ! id "$USER_NAME" &>/dev/null; then
+    echo "Error: User '$USER_NAME' does not exist"
+    exit 1
+fi
+
+HOME_DIR=$(getent passwd "$USER_NAME" | cut -d: -f6)
+if [ -z "$HOME_DIR" ] || [ ! -d "$HOME_DIR" ]; then
+    echo "Error: Home directory for '$USER_NAME' not found"
+    exit 1
+fi
+
 INSTALL_DIR="$HOME_DIR/paperjam"
 
 echo "Installing for user: $USER_NAME"
@@ -24,12 +46,17 @@ echo "Install directory: $INSTALL_DIR"
 echo
 
 # --- Install Software via DietPi ---
-echo "[1/9] Installing software via dietpi-software..."
+echo "[1/9] Installing software..."
 
-# Install VLC, Python, Git (non-interactive)
-/boot/dietpi/dietpi-software install 5 130  # 5=ALSA, 130=Python 3
+# Update package list
+apt-get update
+
+# Install core packages via apt (works on DietPi and Raspberry Pi OS)
 apt-get install -y vlc-nox git i2c-tools python3-pip python3-venv python3-dev \
-    libjpeg-dev zlib1g-dev libfreetype6-dev python3-lgpio python3-dbus python3-gi
+    libjpeg-dev zlib1g-dev libfreetype6-dev alsa-utils
+
+# Install Python GPIO/system packages (may vary by distro)
+apt-get install -y python3-lgpio python3-dbus python3-gi python3-gpiozero 2>/dev/null || true
 
 echo "  Core packages installed"
 
@@ -37,51 +64,69 @@ echo "  Core packages installed"
 echo
 echo "[2/9] Enabling I2C and SPI..."
 
-# Use dietpi-config automation (or direct file edit)
-if [ -f /boot/dietpi.txt ]; then
-    BOOT_CONFIG="/boot/config.txt"
-elif [ -f /boot/firmware/config.txt ]; then
+# Find config.txt location (Bookworm uses /boot/firmware/, older uses /boot/)
+if [ -f /boot/firmware/config.txt ]; then
     BOOT_CONFIG="/boot/firmware/config.txt"
-else
+elif [ -f /boot/config.txt ]; then
     BOOT_CONFIG="/boot/config.txt"
+else
+    echo "Warning: config.txt not found, skipping I2C/SPI setup"
+    BOOT_CONFIG=""
 fi
 
-# Enable I2C
-grep -q "^dtparam=i2c_arm=on" "$BOOT_CONFIG" || echo "dtparam=i2c_arm=on" >> "$BOOT_CONFIG"
+if [ -n "$BOOT_CONFIG" ]; then
+    # Enable I2C
+    grep -q "^dtparam=i2c_arm=on" "$BOOT_CONFIG" || echo "dtparam=i2c_arm=on" >> "$BOOT_CONFIG"
 
-# Enable SPI
-grep -q "^dtparam=spi=on" "$BOOT_CONFIG" || echo "dtparam=spi=on" >> "$BOOT_CONFIG"
+    # Enable SPI
+    grep -q "^dtparam=spi=on" "$BOOT_CONFIG" || echo "dtparam=spi=on" >> "$BOOT_CONFIG"
+
+    echo "  I2C and SPI enabled in $BOOT_CONFIG"
+fi
 
 # Load i2c-dev module
-grep -q "^i2c-dev" /etc/modules || echo "i2c-dev" >> /etc/modules
-
-echo "  I2C and SPI enabled"
+grep -q "^i2c-dev" /etc/modules 2>/dev/null || echo "i2c-dev" >> /etc/modules
 
 # --- User Permissions ---
 echo
 echo "[3/9] Setting up user permissions..."
-usermod -aG i2c,gpio,spi,audio $USER_NAME 2>/dev/null || true
+for group in i2c gpio spi audio video input; do
+    usermod -aG "$group" "$USER_NAME" 2>/dev/null || true
+done
 echo "  Added $USER_NAME to hardware groups"
 
-# --- Disable Unnecessary Services (Power Optimization) ---
+# --- Power Optimization ---
 echo
 echo "[4/9] Optimizing for power efficiency..."
 
-# Disable WiFi power management
+# Disable WiFi power management (if NetworkManager is used)
 if [ -f /etc/NetworkManager/conf.d/default-wifi-powersave-on.conf ]; then
     sed -i 's/wifi.powersave = 3/wifi.powersave = 2/' /etc/NetworkManager/conf.d/default-wifi-powersave-on.conf 2>/dev/null || true
 fi
 
-# Set conservative CPU governor as default
-echo 'GOVERNOR=powersave' > /etc/default/cpufrequtils 2>/dev/null || true
-
-# Disable HDMI (saves ~25mA)
-/usr/bin/tvservice -o 2>/dev/null || true
-
-# Add HDMI disable to rc.local for persistence
-if ! grep -q "tvservice -o" /etc/rc.local 2>/dev/null; then
-    sed -i 's/^exit 0$/\/usr\/bin\/tvservice -o\nexit 0/' /etc/rc.local 2>/dev/null || true
+# Disable HDMI (saves ~25mA) - use vcgencmd on 64-bit, tvservice on 32-bit
+if command -v vcgencmd &>/dev/null; then
+    vcgencmd display_power 0 2>/dev/null || true
+elif command -v tvservice &>/dev/null; then
+    tvservice -o 2>/dev/null || true
 fi
+
+# Create systemd service to disable HDMI on boot
+cat > /etc/systemd/system/disable-hdmi.service << 'HDMIEOF'
+[Unit]
+Description=Disable HDMI output to save power
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'vcgencmd display_power 0 2>/dev/null || tvservice -o 2>/dev/null || true'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+HDMIEOF
+systemctl daemon-reload
+systemctl enable disable-hdmi 2>/dev/null || true
 
 echo "  Power optimizations applied"
 
@@ -164,6 +209,9 @@ echo "  Waveshare driver installed"
 echo
 echo "[9/9] Setting up auto-start service..."
 
+# Get user ID for XDG_RUNTIME_DIR
+USER_ID=$(id -u "$USER_NAME")
+
 # Create system-level service (works without user login)
 cat > /etc/systemd/system/paperjam.service << EOF
 [Unit]
@@ -173,12 +221,14 @@ After=local-fs.target sound.target
 [Service]
 Type=simple
 User=$USER_NAME
+Group=$USER_NAME
 WorkingDirectory=$INSTALL_DIR
 ExecStart=$INSTALL_DIR/venv/bin/python main.py
 Restart=on-failure
 RestartSec=5
 Environment=HOME=$HOME_DIR
-Environment=XDG_RUNTIME_DIR=/run/user/$(id -u $USER_NAME)
+Environment=XDG_RUNTIME_DIR=/run/user/$USER_ID
+Environment=DISPLAY=
 
 [Install]
 WantedBy=multi-user.target
