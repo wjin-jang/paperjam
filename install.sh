@@ -35,7 +35,7 @@ else
 fi
 
 # --- System Packages ---
-echo "[1/9] Installing system packages..."
+echo "[1/10] Installing system packages..."
 sudo apt update
 sudo apt install -y \
     python3-pip \
@@ -58,7 +58,7 @@ sudo apt install -y \
 
 # --- Enable Interfaces ---
 echo
-echo "[2/9] Enabling I2C and SPI..."
+echo "[2/10] Enabling I2C and SPI..."
 
 # Enable I2C
 if grep -q "^dtparam=i2c_arm=on" "$BOOT_CONFIG"; then
@@ -92,13 +92,13 @@ fi
 
 # --- User Permissions ---
 echo
-echo "[3/9] Setting up user permissions..."
+echo "[3/10] Setting up user permissions..."
 sudo usermod -aG i2c,gpio,spi,bluetooth,audio $USER_NAME 2>/dev/null || true
 echo "  Added $USER_NAME to hardware groups"
 
 # --- Bluetooth ---
 echo
-echo "[4/9] Configuring Bluetooth..."
+echo "[4/10] Configuring Bluetooth..."
 sudo systemctl enable bluetooth 2>/dev/null || true
 sudo systemctl start bluetooth 2>/dev/null || true
 sudo rfkill unblock bluetooth 2>/dev/null || true
@@ -106,7 +106,7 @@ echo "  Bluetooth enabled"
 
 # --- Clone Repository ---
 echo
-echo "[5/9] Cloning PaperJam repository..."
+echo "[5/10] Cloning PaperJam repository..."
 if [ -d "$INSTALL_DIR" ]; then
     echo "  Directory exists, pulling latest..."
     cd "$INSTALL_DIR"
@@ -118,7 +118,7 @@ fi
 
 # --- Python Virtual Environment ---
 echo
-echo "[6/9] Setting up Python environment..."
+echo "[6/10] Setting up Python environment..."
 python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
@@ -137,7 +137,7 @@ echo "  Python dependencies installed"
 
 # --- Configuration ---
 echo
-echo "[7/9] Configuring PaperJam..."
+echo "[7/10] Configuring PaperJam..."
 CONFIG_DIR="$HOME_DIR/.config/paperjam"
 mkdir -p "$CONFIG_DIR"
 CONFIG_FILE="$CONFIG_DIR/config.json"
@@ -175,7 +175,7 @@ fi
 
 # --- Waveshare EPD Library ---
 echo
-echo "[8/9] Installing Waveshare e-Paper driver..."
+echo "[8/10] Installing Waveshare e-Paper driver..."
 if [ -d "lib/waveshare" ]; then
     echo "  Directory exists, pulling latest..."
     cd "lib/waveshare"
@@ -190,7 +190,7 @@ echo "  Waveshare driver installed"
 
 # --- Systemd Service ---
 echo
-echo "[9/9] Setting up auto-start service..."
+echo "[9/10] Setting up auto-start service..."
 
 mkdir -p "$HOME_DIR/.config/systemd/user"
 
@@ -217,6 +217,12 @@ systemctl --user enable paperjam
 sudo loginctl enable-linger $USER_NAME 2>/dev/null || true
 
 echo "  Service configured"
+
+# --- PiSugar Scripts ---
+echo
+echo "[10/10] Setting up PiSugar button scripts..."
+chmod +x "$INSTALL_DIR/scripts/pisugar/"*.sh 2>/dev/null || true
+echo "  PiSugar scripts ready at $INSTALL_DIR/scripts/pisugar/"
 
 # --- Done ---
 echo

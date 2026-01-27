@@ -244,3 +244,45 @@ pactl info                # Check PulseAudio
 systemctl --user status pulseaudio
 systemctl --user start pulseaudio
 ```
+
+---
+
+## PiSugar 3 Button Configuration
+
+PaperJam includes scripts for the PiSugar 3 custom button. After installation, configure the button actions via the PiSugar web interface or config file.
+
+### Scripts
+
+| Script | Action |
+|--------|--------|
+| `~/paperjam/scripts/pisugar/toggle_play.sh` | Toggle play/pause |
+| `~/paperjam/scripts/pisugar/skip_track.sh` | Skip to next track |
+| `~/paperjam/scripts/pisugar/shutdown.sh` | Graceful shutdown |
+
+### Configuration via Web Interface
+
+1. Open PiSugar web interface at `http://<pi-ip>:8421`
+2. Navigate to button configuration
+3. Set actions:
+   - **Single tap** → `/home/<user>/paperjam/scripts/pisugar/toggle_play.sh`
+   - **Double tap** → `/home/<user>/paperjam/scripts/pisugar/skip_track.sh`
+
+### Configuration via Config File
+
+Edit `/etc/pisugar-server/config.json`:
+
+```json
+{
+  "single_tap_shell": "/home/<user>/paperjam/scripts/pisugar/toggle_play.sh",
+  "double_tap_shell": "/home/<user>/paperjam/scripts/pisugar/skip_track.sh",
+  "soft_poweroff_shell": "/home/<user>/paperjam/scripts/pisugar/shutdown.sh"
+}
+```
+
+Then restart the PiSugar service:
+
+```bash
+sudo systemctl restart pisugar-server
+```
+
+**Note:** Replace `<user>` with your username (e.g., `pi` or `dietpi`).

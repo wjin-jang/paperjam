@@ -14,7 +14,7 @@ E-ink music player for Raspberry Pi Zero 2 W.
 - **Library** - Auto-scanning with metadata extraction. Supports MP3, FLAC, WAV, M4A.
 - **Audio** - VLC engine with PulseAudio. Bluetooth and wired audio output.
 - **Display** - 1-bit e-paper with partial refresh. Album art, status icons, screensaver.
-- **Input** - Keyboard, IR remote, and media keys. Long-press for context menus.
+- **Input** - Keyboard, IR remote, media keys, and PiSugar button. Long-press for context menus.
 
 ## Quick Start
 
