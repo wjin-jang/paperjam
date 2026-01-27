@@ -86,7 +86,7 @@ aWIFI_KEY[0]='YourWiFiPassword'
 
 ### 3c. Create `Automation_Custom_Script.sh`
 
-Create this new file in the boot partition (same folder as `dietpi.txt`):
+Create this new file in the boot partition:
 
 ```bash
 #!/bin/bash

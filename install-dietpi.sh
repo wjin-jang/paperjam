@@ -1,11 +1,9 @@
 #!/bin/bash
 # PaperJam DietPi Installation Script
 # Optimized for power efficiency on Raspberry Pi Zero 2 W
-# Compatible with DietPi v9.x/v10.x (Bookworm)
 #
-# For headless install, create Automation_Custom_Script.sh on boot partition:
-#   - Bookworm: /boot/firmware/Automation_Custom_Script.sh
-#   - Bullseye: /boot/Automation_Custom_Script.sh
+# For headless install, place this script at:
+#   /boot/Automation_Custom_Script.sh
 # DietPi will run it automatically after first-boot setup.
 
 set -e
@@ -57,9 +55,8 @@ apt-get update
 apt-get install -y vlc-nox git i2c-tools python3-pip python3-venv python3-dev \
     libjpeg-dev zlib1g-dev libfreetype6-dev alsa-utils
 
-# Install Python GPIO/system packages
-# python3-rpi-lgpio provides RPi.GPIO compatibility on Bookworm (replaces legacy RPi.GPIO)
-apt-get install -y python3-lgpio python3-rpi-lgpio python3-dbus python3-gi python3-gpiozero 2>/dev/null || true
+# Install Python GPIO/system packages (may vary by distro)
+apt-get install -y python3-lgpio python3-dbus python3-gi python3-gpiozero 2>/dev/null || true
 
 echo "  Core packages installed"
 
@@ -151,38 +148,17 @@ echo
 echo "[6/9] Setting up Python environment..."
 sudo -u $USER_NAME python3 -m venv "$INSTALL_DIR/venv"
 sudo -u $USER_NAME "$INSTALL_DIR/venv/bin/pip" install --upgrade pip
-
-# Install pip packages (excluding RPi.GPIO - use system rpi-lgpio on Bookworm)
 sudo -u $USER_NAME "$INSTALL_DIR/venv/bin/pip" install \
-    pillow mutagen python-vlc smbus2 evdev numpy spidev gpiozero pyyaml
+    pillow mutagen python-vlc smbus2 evdev numpy spidev RPi.GPIO gpiozero pyyaml
 
-# Try to install RPi.GPIO via pip (works on Bullseye, fails on Bookworm - that's ok)
-sudo -u $USER_NAME "$INSTALL_DIR/venv/bin/pip" install RPi.GPIO 2>/dev/null || true
-
-# Symlink system packages into venv (required for Bookworm compatibility)
+# Symlink system packages into venv
 PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 VENV_SITE="$INSTALL_DIR/venv/lib/python$PYTHON_VERSION/site-packages"
-
-# lgpio (low-level GPIO)
 ln -sf /usr/lib/python3/dist-packages/lgpio.py "$VENV_SITE/" 2>/dev/null || true
 ln -sf /usr/lib/python3/dist-packages/_lgpio*.so "$VENV_SITE/" 2>/dev/null || true
-
-# rpi-lgpio provides RPi.GPIO compatibility on Bookworm
-if [ -d /usr/lib/python3/dist-packages/RPi ]; then
-    ln -sf /usr/lib/python3/dist-packages/RPi "$VENV_SITE/" 2>/dev/null || true
-fi
-
-# D-Bus for MPRIS (Bluetooth media controls)
 ln -sf /usr/lib/python3/dist-packages/dbus "$VENV_SITE/" 2>/dev/null || true
 ln -sf /usr/lib/python3/dist-packages/_dbus*.so "$VENV_SITE/" 2>/dev/null || true
-
-# GLib for D-Bus main loop
 ln -sf /usr/lib/python3/dist-packages/gi "$VENV_SITE/" 2>/dev/null || true
-
-# gpiozero (may be installed via apt)
-if [ -d /usr/lib/python3/dist-packages/gpiozero ]; then
-    ln -sf /usr/lib/python3/dist-packages/gpiozero "$VENV_SITE/" 2>/dev/null || true
-fi
 
 echo "  Python dependencies installed"
 
