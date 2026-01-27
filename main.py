@@ -710,4 +710,5 @@ class MainApp:
 
 if __name__ == "__main__":
     app = MainApp()
+    app.launch_app("music")  # Start directly in Music app
     app.run()
