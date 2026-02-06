@@ -207,19 +207,21 @@ class PlaylistManager:
     def toggle_shuffle(self):
         """Toggle shuffle mode."""
         self.shuffle_active = not self.shuffle_active
-        # Reshuffle queue if needed
-        if self.shuffle_active and self.playlist_source:
+        if self.playlist_source:
             current_path = self.get_current_path()
             self.queue = list(range(len(self.playlist_source)))
-            random.shuffle(self.queue)
-            # Move current track to front
+            if self.shuffle_active:
+                random.shuffle(self.queue)
+            # Place current track at current position in new queue
             if current_path:
                 try:
                     real_idx = self.playlist_source.index(current_path)
-                    if real_idx in self.queue:
+                    if self.shuffle_active:
                         self.queue.remove(real_idx)
-                    self.queue.insert(0, real_idx)
-                    self.queue_idx = 0
+                        self.queue.insert(0, real_idx)
+                        self.queue_idx = 0
+                    else:
+                        self.queue_idx = real_idx
                 except ValueError:
                     pass
         self.save_queue()
