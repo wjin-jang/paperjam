@@ -539,8 +539,9 @@ class MainApp:
         # Save volume before shutdown
         self.settings_app.categories['AUDIO'].save_volume()
 
-        # Get random cover art from library
-        cover = self.music_app.lib.get_random_cover()
+        # Use last playing song's cover art, or a random one
+        state = self.music_app.state
+        cover = state.playing_cover_l or state.playing_cover_s or self.music_app.lib.get_random_cover()
         frame = self.renderer.render_shutdown(cover)
         self._display(frame, full_refresh=True, skip_battery=True, skip_status=True)
         time.sleep(1)
