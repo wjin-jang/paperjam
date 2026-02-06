@@ -92,6 +92,7 @@ class LibraryManager:
         self.artists: dict[str, list[TrackDict]] = {}
         self.albums: dict[str, list[TrackDict]] = {}
         self.featured_on: dict[str, list[TrackDict]] = {}  # Tracks each artist is featured on
+        self.artist_sort_map: dict[str, str] = {}  # Artist name -> album artist sort order
 
         # User collections
         self.recents: list[Path] = []
@@ -265,6 +266,9 @@ class LibraryManager:
         artist_case_map: dict[str, str] = {}
         album_case_map: dict[str, str] = {}
 
+        # Album artist sort order map (canonical artist name -> sort value)
+        temp_artist_sort_map: dict[str, str] = {}
+
         # Scan all supported audio files
         for ext in cfg.VALID_EXTS:
             for p in cfg.MUSIC_PATH.rglob(f"*{ext}"):
@@ -292,6 +296,10 @@ class LibraryManager:
 
                     temp_artists.setdefault(canonical_artist, []).append(data)
                     temp_albums.setdefault(canonical_album, []).append(data)
+
+                    # Store album artist sort order (first non-empty value wins)
+                    if track.artist_sort and canonical_artist not in temp_artist_sort_map:
+                        temp_artist_sort_map[canonical_artist] = track.artist_sort
 
                     # Track featured artist appearances
                     for feat_artist in track.featured:
@@ -332,9 +340,12 @@ class LibraryManager:
 
         # Commit results to main library (protected by lock)
         with self._lock:
-            self.artists = dict(sorted(temp_artists.items(), key=lambda x: get_full_sort_key(x[0])))
+            self.artist_sort_map = temp_artist_sort_map
+            self.artists = dict(sorted(temp_artists.items(),
+                key=lambda x: get_full_sort_key(temp_artist_sort_map.get(x[0], x[0]))))
             self.albums = dict(sorted(temp_albums.items(), key=lambda x: get_full_sort_key(x[0])))
-            self.featured_on = dict(sorted(temp_featured.items(), key=lambda x: get_full_sort_key(x[0])))
+            self.featured_on = dict(sorted(temp_featured.items(),
+                key=lambda x: get_full_sort_key(temp_artist_sort_map.get(x[0], x[0]))))
             self._all_tracks_cache = None
             self._track_count_cache = None
             self._save_cache()
@@ -358,7 +369,8 @@ class LibraryManager:
                 json.dump({
                     'artists': self.artists,
                     'albums': self.albums,
-                    'featured_on': self.featured_on
+                    'featured_on': self.featured_on,
+                    'artist_sort_map': self.artist_sort_map
                 }, f)
         except OSError as e:
             logger.error(f"Cache save error: {e}")
@@ -368,6 +380,7 @@ class LibraryManager:
         self.artists = data.get('artists', {})
         self.albums = data.get('albums', {})
         self.featured_on = data.get('featured_on', {})
+        self.artist_sort_map = data.get('artist_sort_map', {})
 
     def get_playlists(self) -> list[Path]:
         """Get all user playlists sorted by name.

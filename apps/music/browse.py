@@ -7,7 +7,7 @@ from typing import List, Optional, Tuple
 
 import config as cfg
 from core.i18n import t
-from core.metadata import format_duration, get_sort_key
+from core.metadata import format_duration, get_sort_key, get_full_sort_key
 from ui.graphics import get_cover
 from core.metadata import extract_track_info
 from core.library import LibraryManager
@@ -47,7 +47,8 @@ class BrowseHandler:
             {'name': t('player.browse.files'), 'id': {'kind': 'dir', 'mode': 'FILES', 'path': cfg.MUSIC_PATH}, 'icon': icons['dir']}
         ]
 
-    def _create_alphabetical_list(self, data_dict: dict, item_kind: str, item_mode: str) -> List[dict]:
+    def _create_alphabetical_list(self, data_dict: dict, item_kind: str, item_mode: str,
+                                    sort_map: dict = None) -> List[dict]:
         """Create a list with alphabetical headings if needed."""
         items = []
         current_letter = None
@@ -55,7 +56,8 @@ class BrowseHandler:
 
         for k in data_dict.keys():
             if use_headings:
-                group_key = get_sort_key(k)
+                sort_name = sort_map.get(k, k) if sort_map else k
+                group_key = get_sort_key(sort_name)
                 if group_key != current_letter:
                     current_letter = group_key
                     items.append({'name': group_key, 'heading': True})
@@ -76,7 +78,8 @@ class BrowseHandler:
     def get_artists_list(self) -> Tuple[str, List[dict]]:
         """Get list of all artists, organized alphabetically with headings."""
         if self._artist_list_cache is None:
-            self._artist_list_cache = self._create_alphabetical_list(self.lib.artists, 'artist', 'ARTIST_VIEW')
+            self._artist_list_cache = self._create_alphabetical_list(
+                self.lib.artists, 'artist', 'ARTIST_VIEW', self.lib.artist_sort_map)
         return t('player.browse.artists'), self._artist_list_cache
 
     def get_albums_list(self) -> Tuple[str, List[dict]]:
@@ -89,9 +92,11 @@ class BrowseHandler:
         """Get list of favorite artists."""
         if not self.lib.fav_artists:
             return t('player.browse.fav_artists'), [{'name': t('player.browse.no_fav_artists'), 'selectable': False}]
+        sort_map = self.lib.artist_sort_map
         items = [
             {'name': k, 'id': {'kind': 'artist', 'mode': 'ARTIST_VIEW'}, 'icon': 'Ⓗ'}
-            for k in sorted(self.lib.fav_artists, key=lambda s: s.lower())
+            for k in sorted(self.lib.fav_artists,
+                key=lambda s: get_full_sort_key(sort_map.get(s, s)))
         ]
         return t('player.browse.fav_artists'), items
 

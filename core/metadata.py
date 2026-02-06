@@ -105,15 +105,16 @@ def parse_num(val):
 def get_metadata(file_path):
     """
     Fast extraction of text-only metadata.
-    Returns: (album, artist, title, track_number, disc_number, year, duration, featured_artists)
+    Returns: (album, artist, title, track_number, disc_number, year, duration, featured_artists, artist_sort)
     """
     if not os.path.exists(file_path):
-        return ("Unknown Album", "Unknown Artist", format_track_name(file_path), 0, 0, "", 0, [])
+        return ("Unknown Album", "Unknown Artist", format_track_name(file_path), 0, 0, "", 0, [], "")
 
     album, album_artist, title, year = None, None, None, None
     track_num, disc_num = 0, 0
     duration = 0
     raw_artist = None  # Track artist (for featured detection)
+    artist_sort = None  # Album artist sort order
 
     try:
         audio = File(file_path)
@@ -127,6 +128,7 @@ def get_metadata(file_path):
             if not album_artist:
                 album_artist = raw_artist
             title = audio.get("title", [None])[0]
+            artist_sort = audio.get("albumartistsort", [None])[0]
 
             track_num = parse_num(audio.get("tracknumber", [0])[0])
             # Try multiple disc number tag variations (different taggers use different names)
@@ -147,6 +149,7 @@ def get_metadata(file_path):
                 if not album_artist:
                     album_artist = raw_artist
                 if 'TIT2' in tags: title = tags['TIT2'].text[0]
+                if 'TSO2' in tags: artist_sort = tags['TSO2'].text[0]
                 if 'TRCK' in tags: track_num = parse_num(tags['TRCK'].text[0])
                 if 'TPOS' in tags: disc_num = parse_num(tags['TPOS'].text[0])
 
@@ -158,6 +161,7 @@ def get_metadata(file_path):
 
     album = clean_tag(album)
     album_artist = clean_tag(album_artist)
+    artist_sort = clean_tag(artist_sort)
     if not title: title = format_track_name(file_path)
 
     # Parse featured artists from title and track artist
@@ -171,7 +175,8 @@ def get_metadata(file_path):
         disc_num,
         str(year) if year else "",
         duration,
-        featured
+        featured,
+        artist_sort or ""
     )
 
 
@@ -199,6 +204,7 @@ class TrackInfo:
     disc_num: int
     duration: int = 0
     featured: List[str] = field(default_factory=list)
+    artist_sort: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for compatibility with existing code."""
@@ -239,7 +245,8 @@ def extract_track_info(file_path: Path) -> TrackInfo:
         disc_num=meta[4] if meta[4] else 0,
         year=meta[5] if meta[5] else "",
         duration=meta[6] if len(meta) > 6 else 0,
-        featured=meta[7] if len(meta) > 7 else []
+        featured=meta[7] if len(meta) > 7 else [],
+        artist_sort=meta[8] if len(meta) > 8 else ""
     )
 
 
