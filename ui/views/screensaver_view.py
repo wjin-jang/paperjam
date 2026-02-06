@@ -2,7 +2,7 @@ from PIL import Image, ImageDraw
 import config as cfg
 from core.i18n import t
 from ui.views.core import Panel
-from ui.views.items import Item
+from ui.views.items import Item, Column
 
 
 class ScreensaverRenderer:
@@ -83,7 +83,7 @@ class ScreensaverRenderer:
 
         # Add items for status, title, artist, album
         info_menu.items = [
-            Item(columns=[title,status_icon], font=cfg.FONT_HEADER, selectable=False),
+            Item(columns=[title, Column(content=status_icon, width=12)], font=cfg.FONT_HEADER, selectable=False),
             Item(text=album, selectable=False),
             Item(text=artist, selectable=False),
         ]

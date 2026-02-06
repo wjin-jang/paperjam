@@ -237,6 +237,11 @@ class TextInput:
             draw.line((text_x, underline_y, text_x + char_width, underline_y), fill=fg)
 
 
+def _col_text(col) -> str:
+    """Extract display text from a column (Column object or plain string)."""
+    return str(col.content) if isinstance(col, Column) else str(col)
+
+
 @dataclass
 class Column:
     """A single column within a multi-column layout.
@@ -612,26 +617,26 @@ class Item:
     def _render_plain_columns(self, draw, columns, x, y, w, fg=cfg.BLACK, column_widths=None):
         if not columns: return
         font_pad = get_font_padding(cfg.FONT_MAIN)
-        draw_text_with_cjk(draw, (x + font_pad[0], y + font_pad[1]), str(columns[0]), cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=fg)
+        draw_text_with_cjk(draw, (x + font_pad[0], y + font_pad[1]), _col_text(columns[0]), cfg.FONT_MAIN, cfg.FONT_CJK_MAIN, fill=fg)
         if len(columns) > 1:
             right_widths = column_widths if column_widths else self._calc_column_widths(columns, w)
             col_x = x + max(20, w - sum(right_widths))
             for i, col in enumerate(columns[1:]):
                 col_w = right_widths[i] if i < len(right_widths) else 12
-                self._draw_aligned_text(draw, str(col), col_x, y, col_w, cfg.ROW_HEIGHT, 'center', fg)
+                self._draw_aligned_text(draw, _col_text(col), col_x, y, col_w, cfg.ROW_HEIGHT, 'center', fg)
                 col_x += col_w
 
     def _render_info_columns(self, draw, canvas, x, y, w, invert=False, column_widths=None):
         if not self.columns: return
         right_widths = column_widths if column_widths else self._calc_column_widths(self.columns, w)
         left_w = max(20, w - sum(right_widths)) if right_widths else w
-        self._draw_text_box(draw, canvas, str(self.columns[0]), x, y, left_w, cfg.ROW_HEIGHT, invert=invert)
+        self._draw_text_box(draw, canvas, _col_text(self.columns[0]), x, y, left_w, cfg.ROW_HEIGHT, invert=invert)
         col_x = x + left_w
         if invert:
             draw.line((col_x, y + 1, col_x, y + cfg.ROW_HEIGHT), fill=cfg.WHITE)
         for i, col in enumerate(self.columns[1:]):
             col_w = right_widths[i] if i < len(right_widths) else 12
-            self._draw_text_box(draw, canvas, str(col), col_x, y, col_w, cfg.ROW_HEIGHT, center=True, invert=invert)
+            self._draw_text_box(draw, canvas, _col_text(col), col_x, y, col_w, cfg.ROW_HEIGHT, center=True, invert=invert)
             col_x += col_w
             if invert and i < len(self.columns) - 2:
                 draw.line((col_x, y + 1, col_x, y + cfg.ROW_HEIGHT), fill=cfg.WHITE)
@@ -754,8 +759,11 @@ def calc_menu_column_widths(items, total_width):
             max_cols = max(max_cols, len(cols) - 1)
             widths = []
             for col in cols[1:]:
-                text_width = len(str(col)) * 6 + 8
-                widths.append(max(default_col_width, text_width))
+                if isinstance(col, Column) and col.width is not None:
+                    widths.append(col.width)
+                else:
+                    text_width = len(_col_text(col)) * 6 + 8
+                    widths.append(max(default_col_width, text_width))
             item_widths[idx] = widths
 
     if not item_widths:
