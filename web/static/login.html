@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PaperJam — Login</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="icon" type="image/png" href="/static/icons/icon-192.png">
+    <meta name="theme-color" content="#101033">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="login-body">
+    <div class="login-container">
+        <div class="site-title">PaperJam</div>
+        <div class="login-subtitle">music streaming</div>
+        <form id="login-form" class="login-form" autocomplete="on">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" autocomplete="current-password" required>
+            </div>
+            <div id="login-error" class="error-message" hidden></div>
+            <button type="submit" class="btn-primary">Log In</button>
+        </form>
+        <div class="login-footer">music.jangnet.cc</div>
+    </div>
+    <script>
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const err = document.getElementById('login-error');
+            err.hidden = true;
+
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) {
+                err.textContent = 'Please enter username and password';
+                err.hidden = false;
+                return;
+            }
+
+            try {
+                const res = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password }),
+                });
+
+                if (res.ok) {
+                    window.location.href = '/app';
+                } else {
+                    const data = await res.json();
+                    err.textContent = data.detail || 'Invalid credentials';
+                    err.hidden = false;
+                }
+            } catch {
+                err.textContent = 'Connection error';
+                err.hidden = false;
+            }
+        });
+    </script>
+</body>
+</html>

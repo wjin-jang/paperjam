@@ -1,0 +1,19 @@
+[Unit]
+Description=PaperJam Web Music Streaming Server
+After=network.target
+
+[Service]
+Type=simple
+User=woojin
+Group=woojin
+WorkingDirectory=/opt/paperjam-web
+Environment=PAPERJAM_MUSIC_PATH=/home/woojin/Music
+Environment=PAPERJAM_SECRET_KEY=CHANGE_ME_TO_A_RANDOM_SECRET
+Environment=PAPERJAM_HOST=127.0.0.1
+Environment=PAPERJAM_PORT=8800
+ExecStart=/opt/paperjam-web/venv/bin/python -m uvicorn server:app --host 127.0.0.1 --port 8800
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
