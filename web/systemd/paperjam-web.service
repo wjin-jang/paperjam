@@ -6,12 +6,12 @@ After=network.target
 Type=simple
 User=woojin
 Group=woojin
-WorkingDirectory=/opt/paperjam-web
+WorkingDirectory=/opt/paperjam-web/web
 Environment=PAPERJAM_MUSIC_PATH=/home/woojin/Music
 Environment=PAPERJAM_SECRET_KEY=CHANGE_ME_TO_A_RANDOM_SECRET
 Environment=PAPERJAM_HOST=127.0.0.1
 Environment=PAPERJAM_PORT=8800
-ExecStart=/opt/paperjam-web/venv/bin/python -m uvicorn server:app --host 127.0.0.1 --port 8800
+ExecStart=/opt/paperjam-web/web/venv/bin/python -m uvicorn server:app --host 0.0.0.0 --port 8800
 Restart=always
 RestartSec=5
 

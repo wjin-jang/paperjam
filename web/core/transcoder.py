@@ -50,15 +50,12 @@ def needs_transcoding(path: str, quality: str) -> bool:
         return False
 
     suffix = Path(path).suffix.lower()
-    # MP3 files at or below requested bitrate don't need transcoding
-    if suffix == ".mp3":
-        bitrate = QUALITY_PRESETS.get(quality, 256)
-        info = get_audio_info(path)
-        if info:
-            fmt = info.get("format", {})
-            file_bitrate = int(fmt.get("bit_rate", 0)) // 1000
-            if file_bitrate > 0 and file_bitrate <= bitrate:
-                return False
+    
+    # Browsers natively support FLAC, MP3, M4A/AAC, WAV, OGG — no need to transcode
+    browser_native = {".flac", ".mp3", ".m4a", ".aac", ".wav", ".ogg", ".opus"}
+    if suffix in browser_native:
+        return False
+    
     return True
 
 

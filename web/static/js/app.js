@@ -681,6 +681,7 @@ const App = {
                 { value: 'light', label: 'Light' },
             ], (val) => {
                 document.documentElement.dataset.theme = val;
+                localStorage.setItem('pj-theme', val);
                 const meta = document.querySelector('meta[name="theme-color"]');
                 if (meta) meta.content = val === 'dark' ? '#121218' : '#e9e3d3';
             }));
@@ -1271,6 +1272,7 @@ const App = {
             const settings = await API.settings();
             const theme = settings.theme || 'dark';
             document.documentElement.dataset.theme = theme;
+            localStorage.setItem('pj-theme', theme);
             const meta = document.querySelector('meta[name="theme-color"]');
             if (meta) meta.content = theme === 'dark' ? '#121218' : '#e9e3d3';
         } catch {}
