@@ -36,9 +36,31 @@ const App = {
             this.navigate(btn.dataset.view);
         });
 
-        // Search
+        // Search toggle
+        const searchBar = document.getElementById('search-bar');
         const searchInput = document.getElementById('search-input');
+        const searchToggle = document.getElementById('search-toggle');
         let searchTimeout;
+
+        const closeSearch = () => {
+            searchBar.hidden = true;
+            searchToggle.classList.remove('active');
+            searchInput.value = '';
+            if (this.currentView === 'search') this.navigate('library');
+        };
+
+        searchToggle.addEventListener('click', () => {
+            if (searchBar.hidden) {
+                searchBar.hidden = false;
+                searchToggle.classList.add('active');
+                searchInput.focus();
+            } else {
+                closeSearch();
+            }
+        });
+
+        document.getElementById('search-close').addEventListener('click', () => closeSearch());
+
         searchInput.addEventListener('input', () => {
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
@@ -48,9 +70,8 @@ const App = {
             }, 300);
         });
 
-        document.getElementById('search-btn').addEventListener('click', () => {
-            const q = searchInput.value.trim();
-            if (q) this.showSearch(q);
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeSearch();
         });
 
         // Player controls
@@ -183,7 +204,10 @@ const App = {
 
     async _renderLibrary(el) {
         try {
-            const stats = await API.libraryStats();
+            const [stats, recents] = await Promise.all([
+                API.libraryStats(),
+                API.recents().catch(() => []),
+            ]);
             el.innerHTML = '';
 
             const header = document.createElement('div');
@@ -191,25 +215,12 @@ const App = {
             header.textContent = 'Library';
             el.appendChild(header);
 
-            const items = [
-                { icon: '♪', title: 'All Tracks', meta: `${stats.tracks} tracks`, action: () => this._renderAllTracks(el) },
-                { icon: 'A', title: 'Artists', meta: `${stats.artists} artists`, action: () => { this.viewStack.push('library'); this.navigate('artists'); } },
-                { icon: 'B', title: 'Albums', meta: `${stats.albums} albums`, action: () => { this.viewStack.push('library'); this.navigate('albums'); } },
-                { icon: '♥', title: 'Favorites', meta: '', action: () => { this.viewStack.push('library'); this.navigate('favorites'); } },
-                { icon: '⟳', title: 'Recently Played', meta: '', action: () => { this.viewStack.push('library'); this.navigate('recents'); } },
-            ];
-
-            items.forEach(item => {
-                const div = this._createListItem(item.icon, item.title, item.meta, null, item.action);
-                el.appendChild(div);
-            });
-
-            // Stats footer
-            const footer = document.createElement('div');
-            footer.className = 'settings-item';
-            footer.innerHTML = `<span class="settings-label">Total Duration</span>
-                               <span class="settings-value">${stats.total_duration}</span>`;
-            el.appendChild(footer);
+            // Stats overview
+            const statsDiv = document.createElement('div');
+            statsDiv.className = 'settings-item';
+            statsDiv.innerHTML = `<span class="settings-label">${stats.artists} artists · ${stats.albums} albums · ${stats.tracks} tracks</span>
+                <span class="settings-value">${stats.total_duration}</span>`;
+            el.appendChild(statsDiv);
 
             if (stats.scanning) {
                 const scanDiv = document.createElement('div');
@@ -217,6 +228,27 @@ const App = {
                 scanDiv.innerHTML = `<span class="settings-label">Scanning...</span>
                     <span class="settings-value">${stats.scan_progress} / ${stats.scan_total}</span>`;
                 el.appendChild(scanDiv);
+            }
+
+            // All Tracks shortcut
+            const allTracksDiv = this._createListItem('♪', 'All Tracks', `${stats.tracks} tracks`, null, () => this._renderAllTracks(el));
+            el.appendChild(allTracksDiv);
+
+            // Recent plays preview
+            if (recents.length > 0) {
+                const recentHeader = document.createElement('div');
+                recentHeader.className = 'section-header';
+                recentHeader.textContent = 'Recently Played';
+                el.appendChild(recentHeader);
+
+                recents.slice(0, 5).forEach(r => {
+                    const filename = r.track_path.split('/').pop();
+                    const div = this._createListItem('⟳', filename, '', null, () => {
+                        const track = { path: r.track_path, title: filename, artist: '', album: '' };
+                        Player.play(track, [track], 0);
+                    });
+                    el.appendChild(div);
+                });
             }
         } catch (e) {
             el.innerHTML = `<div class="empty-state">Error loading library: ${e.message}</div>`;
@@ -238,16 +270,29 @@ const App = {
                 return;
             }
 
-            const playAllBtn = this._createListItem('▶', 'Play All', `${tracks.length} tracks`, null, () => {
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'album-actions';
+            actionsDiv.style.padding = 'var(--pad)';
+            actionsDiv.style.borderBottom = 'var(--cell)';
+
+            const playAllBtn = document.createElement('button');
+            playAllBtn.className = 'btn-small';
+            playAllBtn.textContent = '▶ Play All';
+            playAllBtn.addEventListener('click', () => {
                 Player.play(tracks[0], tracks, 0);
             });
-            el.appendChild(playAllBtn);
+            actionsDiv.appendChild(playAllBtn);
 
-            const shuffleBtn = this._createListItem('⤨', 'Shuffle All', '', null, () => {
+            const shuffleBtn = document.createElement('button');
+            shuffleBtn.className = 'btn-small';
+            shuffleBtn.textContent = '⤨ Shuffle All';
+            shuffleBtn.addEventListener('click', () => {
                 const shuffled = [...tracks].sort(() => Math.random() - 0.5);
                 Player.play(shuffled[0], shuffled, 0);
             });
-            el.appendChild(shuffleBtn);
+            actionsDiv.appendChild(shuffleBtn);
+
+            el.appendChild(actionsDiv);
 
             tracks.forEach((t, i) => {
                 const div = this._createTrackItem(t, () => {
@@ -669,16 +714,6 @@ const App = {
             pwItem.addEventListener('click', () => this._showChangePasswordModal());
             el.appendChild(pwItem);
 
-            // Logout
-            const logoutItem = document.createElement('div');
-            logoutItem.className = 'list-item';
-            logoutItem.innerHTML = '<div class="item-info"><div class="item-title">Log Out</div></div>';
-            logoutItem.addEventListener('click', async () => {
-                await API.logout();
-                window.location.href = '/login';
-            });
-            el.appendChild(logoutItem);
-
             // Admin section
             if (this.user.is_admin) {
                 const adminHeader = document.createElement('div');
@@ -824,17 +859,22 @@ const App = {
             return;
         }
 
+        this._setBreadcrumb(
+            { label: 'Back', action: () => this.goBack() },
+            { label: 'Now Playing' }
+        );
+
         el.innerHTML = '';
         const np = document.createElement('div');
         np.className = 'now-playing-full';
         np.innerHTML = `
             <div class="np-cover">
-                <img src="${API.coverUrl(t.path, 'large')}" alt="" onerror="this.style.display='none'">
+                <img src="${API.coverUrl(t.path, 'large')}" alt="" onerror="this.parentElement.innerHTML='<span class=np-placeholder>♪</span>'">
             </div>
             <div class="np-info">
                 <div class="np-title">${this._esc(t.title)}</div>
                 <div class="np-artist">${this._esc(t.artist)}</div>
-                <div class="np-album">${this._esc(t.album)}</div>
+                ${t.album ? `<div class="np-album">${this._esc(t.album)}</div>` : ''}
             </div>`;
         el.appendChild(np);
     },
@@ -1055,12 +1095,8 @@ const App = {
         const rect = btn.getBoundingClientRect();
         const items = [
             { label: `Signed in as ${this.user.username}`, action: () => {} },
-            { label: 'Settings', action: () => this.navigate('settings') },
+            { label: 'Log Out', action: async () => { await API.logout(); window.location.href = '/login'; } },
         ];
-        if (this.user.is_admin) {
-            items.push({ label: 'Manage Users', action: () => { this.viewStack.push(this.currentView); this.navigate('admin'); } });
-        }
-        items.push({ label: 'Log Out', action: async () => { await API.logout(); window.location.href = '/login'; } });
 
         this._showContextMenu({ clientX: rect.right - 200, clientY: rect.bottom }, items);
     },
@@ -1092,7 +1128,7 @@ const App = {
         this.showModal('New Playlist',
             `<div class="form-group">
                 <label for="pl-name">Playlist Name</label>
-                <input type="text" id="pl-name" style="width:100%;padding:0.4rem;font-family:var(--font-mono);font-size:0.8rem;border:var(--cell);background:var(--code-bg);color:var(--text)">
+                <input type="text" id="pl-name">
             </div>`,
             [
                 { label: 'Cancel', action: () => this.closeModal() },
@@ -1113,7 +1149,7 @@ const App = {
         this.showModal('Rename Playlist',
             `<div class="form-group">
                 <label for="pl-rename">Name</label>
-                <input type="text" id="pl-rename" value="${this._esc(playlist.name)}" style="width:100%;padding:0.4rem;font-family:var(--font-mono);font-size:0.8rem;border:var(--cell);background:var(--code-bg);color:var(--text)">
+                <input type="text" id="pl-rename" value="${this._esc(playlist.name)}">
             </div>`,
             [
                 { label: 'Cancel', action: () => this.closeModal() },
@@ -1133,11 +1169,11 @@ const App = {
         this.showModal('Change Password',
             `<div class="form-group">
                 <label for="pw-current">Current Password</label>
-                <input type="password" id="pw-current" style="width:100%;padding:0.4rem;font-family:var(--font-mono);font-size:0.8rem;border:var(--cell);background:var(--code-bg);color:var(--text)">
+                <input type="password" id="pw-current">
             </div>
             <div class="form-group">
                 <label for="pw-new">New Password</label>
-                <input type="password" id="pw-new" style="width:100%;padding:0.4rem;font-family:var(--font-mono);font-size:0.8rem;border:var(--cell);background:var(--code-bg);color:var(--text)">
+                <input type="password" id="pw-new">
             </div>`,
             [
                 { label: 'Cancel', action: () => this.closeModal() },
@@ -1161,15 +1197,15 @@ const App = {
         this.showModal('Create User',
             `<div class="form-group">
                 <label for="new-username">Username</label>
-                <input type="text" id="new-username" style="width:100%;padding:0.4rem;font-family:var(--font-mono);font-size:0.8rem;border:var(--cell);background:var(--code-bg);color:var(--text)">
+                <input type="text" id="new-username">
             </div>
             <div class="form-group">
                 <label for="new-display">Display Name</label>
-                <input type="text" id="new-display" style="width:100%;padding:0.4rem;font-family:var(--font-mono);font-size:0.8rem;border:var(--cell);background:var(--code-bg);color:var(--text)">
+                <input type="text" id="new-display">
             </div>
             <div class="form-group">
                 <label for="new-password">Password</label>
-                <input type="password" id="new-password" style="width:100%;padding:0.4rem;font-family:var(--font-mono);font-size:0.8rem;border:var(--cell);background:var(--code-bg);color:var(--text)">
+                <input type="password" id="new-password">
             </div>
             <div class="form-group checkbox-group">
                 <input type="checkbox" id="new-admin">
@@ -1202,7 +1238,7 @@ const App = {
         this.showModal(`Reset Password: ${user.username}`,
             `<div class="form-group">
                 <label for="reset-pw">New Password</label>
-                <input type="password" id="reset-pw" style="width:100%;padding:0.4rem;font-family:var(--font-mono);font-size:0.8rem;border:var(--cell);background:var(--code-bg);color:var(--text)">
+                <input type="password" id="reset-pw">
             </div>`,
             [
                 { label: 'Cancel', action: () => this.closeModal() },

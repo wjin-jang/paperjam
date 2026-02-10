@@ -1,8 +1,6 @@
 /* PaperJam Web — Stylesheet
-   Based on blog.jangnet.cc design language
+   Brutalist zine aesthetic
    Fonts: Space Mono (body/heading), Fira Code (mono) */
-
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Fira+Code:wght@400;500&display=swap');
 
 /* === Reset === */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -19,10 +17,10 @@
     --accent: #1010A0;
     --highlight: #e0d8c4;
     --max-width: 960px;
-    --player-height: 80px;
     --bw: 2px;
     --cell: var(--bw) solid var(--ink);
-    --pad: 0.8rem;
+    --rule: 1px solid var(--highlight);
+    --pad: 0.75rem;
     --font-body: 'Space Mono', monospace;
     --font-mono: 'Fira Code', monospace;
     --font-heading: 'Space Mono', monospace;
@@ -44,7 +42,6 @@
 /* === Base === */
 html {
     font-size: 16px;
-    scroll-behavior: smooth;
     background: var(--paper);
     height: 100%;
 }
@@ -54,7 +51,7 @@ body {
     font-size: 0.85rem;
     background: var(--paper);
     color: var(--text);
-    line-height: 1.6;
+    line-height: 1.5;
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -93,32 +90,28 @@ a:hover { text-decoration-thickness: 2px; }
 
 .login-subtitle {
     font-size: 0.75rem;
-    padding: 0.35rem var(--pad);
+    padding: 0.3rem var(--pad);
     border-bottom: var(--cell);
     text-transform: uppercase;
     letter-spacing: 0.08em;
 }
 
-.login-form {
-    padding: var(--pad);
-}
+.login-form { padding: var(--pad); }
 
-.form-group {
-    margin-bottom: 0.8rem;
-}
+.form-group { margin-bottom: 0.7rem; }
 
 .form-group label {
     display: block;
     font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    margin-bottom: 0.3rem;
+    margin-bottom: 0.25rem;
     font-weight: 700;
 }
 
 .form-group input {
     width: 100%;
-    padding: 0.5rem;
+    padding: 0.45rem;
     font-family: var(--font-mono);
     font-size: 0.85rem;
     border: var(--cell);
@@ -127,14 +120,12 @@ a:hover { text-decoration-thickness: 2px; }
     outline: none;
 }
 
-.form-group input:focus {
-    box-shadow: 3px 3px 0 var(--ink);
-}
+.form-group input:focus { box-shadow: 3px 3px 0 var(--ink); }
 
 .error-message {
     color: var(--red-ink);
     font-size: 0.75rem;
-    padding: 0.4rem 0;
+    padding: 0.3rem 0;
     font-weight: 700;
 }
 
@@ -149,7 +140,7 @@ a:hover { text-decoration-thickness: 2px; }
     color: var(--paper);
     border: var(--cell);
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
 }
 
 .btn-primary:hover {
@@ -159,18 +150,21 @@ a:hover { text-decoration-thickness: 2px; }
 }
 
 .login-footer {
-    padding: 0.35rem var(--pad);
+    padding: 0.3rem var(--pad);
     font-size: 0.7rem;
     border-top: var(--cell);
     text-align: center;
     opacity: 0.6;
 }
 
-/* === App Shell === */
+/* ============================================
+   App Shell
+   ============================================ */
 .app-shell {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    height: 100dvh;
     max-width: var(--max-width);
     margin: 0 auto;
     width: 100%;
@@ -178,7 +172,9 @@ a:hover { text-decoration-thickness: 2px; }
     border-right: var(--cell);
 }
 
-/* === Header === */
+/* ============================================
+   Header
+   ============================================ */
 .app-header {
     flex-shrink: 0;
     border-bottom: var(--cell);
@@ -193,20 +189,20 @@ a:hover { text-decoration-thickness: 2px; }
 
 .app-title {
     font-family: var(--font-heading);
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 700;
     letter-spacing: -0.02em;
-    padding: 0.35rem var(--pad);
+    padding: 0.3rem var(--pad);
     text-transform: uppercase;
     flex: 1;
 }
 
-.app-user-menu {
+.header-action {
     font-family: var(--font-heading);
-    font-size: 0.7rem;
+    font-size: 0.6rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    padding: 0.35rem var(--pad);
+    padding: 0.3rem var(--pad);
     cursor: pointer;
     border-left: 2px solid var(--paper);
     color: var(--paper);
@@ -214,32 +210,58 @@ a:hover { text-decoration-thickness: 2px; }
     border-top: none;
     border-bottom: none;
     border-right: none;
-    transition: background 0.15s ease;
+    transition: background 0.15s;
 }
 
-.app-user-menu:hover {
-    background: rgba(255,255,255,0.1);
+.header-action:hover,
+.header-action.active { background: rgba(255,255,255,0.15); }
+
+.app-user-menu {
+    font-family: var(--font-heading);
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.3rem var(--pad);
+    cursor: pointer;
+    border-left: 2px solid var(--paper);
+    color: var(--paper);
+    background: none;
+    border-top: none;
+    border-bottom: none;
+    border-right: none;
+    transition: background 0.15s;
 }
 
-/* === Navigation === */
+.app-user-menu:hover { background: rgba(255,255,255,0.1); }
+
+/* ============================================
+   Navigation — horizontal scroll, no wrapping
+   ============================================ */
 .app-nav {
     display: flex;
-    flex-wrap: wrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
     border-bottom: var(--cell);
 }
 
+.app-nav::-webkit-scrollbar { display: none; }
+
 .app-nav button {
     font-family: var(--font-heading);
-    font-size: 0.7rem;
+    font-size: 0.6rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: var(--ink);
     background: var(--paper);
-    padding: 0.35rem var(--pad);
+    padding: 0.3rem var(--pad);
     border: none;
     border-right: var(--cell);
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .app-nav button:hover,
@@ -248,15 +270,25 @@ a:hover { text-decoration-thickness: 2px; }
     color: var(--paper);
 }
 
-/* === Search Bar === */
+/* ============================================
+   Search Bar — toggleable with animation
+   ============================================ */
 .search-bar {
     display: flex;
     border-bottom: var(--cell);
+    animation: searchSlideIn 0.15s ease-out;
+}
+
+.search-bar[hidden] { display: none; }
+
+@keyframes searchSlideIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .search-bar input {
     flex: 1;
-    padding: 0.4rem var(--pad);
+    padding: 0.35rem var(--pad);
     font-family: var(--font-mono);
     font-size: 0.8rem;
     border: none;
@@ -265,36 +297,46 @@ a:hover { text-decoration-thickness: 2px; }
     outline: none;
 }
 
+.search-bar input:focus {
+    background: var(--paper);
+}
+
 .search-bar button {
-    padding: 0.4rem var(--pad);
+    padding: 0.35rem var(--pad);
     font-family: var(--font-heading);
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    font-size: 0.75rem;
     background: var(--ink);
     color: var(--paper);
     border: none;
     border-left: var(--cell);
     cursor: pointer;
+    transition: background 0.12s;
 }
 
-/* === Content Area === */
+.search-bar button:hover {
+    background: var(--accent);
+}
+
+/* ============================================
+   Content Area
+   ============================================ */
 .app-content {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
 }
 
-/* === List Items === */
+/* ============================================
+   List Items — compact
+   ============================================ */
 .list-item {
     display: flex;
     align-items: center;
-    padding: 0.5rem var(--pad);
-    border-bottom: var(--cell);
+    padding: 0.4rem var(--pad);
+    border-bottom: var(--rule);
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
-    gap: 0.6rem;
-    text-decoration: none;
+    transition: background 0.1s, color 0.1s;
+    gap: 0.5rem;
     color: var(--text);
 }
 
@@ -305,15 +347,12 @@ a:hover { text-decoration-thickness: 2px; }
 
 .list-item:hover .item-meta { color: var(--paper); opacity: 0.7; }
 .list-item:hover .item-badge { background: var(--paper); color: var(--ink); }
-
-.list-item.active {
-    background: var(--highlight);
-}
+.list-item.active { background: var(--highlight); }
 
 .item-cover {
-    width: 40px;
-    height: 40px;
-    border: var(--cell);
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--ink);
     flex-shrink: 0;
     background: var(--code-bg);
     display: flex;
@@ -329,8 +368,8 @@ a:hover { text-decoration-thickness: 2px; }
 }
 
 .item-cover-placeholder {
-    font-size: 0.7rem;
-    opacity: 0.4;
+    font-size: 0.65rem;
+    opacity: 0.35;
 }
 
 .item-info {
@@ -340,15 +379,15 @@ a:hover { text-decoration-thickness: 2px; }
 
 .item-title {
     font-weight: 700;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .item-meta {
-    font-size: 0.7rem;
-    opacity: 0.6;
+    font-size: 0.68rem;
+    opacity: 0.55;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -356,17 +395,17 @@ a:hover { text-decoration-thickness: 2px; }
 
 .item-duration {
     font-family: var(--font-mono);
-    font-size: 0.7rem;
-    opacity: 0.5;
+    font-size: 0.65rem;
+    opacity: 0.45;
     flex-shrink: 0;
 }
 
 .item-badge {
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    padding: 0.1rem 0.3rem;
+    padding: 0.1rem 0.25rem;
     background: var(--ink);
     color: var(--paper);
     flex-shrink: 0;
@@ -374,7 +413,7 @@ a:hover { text-decoration-thickness: 2px; }
 
 .item-actions {
     display: flex;
-    gap: 0.3rem;
+    gap: 0.2rem;
     flex-shrink: 0;
 }
 
@@ -384,31 +423,35 @@ a:hover { text-decoration-thickness: 2px; }
     cursor: pointer;
     font-size: 0.8rem;
     color: var(--text);
-    padding: 0.2rem;
-    opacity: 0.5;
+    padding: 0.15rem;
+    opacity: 0.4;
     transition: opacity 0.15s;
 }
 
 .item-actions button:hover { opacity: 1; }
 .item-actions button.favorited { color: var(--red-ink); opacity: 1; }
 
-/* === Section Headers === */
+/* ============================================
+   Section Headers — sticky, inverted
+   ============================================ */
 .section-header {
     font-family: var(--font-heading);
-    font-size: 0.8rem;
+    font-size: 0.68rem;
     font-weight: 700;
     background: var(--ink);
     color: var(--paper);
-    padding: 0.25rem var(--pad);
+    padding: 0.2rem var(--pad);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     border-bottom: var(--cell);
     position: sticky;
     top: 0;
     z-index: 5;
 }
 
-/* === Album View === */
+/* ============================================
+   Album View
+   ============================================ */
 .album-header {
     display: flex;
     gap: var(--pad);
@@ -417,9 +460,10 @@ a:hover { text-decoration-thickness: 2px; }
 }
 
 .album-cover {
-    width: 160px;
-    height: 160px;
+    width: 140px;
+    height: 140px;
     border: var(--cell);
+    box-shadow: 4px 4px 0 var(--ink);
     flex-shrink: 0;
     background: var(--code-bg);
     display: flex;
@@ -443,75 +487,93 @@ a:hover { text-decoration-thickness: 2px; }
 
 .album-title {
     font-family: var(--font-heading);
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 700;
     text-transform: uppercase;
     line-height: 1.2;
 }
 
 .album-artist {
-    font-size: 0.8rem;
-    margin-top: 0.3rem;
+    font-size: 0.78rem;
+    margin-top: 0.2rem;
 }
 
 .album-meta {
-    font-size: 0.7rem;
-    opacity: 0.6;
-    margin-top: 0.2rem;
+    font-size: 0.68rem;
+    opacity: 0.55;
+    margin-top: 0.15rem;
 }
 
 .album-actions {
     display: flex;
-    gap: 0.4rem;
-    margin-top: 0.6rem;
+    gap: 0.3rem;
+    margin-top: 0.5rem;
 }
 
 .btn-small {
     font-family: var(--font-heading);
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    padding: 0.3rem 0.6rem;
+    padding: 0.25rem 0.5rem;
     border: var(--cell);
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background 0.1s, color 0.1s;
     background: var(--paper);
     color: var(--ink);
 }
 
-.btn-small:hover {
-    background: var(--ink);
-    color: var(--paper);
-}
-
+.btn-small:hover,
 .btn-small.active {
     background: var(--ink);
     color: var(--paper);
 }
 
-/* === Now Playing / Player Bar === */
+/* ============================================
+   Player Bar — compact single-row design
+   3px progress line at top + one row of controls
+   ============================================ */
 .player-bar {
     flex-shrink: 0;
-    border-top: var(--cell);
     background: var(--paper);
-    box-shadow: 0 -2px 0 var(--ink);
+    border-top: var(--cell);
 }
 
-.player-bar.empty {
-    display: none;
+.player-bar.empty { display: none; }
+
+/* Thin progress line */
+.player-progress {
+    height: 4px;
+    background: var(--highlight);
+    cursor: pointer;
+    position: relative;
+    transition: height 0.15s;
 }
 
+.player-progress:hover {
+    height: 7px;
+}
+
+.player-progress-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.3s linear;
+    pointer-events: none;
+}
+
+/* Main player row */
 .player-main {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    padding: 0.4rem var(--pad);
+    gap: 0.4rem;
+    padding: 0.3rem var(--pad);
 }
 
 .player-cover {
-    width: 48px;
-    height: 48px;
-    border: var(--cell);
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--ink);
     flex-shrink: 0;
     background: var(--code-bg);
     cursor: pointer;
@@ -532,24 +594,39 @@ a:hover { text-decoration-thickness: 2px; }
 
 .player-title {
     font-weight: 700;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.player-artist {
-    font-size: 0.7rem;
-    opacity: 0.6;
+.player-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.68rem;
+    opacity: 0.55;
+}
+
+.player-meta > span:first-child {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.player-time {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    opacity: 0.8;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .player-controls {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.1rem;
     flex-shrink: 0;
 }
 
@@ -558,92 +635,79 @@ a:hover { text-decoration-thickness: 2px; }
     border: none;
     cursor: pointer;
     font-family: var(--font-heading);
-    font-size: 1rem;
+    font-size: 0.8rem;
     color: var(--text);
-    padding: 0.2rem;
+    padding: 0.15rem 0.2rem;
     transition: opacity 0.15s;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 2rem;
-    height: 2rem;
+    min-width: 1.5rem;
+    height: 1.5rem;
+    opacity: 0.55;
 }
 
-.player-controls button:hover { opacity: 0.7; }
+.player-controls button:hover { opacity: 1; }
 
 .player-controls .btn-play {
-    width: 2.4rem;
-    height: 2.4rem;
+    width: 2rem;
+    height: 2rem;
     border: var(--cell);
-    font-size: 1.1rem;
+    font-size: 0.9rem;
+    opacity: 1;
 }
 
-.player-progress {
+.player-controls button.active { opacity: 1; color: var(--accent); }
+
+/* Shuffle/Loop text labels */
+#btn-shuffle,
+#btn-loop {
+    font-size: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* Player right-side actions */
+.player-actions {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0 var(--pad) 0.4rem;
-}
-
-.progress-time {
-    font-family: var(--font-mono);
-    font-size: 0.65rem;
-    opacity: 0.5;
+    gap: 0.15rem;
     flex-shrink: 0;
-    width: 3.5rem;
-    text-align: center;
 }
 
-.progress-bar {
-    flex: 1;
-    height: 4px;
-    background: var(--highlight);
-    border: 1px solid var(--ink);
-    cursor: pointer;
-    position: relative;
-}
-
-.progress-fill {
-    height: 100%;
-    background: var(--ink);
-    width: 0%;
-    transition: width 0.3s linear;
-}
-
-.player-extra {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0 var(--pad) 0.3rem;
-    justify-content: flex-end;
-}
-
-.player-extra button {
+.player-actions button {
     background: none;
     border: none;
     cursor: pointer;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--text);
     opacity: 0.4;
-    padding: 0.1rem 0.3rem;
+    padding: 0.15rem 0.2rem;
     font-family: var(--font-heading);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    transition: opacity 0.15s;
+    letter-spacing: 0.04em;
+    transition: opacity 0.12s;
 }
 
-.player-extra button:hover { opacity: 0.8; }
-.player-extra button.active { opacity: 1; color: var(--accent); }
+.player-actions button:hover { opacity: 0.8; }
+.player-actions button.active { opacity: 1; color: var(--accent); }
+
+#btn-fav {
+    font-size: 0.9rem;
+    font-family: inherit;
+    text-transform: none;
+    letter-spacing: 0;
+}
 
 .volume-control {
     display: flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: 0.2rem;
 }
 
 .volume-slider {
-    width: 60px;
-    height: 4px;
+    width: 50px;
+    height: 3px;
     -webkit-appearance: none;
     appearance: none;
     background: var(--highlight);
@@ -654,30 +718,37 @@ a:hover { text-decoration-thickness: 2px; }
 
 .volume-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
     background: var(--ink);
     cursor: pointer;
 }
 
-/* === Now Playing Full View === */
+/* ============================================
+   Now Playing — centered poster layout
+   ============================================ */
 .now-playing-full {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: var(--pad);
-    gap: var(--pad);
+    justify-content: center;
+    padding: calc(var(--pad) * 2) var(--pad);
+    gap: calc(var(--pad) * 1.5);
+    min-height: 100%;
 }
 
 .np-cover {
     width: 280px;
     height: 280px;
-    max-width: 80vw;
-    max-height: 80vw;
+    max-width: 70vw;
+    max-height: 70vw;
     border: var(--cell);
-    box-shadow: 6px 6px 0 var(--ink);
+    box-shadow: 8px 8px 0 var(--ink);
     background: var(--code-bg);
     overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .np-cover img {
@@ -686,84 +757,77 @@ a:hover { text-decoration-thickness: 2px; }
     object-fit: cover;
 }
 
+.np-placeholder {
+    font-size: 3rem;
+    opacity: 0.15;
+}
+
 .np-info {
     text-align: center;
     width: 100%;
+    max-width: 340px;
 }
 
 .np-title {
     font-family: var(--font-heading);
-    font-size: 1rem;
+    font-size: 1.1rem;
     font-weight: 700;
     text-transform: uppercase;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
 }
 
 .np-artist {
     font-size: 0.8rem;
-    opacity: 0.7;
-    margin-top: 0.2rem;
+    opacity: 0.65;
+    margin-top: 0.25rem;
 }
 
 .np-album {
     font-size: 0.7rem;
-    opacity: 0.5;
+    opacity: 0.4;
     margin-top: 0.1rem;
+    font-style: italic;
 }
 
-/* === Settings View === */
-.settings-section {
-    border-bottom: var(--cell);
-}
-
+/* ============================================
+   Settings View
+   ============================================ */
 .settings-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.5rem var(--pad);
-    border-bottom: var(--cell);
+    padding: 0.4rem var(--pad);
+    border-bottom: var(--rule);
 }
 
-.settings-item:last-child {
-    border-bottom: none;
-}
-
-.settings-label {
-    font-size: 0.8rem;
-}
+.settings-label { font-size: 0.78rem; }
 
 .settings-value {
     font-family: var(--font-mono);
-    font-size: 0.75rem;
-    opacity: 0.7;
+    font-size: 0.72rem;
+    opacity: 0.65;
 }
 
 .settings-select {
     font-family: var(--font-mono);
-    font-size: 0.75rem;
-    padding: 0.2rem 0.4rem;
+    font-size: 0.72rem;
+    padding: 0.2rem 0.35rem;
     border: var(--cell);
     background: var(--code-bg);
     color: var(--text);
     cursor: pointer;
 }
 
-/* === Admin Panel === */
-.admin-user-list .list-item {
-    justify-content: space-between;
-}
-
-.admin-form {
-    padding: var(--pad);
-    border-bottom: var(--cell);
-}
-
-.admin-form .form-group {
-    margin-bottom: 0.6rem;
-}
+/* ============================================
+   Admin Panel
+   ============================================ */
+.admin-form { padding: var(--pad); border-bottom: var(--cell); }
+.admin-form .form-group { margin-bottom: 0.5rem; }
 
 .admin-form input {
     width: 100%;
-    padding: 0.4rem;
+    padding: 0.35rem;
     font-family: var(--font-mono);
     font-size: 0.8rem;
     border: var(--cell);
@@ -772,57 +836,50 @@ a:hover { text-decoration-thickness: 2px; }
     outline: none;
 }
 
-.admin-form input:focus {
-    box-shadow: 3px 3px 0 var(--ink);
-}
+.admin-form input:focus { box-shadow: 3px 3px 0 var(--ink); }
 
 .admin-form label {
     display: block;
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    margin-bottom: 0.2rem;
+    margin-bottom: 0.15rem;
     font-weight: 700;
 }
 
-.checkbox-group {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-}
+.checkbox-group { display: flex; align-items: center; gap: 0.35rem; }
+.checkbox-group input[type="checkbox"] { width: auto; }
 
-.checkbox-group input[type="checkbox"] {
-    width: auto;
-}
-
-/* === Queue View === */
+/* ============================================
+   Queue View
+   ============================================ */
 .queue-item {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.3rem;
 }
 
 .queue-num {
     font-family: var(--font-mono);
-    font-size: 0.65rem;
-    opacity: 0.4;
-    width: 1.8rem;
+    font-size: 0.6rem;
+    opacity: 0.35;
+    width: 1.6rem;
     text-align: right;
     flex-shrink: 0;
 }
 
-.queue-item.current-track {
-    background: var(--highlight);
-}
+.queue-item.current-track { background: var(--highlight); }
 
-/* === Breadcrumb === */
+/* ============================================
+   Breadcrumb
+   ============================================ */
 .breadcrumb {
     display: flex;
     flex-wrap: wrap;
-    padding: 0.3rem var(--pad);
-    font-size: 0.7rem;
+    padding: 0.25rem var(--pad);
+    font-size: 0.68rem;
     border-bottom: var(--cell);
-    gap: 0.2rem;
+    gap: 0.15rem;
 }
 
 .breadcrumb span {
@@ -831,67 +888,49 @@ a:hover { text-decoration-thickness: 2px; }
     text-underline-offset: 2px;
 }
 
-.breadcrumb span:hover {
-    text-decoration-thickness: 2px;
-}
+.breadcrumb span:hover { text-decoration-thickness: 2px; }
+.breadcrumb .sep { cursor: default; text-decoration: none; opacity: 0.35; }
+.breadcrumb .current { cursor: default; text-decoration: none; font-weight: 700; }
 
-.breadcrumb .sep {
-    cursor: default;
-    text-decoration: none;
-    opacity: 0.4;
-}
-
-.breadcrumb .current {
-    cursor: default;
-    text-decoration: none;
-    font-weight: 700;
-}
-
-/* === Empty State === */
+/* ============================================
+   Empty State & Loading
+   ============================================ */
 .empty-state {
     padding: 2rem var(--pad);
     text-align: center;
-    opacity: 0.5;
+    opacity: 0.45;
+    font-size: 0.8rem;
 }
 
-.empty-state .empty-icon {
-    font-size: 2rem;
-    margin-bottom: 0.5rem;
-}
-
-/* === Loading === */
 .loading {
     padding: 2rem var(--pad);
     text-align: center;
-    font-size: 0.8rem;
-    opacity: 0.5;
+    font-size: 0.78rem;
+    opacity: 0.45;
 }
 
 .loading::after {
     content: '';
     display: inline-block;
-    width: 0.8rem;
-    height: 0.8rem;
+    width: 0.7rem;
+    height: 0.7rem;
     border: 2px solid var(--ink);
     border-top-color: transparent;
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
-    margin-left: 0.4rem;
+    margin-left: 0.35rem;
     vertical-align: middle;
 }
 
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
-/* === Popup / Modal === */
+/* ============================================
+   Modal
+   ============================================ */
 .modal-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.4);
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.45);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -906,22 +945,39 @@ a:hover { text-decoration-thickness: 2px; }
     border: var(--cell);
     box-shadow: 6px 6px 0 var(--ink);
     width: 100%;
-    max-width: 400px;
+    max-width: 380px;
+    animation: modalIn 0.15s ease-out;
+}
+
+@keyframes modalIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .modal-title {
     font-family: var(--font-heading);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 700;
     background: var(--ink);
     color: var(--paper);
-    padding: 0.35rem var(--pad);
+    padding: 0.3rem var(--pad);
     text-transform: uppercase;
 }
 
-.modal-body {
-    padding: var(--pad);
+.modal-body { padding: var(--pad); }
+
+.modal-body input {
+    width: 100%;
+    padding: 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    border: var(--cell);
+    background: var(--code-bg);
+    color: var(--text);
+    outline: none;
 }
+
+.modal-body input:focus { box-shadow: 3px 3px 0 var(--ink); }
 
 .modal-actions {
     display: flex;
@@ -930,48 +986,46 @@ a:hover { text-decoration-thickness: 2px; }
 
 .modal-actions button {
     flex: 1;
-    padding: 0.4rem;
+    padding: 0.35rem;
     font-family: var(--font-heading);
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     border: none;
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background 0.1s, color 0.1s;
     background: var(--paper);
     color: var(--ink);
 }
 
-.modal-actions button + button {
-    border-left: var(--cell);
-}
+.modal-actions button + button { border-left: var(--cell); }
 
 .modal-actions button:hover {
     background: var(--ink);
     color: var(--paper);
 }
 
-.modal-actions button.danger {
-    color: var(--red-ink);
-}
+.modal-actions button.danger { color: var(--red-ink); }
 
-/* === Toast Notification === */
+/* ============================================
+   Toast Notification
+   ============================================ */
 .toast {
     position: fixed;
-    bottom: calc(var(--player-height) + 1rem);
+    bottom: 5rem;
     left: 50%;
     transform: translateX(-50%) translateY(100%);
     background: var(--ink);
     color: var(--paper);
     font-family: var(--font-heading);
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    padding: 0.4rem 0.8rem;
+    padding: 0.35rem 0.7rem;
     border: var(--cell);
     z-index: 200;
     opacity: 0;
-    transition: transform 0.3s ease, opacity 0.3s ease;
+    transition: transform 0.25s ease, opacity 0.25s ease;
     pointer-events: none;
 }
 
@@ -980,76 +1034,16 @@ a:hover { text-decoration-thickness: 2px; }
     opacity: 1;
 }
 
-/* === Responsive === */
-@media (max-width: 600px) {
-    :root { --pad: 0.6rem; }
-    body { font-size: 0.8rem; }
-
-    .app-title { font-size: 0.9rem; }
-    .app-nav button { font-size: 0.6rem; padding: 0.3rem 0.5rem; }
-
-    .album-header {
-        flex-direction: column;
-        align-items: center;
-    }
-
-    .album-cover {
-        width: 200px;
-        height: 200px;
-    }
-
-    .album-info {
-        align-items: center;
-        text-align: center;
-    }
-
-    .np-cover {
-        width: 240px;
-        height: 240px;
-    }
-
-    .player-controls button { font-size: 0.9rem; }
-    .player-controls .btn-play { width: 2rem; height: 2rem; font-size: 0.9rem; }
-
-    .search-bar input { font-size: 0.75rem; }
-
-    .volume-control { display: none; }
-}
-
-@media (max-width: 380px) {
-    .album-cover {
-        width: 160px;
-        height: 160px;
-    }
-
-    .np-cover {
-        width: 180px;
-        height: 180px;
-    }
-}
-
-/* === Scrollbar === */
-.app-content::-webkit-scrollbar {
-    width: 6px;
-}
-
-.app-content::-webkit-scrollbar-track {
-    background: var(--paper);
-}
-
-.app-content::-webkit-scrollbar-thumb {
-    background: var(--ink);
-    border: 1px solid var(--paper);
-}
-
-/* === Context Menu === */
+/* ============================================
+   Context Menu
+   ============================================ */
 .context-menu {
     position: fixed;
     background: var(--paper);
     border: var(--cell);
     box-shadow: 4px 4px 0 var(--ink);
     z-index: 50;
-    min-width: 180px;
+    min-width: 170px;
 }
 
 .context-menu[hidden] { display: none; }
@@ -1058,36 +1052,61 @@ a:hover { text-decoration-thickness: 2px; }
     display: block;
     width: 100%;
     text-align: left;
-    padding: 0.4rem var(--pad);
+    padding: 0.35rem var(--pad);
     font-family: var(--font-body);
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     border: none;
     background: none;
     color: var(--text);
     cursor: pointer;
     border-bottom: 1px solid var(--highlight);
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background 0.1s, color 0.1s;
 }
 
-.context-menu button:last-child {
-    border-bottom: none;
-}
+.context-menu button:last-child { border-bottom: none; }
 
 .context-menu button:hover {
     background: var(--ink);
     color: var(--paper);
 }
 
-/* === Halftone pattern (from blog) === */
-.halftone {
-    flex-shrink: 0;
-    background:
-        radial-gradient(circle, var(--ink) 1px, transparent 1px);
-    background-size: 4px 4px;
+/* ============================================
+   Scrollbar
+   ============================================ */
+.app-content::-webkit-scrollbar { width: 4px; }
+.app-content::-webkit-scrollbar-track { background: transparent; }
+.app-content::-webkit-scrollbar-thumb { background: var(--ink); opacity: 0.3; }
+
+/* ============================================
+   Responsive
+   ============================================ */
+@media (max-width: 640px) {
+    :root { --pad: 0.6rem; }
+    body { font-size: 0.8rem; }
+
+    .app-title { font-size: 0.9rem; }
+
+    .album-header { flex-direction: column; align-items: center; }
+    .album-cover { width: 180px; height: 180px; }
+    .album-info { align-items: center; text-align: center; }
+    .np-cover { width: 220px; height: 220px; }
+
+    /* Hide secondary player controls on mobile */
+    #btn-shuffle, #btn-loop, #btn-queue { display: none; }
+    .volume-control { display: none; }
+
+    .player-controls .btn-play { width: 1.8rem; height: 1.8rem; font-size: 0.85rem; }
 }
 
-/* === Utility === */
+@media (max-width: 380px) {
+    .album-cover { width: 140px; height: 140px; }
+    .np-cover { width: 180px; height: 180px; }
+
+    #btn-prev { display: none; }
+    .player-cover { width: 36px; height: 36px; }
+}
+
+/* ============================================
+   Utility
+   ============================================ */
 .hidden { display: none !important; }
-.text-center { text-align: center; }
-.uppercase { text-transform: uppercase; }
-.mono { font-family: var(--font-mono); }

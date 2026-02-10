@@ -104,18 +104,22 @@ def extract_track_info(path: Path) -> TrackInfo | None:
 
     if isinstance(audio, FLAC):
         title = clean_tag((audio.get("title") or [""])[0])
-        artist = clean_tag((audio.get("artist") or [""])[0])
+        album_artist = clean_tag((audio.get("albumartist") or [""])[0])
+        raw_artist = clean_tag((audio.get("artist") or [""])[0])
+        artist = album_artist or raw_artist
         album = clean_tag((audio.get("album") or [""])[0])
         year = clean_tag((audio.get("date") or [""])[0])[:4]
         track_num = parse_num((audio.get("tracknumber") or ["0"])[0])
-        disc_num = parse_num((audio.get("discnumber") or ["1"])[0])
+        disc_num = parse_num((audio.get("discnumber") or audio.get("disc") or ["1"])[0])
         artist_sort = clean_tag((audio.get("albumartistsort") or [""])[0])
 
     elif isinstance(audio, MP3):
         tags = audio.tags
         if tags:
             title = clean_tag(tags.get("TIT2"))
-            artist = clean_tag(tags.get("TPE1") or tags.get("TPE2"))
+            album_artist = clean_tag(tags.get("TPE2"))
+            raw_artist = clean_tag(tags.get("TPE1"))
+            artist = album_artist or raw_artist
             album = clean_tag(tags.get("TALB"))
             track_num = parse_num(tags.get("TRCK"))
             disc_num = parse_num(tags.get("TPOS") or "1")
@@ -126,7 +130,9 @@ def extract_track_info(path: Path) -> TrackInfo | None:
 
     elif isinstance(audio, MP4):
         title = clean_tag((audio.get("\xa9nam") or [""])[0])
-        artist = clean_tag((audio.get("\xa9ART") or [""])[0])
+        album_artist = clean_tag((audio.get("aART") or [""])[0])
+        raw_artist = clean_tag((audio.get("\xa9ART") or [""])[0])
+        artist = album_artist or raw_artist
         album = clean_tag((audio.get("\xa9alb") or [""])[0])
         year = clean_tag((audio.get("\xa9day") or [""])[0])[:4]
         trkn = audio.get("trkn")
@@ -138,7 +144,9 @@ def extract_track_info(path: Path) -> TrackInfo | None:
 
     elif isinstance(audio, (OggVorbis, OggOpus)):
         title = clean_tag((audio.get("title") or [""])[0])
-        artist = clean_tag((audio.get("artist") or [""])[0])
+        album_artist = clean_tag((audio.get("albumartist") or [""])[0])
+        raw_artist = clean_tag((audio.get("artist") or [""])[0])
+        artist = album_artist or raw_artist
         album = clean_tag((audio.get("album") or [""])[0])
         year = clean_tag((audio.get("date") or [""])[0])[:4]
         track_num = parse_num((audio.get("tracknumber") or ["0"])[0])
