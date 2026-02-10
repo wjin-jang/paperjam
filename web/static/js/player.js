@@ -135,8 +135,14 @@ const Player = {
         this.loop = (this.loop + 1) % 3;
         const btn = document.getElementById('btn-loop');
         btn.classList.toggle('active', this.loop > 0);
-        const labels = ['Loop', 'Loop All', 'Loop One'];
-        btn.textContent = labels[this.loop];
+        const icons = [
+            'ds_endless_16',  // off
+            'ds_endless_16',  // all
+            'ds_stopped_16',  // one
+        ];
+        const titles = ['Loop: Off', 'Loop: All', 'Loop: One'];
+        btn.innerHTML = `<span class="icon" style="-webkit-mask-image:url(/static/icons/ui/${icons[this.loop]}.png);mask-image:url(/static/icons/ui/${icons[this.loop]}.png)"></span>`;
+        btn.title = titles[this.loop];
     },
 
     getQueue() {

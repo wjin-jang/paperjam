@@ -3,6 +3,7 @@
 const App = {
     user: null,
     currentView: 'library',
+    currentViewData: null,
     viewStack: [],
     playlists: [],
 
@@ -13,8 +14,6 @@ const App = {
             window.location.href = '/login';
             return;
         }
-
-        document.getElementById('user-menu-btn').textContent = this.user.display_name || this.user.username;
 
         Player.init();
         this._bindEvents();
@@ -36,44 +35,6 @@ const App = {
             this.navigate(btn.dataset.view);
         });
 
-        // Search toggle
-        const searchBar = document.getElementById('search-bar');
-        const searchInput = document.getElementById('search-input');
-        const searchToggle = document.getElementById('search-toggle');
-        let searchTimeout;
-
-        const closeSearch = () => {
-            searchBar.hidden = true;
-            searchToggle.classList.remove('active');
-            searchInput.value = '';
-            if (this.currentView === 'search') this.navigate('library');
-        };
-
-        searchToggle.addEventListener('click', () => {
-            if (searchBar.hidden) {
-                searchBar.hidden = false;
-                searchToggle.classList.add('active');
-                searchInput.focus();
-            } else {
-                closeSearch();
-            }
-        });
-
-        document.getElementById('search-close').addEventListener('click', () => closeSearch());
-
-        searchInput.addEventListener('input', () => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                const q = searchInput.value.trim();
-                if (q.length >= 2) this.showSearch(q);
-                else if (this.currentView === 'search') this.navigate('library');
-            }, 300);
-        });
-
-        searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeSearch();
-        });
-
         // Player controls
         document.getElementById('btn-play').addEventListener('click', () => Player.toggle());
         document.getElementById('btn-prev').addEventListener('click', () => Player.prev());
@@ -81,7 +42,7 @@ const App = {
         document.getElementById('btn-shuffle').addEventListener('click', () => Player.toggleShuffle());
         document.getElementById('btn-loop').addEventListener('click', () => Player.cycleLoop());
         document.getElementById('btn-queue').addEventListener('click', () => {
-            this.viewStack.push(this.currentView);
+            this.viewStack.push({view: this.currentView, data: this.currentViewData});
             this.navigate('queue');
         });
         document.getElementById('btn-fav').addEventListener('click', async () => {
@@ -103,21 +64,16 @@ const App = {
             Player.setVolume(parseInt(e.target.value));
         });
 
-        // User menu
-        document.getElementById('user-menu-btn').addEventListener('click', () => {
-            this._showUserMenu();
-        });
-
         // Now playing click
         document.getElementById('player-info-click').addEventListener('click', () => {
             if (Player.currentTrack) {
-                this.viewStack.push(this.currentView);
+                this.viewStack.push({view: this.currentView, data: this.currentViewData});
                 this.navigate('now-playing');
             }
         });
         document.getElementById('player-cover-click').addEventListener('click', () => {
             if (Player.currentTrack) {
-                this.viewStack.push(this.currentView);
+                this.viewStack.push({view: this.currentView, data: this.currentViewData});
                 this.navigate('now-playing');
             }
         });
@@ -137,6 +93,7 @@ const App = {
 
     navigate(view, data) {
         this.currentView = view;
+        this.currentViewData = data;
         this._updateNav(view);
 
         const content = document.getElementById('content');
@@ -154,7 +111,7 @@ const App = {
             case 'favorites': this._renderFavorites(content); break;
             case 'settings': this._renderSettings(content); break;
             case 'admin': this._renderAdmin(content); break;
-            case 'search': this.showSearch(data, true); break;
+            case 'search': this._renderSearch(content, data); break;
             case 'queue': this._renderQueue(content); break;
             case 'now-playing': this._renderNowPlaying(content); break;
         }
@@ -162,7 +119,8 @@ const App = {
 
     goBack() {
         if (this.viewStack.length > 0) {
-            this.navigate(this.viewStack.pop());
+            const prev = this.viewStack.pop();
+            this.navigate(prev.view, prev.data);
         } else {
             this.navigate('library');
         }
@@ -171,32 +129,6 @@ const App = {
     _updateNav(view) {
         const btns = document.querySelectorAll('#main-nav button');
         btns.forEach(b => b.classList.toggle('active', b.dataset.view === view));
-        document.getElementById('breadcrumb').hidden = true;
-    },
-
-    _setBreadcrumb(...items) {
-        const bc = document.getElementById('breadcrumb');
-        bc.hidden = false;
-        bc.innerHTML = '';
-        items.forEach((item, i) => {
-            if (i > 0) {
-                const sep = document.createElement('span');
-                sep.className = 'sep';
-                sep.textContent = '/';
-                bc.appendChild(sep);
-            }
-            if (i === items.length - 1) {
-                const span = document.createElement('span');
-                span.className = 'current';
-                span.textContent = item.label;
-                bc.appendChild(span);
-            } else {
-                const span = document.createElement('span');
-                span.textContent = item.label;
-                span.addEventListener('click', item.action);
-                bc.appendChild(span);
-            }
-        });
     },
 
     // --- Views ---
@@ -230,7 +162,10 @@ const App = {
             }
 
             // All Tracks shortcut
-            const allTracksDiv = this._createListItem(this._icon('tracks'), 'All Tracks', `${stats.tracks} tracks`, null, () => this._renderAllTracks(el));
+            const allTracksDiv = this._createListItem(this._icon('tracks'), 'All Tracks', `${stats.tracks} tracks`, null, () => {
+                this.viewStack.push({view: this.currentView, data: this.currentViewData});
+                this._renderAllTracks(el);
+            });
             el.appendChild(allTracksDiv);
 
             // Recent plays preview
@@ -259,13 +194,11 @@ const App = {
         try {
             const tracks = await API.tracks();
             el.innerHTML = '';
-            this._setBreadcrumb(
-                { label: 'Library', action: () => this.navigate('library') },
-                { label: 'All Tracks' }
-            );
+
+            el.appendChild(this._createBackHeader('All Tracks'));
 
             if (tracks.length === 0) {
-                el.innerHTML = '<div class="empty-state">No tracks found</div>';
+                el.innerHTML += '<div class="empty-state">No tracks found</div>';
                 return;
             }
 
@@ -320,7 +253,7 @@ const App = {
                     `${a.album_count} albums · ${a.track_count} tracks`,
                     null,
                     () => {
-                        this.viewStack.push('artists');
+                        this.viewStack.push({view: this.currentView, data: this.currentViewData});
                         this.navigate('artist', a.name);
                     }
                 );
@@ -335,15 +268,8 @@ const App = {
         try {
             const artist = await API.artist(name);
             el.innerHTML = '';
-            this._setBreadcrumb(
-                { label: 'Artists', action: () => this.navigate('artists') },
-                { label: artist.name }
-            );
 
-            const header = document.createElement('div');
-            header.className = 'section-header';
-            header.textContent = artist.name;
-            el.appendChild(header);
+            el.appendChild(this._createBackHeader(artist.name));
 
             artist.albums.forEach(album => {
                 const albumDiv = this._createListItem(
@@ -351,7 +277,7 @@ const App = {
                     `${album.year || ''} · ${album.track_count} tracks`,
                     null,
                     () => {
-                        this.viewStack.push('artist');
+                        this.viewStack.push({view: this.currentView, data: this.currentViewData});
                         this.navigate('album', album.name);
                     }
                 );
@@ -378,7 +304,7 @@ const App = {
                     `${a.artist} · ${a.track_count} tracks`,
                     a.path || null,
                     () => {
-                        this.viewStack.push('albums');
+                        this.viewStack.push({view: this.currentView, data: this.currentViewData});
                         this.navigate('album', a.name);
                     }
                 );
@@ -393,10 +319,8 @@ const App = {
         try {
             const album = await API.album(name);
             el.innerHTML = '';
-            this._setBreadcrumb(
-                { label: 'Albums', action: () => this.navigate('albums') },
-                { label: album.name }
-            );
+
+            el.appendChild(this._createBackHeader(album.name));
 
             // Album header
             const headerDiv = document.createElement('div');
@@ -490,7 +414,7 @@ const App = {
                     `${p.track_count} tracks`,
                     null,
                     () => {
-                        this.viewStack.push('playlists');
+                        this.viewStack.push({view: this.currentView, data: this.currentViewData});
                         this.navigate('playlist', p.id);
                     }
                 );
@@ -522,15 +446,7 @@ const App = {
             const meta = allPlaylists.find(p => p.id === id);
             el.innerHTML = '';
 
-            this._setBreadcrumb(
-                { label: 'Playlists', action: () => this.navigate('playlists') },
-                { label: meta?.name || `Playlist ${id}` }
-            );
-
-            const header = document.createElement('div');
-            header.className = 'section-header';
-            header.textContent = meta?.name || `Playlist ${id}`;
-            el.appendChild(header);
+            el.appendChild(this._createBackHeader(meta?.name || `Playlist ${id}`));
 
             if (playlist.tracks.length === 0) {
                 el.innerHTML += '<div class="empty-state">Empty playlist</div>';
@@ -608,7 +524,7 @@ const App = {
                 el.appendChild(h);
                 artists.forEach(a => {
                     const div = this._createListItem(this._icon('artist'), a.item_key, '', null, () => {
-                        this.viewStack.push('favorites');
+                        this.viewStack.push({view: this.currentView, data: this.currentViewData});
                         this.navigate('artist', a.item_key);
                     });
                     el.appendChild(div);
@@ -623,7 +539,7 @@ const App = {
                 el.appendChild(h);
                 albums.forEach(a => {
                     const div = this._createListItem(this._icon('album'), a.item_key, '', null, () => {
-                        this.viewStack.push('favorites');
+                        this.viewStack.push({view: this.currentView, data: this.currentViewData});
                         this.navigate('album', a.item_key);
                     });
                     el.appendChild(div);
@@ -707,12 +623,29 @@ const App = {
             acctHeader.textContent = 'Account';
             el.appendChild(acctHeader);
 
+            // Signed-in info
+            const userInfo = document.createElement('div');
+            userInfo.className = 'settings-item';
+            userInfo.innerHTML = `<span class="settings-label">Signed in as</span>
+                <span class="settings-value">${this._esc(this.user.display_name || this.user.username)}</span>`;
+            el.appendChild(userInfo);
+
             // Change password
             const pwItem = document.createElement('div');
             pwItem.className = 'list-item';
             pwItem.innerHTML = '<div class="item-info"><div class="item-title">Change Password</div></div>';
             pwItem.addEventListener('click', () => this._showChangePasswordModal());
             el.appendChild(pwItem);
+
+            // Log out
+            const logoutItem = document.createElement('div');
+            logoutItem.className = 'list-item';
+            logoutItem.innerHTML = '<div class="item-info"><div class="item-title">Log Out</div></div>';
+            logoutItem.addEventListener('click', async () => {
+                await API.logout();
+                window.location.href = '/login';
+            });
+            el.appendChild(logoutItem);
 
             // Admin section
             if (this.user.is_admin) {
@@ -725,7 +658,7 @@ const App = {
                 manageUsers.className = 'list-item';
                 manageUsers.innerHTML = '<div class="item-info"><div class="item-title">Manage Users</div></div>';
                 manageUsers.addEventListener('click', () => {
-                    this.viewStack.push('settings');
+                    this.viewStack.push({view: this.currentView, data: this.currentViewData});
                     this.navigate('admin');
                 });
                 el.appendChild(manageUsers);
@@ -769,15 +702,7 @@ const App = {
             const users = await API.adminUsers();
             el.innerHTML = '';
 
-            this._setBreadcrumb(
-                { label: 'Settings', action: () => this.navigate('settings') },
-                { label: 'Manage Users' }
-            );
-
-            const header = document.createElement('div');
-            header.className = 'section-header';
-            header.textContent = 'Users';
-            el.appendChild(header);
+            el.appendChild(this._createBackHeader('Manage Users'));
 
             // Create user button
             const createBtn = this._createListItem(this._icon('plus'), 'Create User', '', null, () => {
@@ -826,10 +751,7 @@ const App = {
     _renderQueue(el) {
         el.innerHTML = '';
 
-        const header = document.createElement('div');
-        header.className = 'section-header';
-        header.textContent = 'Queue';
-        el.appendChild(header);
+        el.appendChild(this._createBackHeader('Queue'));
 
         const queue = Player.getQueue();
         if (queue.length === 0) {
@@ -859,12 +781,9 @@ const App = {
             return;
         }
 
-        this._setBreadcrumb(
-            { label: 'Back', action: () => this.goBack() },
-            { label: 'Now Playing' }
-        );
-
         el.innerHTML = '';
+        el.appendChild(this._createBackHeader('Now Playing'));
+
         const np = document.createElement('div');
         np.className = 'now-playing-full';
 
@@ -887,68 +806,107 @@ const App = {
         el.appendChild(np);
     },
 
-    async showSearch(query, skipSet) {
-        if (!skipSet) {
-            this.currentView = 'search';
-            this._updateNav('search');
-        }
-        const el = document.getElementById('content');
-        el.innerHTML = '<div class="loading">Searching</div>';
+    async _renderSearch(el, query) {
+        el.innerHTML = '';
 
-        try {
-            const results = await API.search(query);
-            el.innerHTML = '';
+        // Search input row
+        const searchRow = document.createElement('div');
+        searchRow.className = 'search-row';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Search artists, albums, tracks...';
+        if (query) input.value = query;
+        searchRow.appendChild(input);
+        el.appendChild(searchRow);
 
-            if (results.artists.length > 0) {
-                const h = document.createElement('div');
-                h.className = 'section-header';
-                h.textContent = `Artists (${results.artists.length})`;
-                el.appendChild(h);
-                results.artists.forEach(a => {
-                    const div = this._createListItem(this._icon('artist'), a.name, `${a.track_count} tracks`, null, () => {
-                        this.viewStack.push('search');
-                        this.navigate('artist', a.name);
+        const resultsDiv = document.createElement('div');
+        el.appendChild(resultsDiv);
+
+        let searchTimeout;
+        const doSearch = async (q) => {
+            if (q.length < 2) {
+                resultsDiv.innerHTML = '';
+                return;
+            }
+            this.currentViewData = q;
+            resultsDiv.innerHTML = '<div class="loading">Searching</div>';
+            try {
+                const results = await API.search(q);
+                resultsDiv.innerHTML = '';
+
+                if (results.artists.length > 0) {
+                    const h = document.createElement('div');
+                    h.className = 'section-header';
+                    h.textContent = `Artists (${results.artists.length})`;
+                    resultsDiv.appendChild(h);
+                    results.artists.forEach(a => {
+                        const div = this._createListItem(this._icon('artist'), a.name, `${a.track_count} tracks`, null, () => {
+                            this.viewStack.push({view: this.currentView, data: this.currentViewData});
+                            this.navigate('artist', a.name);
+                        });
+                        resultsDiv.appendChild(div);
                     });
-                    el.appendChild(div);
-                });
-            }
+                }
 
-            if (results.albums.length > 0) {
-                const h = document.createElement('div');
-                h.className = 'section-header';
-                h.textContent = `Albums (${results.albums.length})`;
-                el.appendChild(h);
-                results.albums.forEach(a => {
-                    const div = this._createListItem(this._icon('album'), a.name, `${a.artist} · ${a.track_count} tracks`, null, () => {
-                        this.viewStack.push('search');
-                        this.navigate('album', a.name);
+                if (results.albums.length > 0) {
+                    const h = document.createElement('div');
+                    h.className = 'section-header';
+                    h.textContent = `Albums (${results.albums.length})`;
+                    resultsDiv.appendChild(h);
+                    results.albums.forEach(a => {
+                        const div = this._createListItem(this._icon('album'), a.name, `${a.artist} · ${a.track_count} tracks`, null, () => {
+                            this.viewStack.push({view: this.currentView, data: this.currentViewData});
+                            this.navigate('album', a.name);
+                        });
+                        resultsDiv.appendChild(div);
                     });
-                    el.appendChild(div);
-                });
-            }
+                }
 
-            if (results.tracks.length > 0) {
-                const h = document.createElement('div');
-                h.className = 'section-header';
-                h.textContent = `Tracks (${results.tracks.length})`;
-                el.appendChild(h);
-                results.tracks.forEach((t, i) => {
-                    const div = this._createTrackItem(t, () => {
-                        Player.play(t, results.tracks, i);
+                if (results.tracks.length > 0) {
+                    const h = document.createElement('div');
+                    h.className = 'section-header';
+                    h.textContent = `Tracks (${results.tracks.length})`;
+                    resultsDiv.appendChild(h);
+                    results.tracks.forEach((t, i) => {
+                        const div = this._createTrackItem(t, () => {
+                            Player.play(t, results.tracks, i);
+                        });
+                        resultsDiv.appendChild(div);
                     });
-                    el.appendChild(div);
-                });
-            }
+                }
 
-            if (results.artists.length === 0 && results.albums.length === 0 && results.tracks.length === 0) {
-                el.innerHTML = '<div class="empty-state">No results found</div>';
+                if (results.artists.length === 0 && results.albums.length === 0 && results.tracks.length === 0) {
+                    resultsDiv.innerHTML = '<div class="empty-state">No results found</div>';
+                }
+            } catch (e) {
+                resultsDiv.innerHTML = `<div class="empty-state">Search error: ${e.message}</div>`;
             }
-        } catch (e) {
-            el.innerHTML = `<div class="empty-state">Search error: ${e.message}</div>`;
-        }
+        };
+
+        input.addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => doSearch(input.value.trim()), 300);
+        });
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') input.value = '';
+        });
+
+        // Focus input and search if query provided
+        setTimeout(() => input.focus(), 50);
+        if (query) doSearch(query);
     },
 
     // --- UI Helpers ---
+
+    _createBackHeader(title) {
+        const header = document.createElement('div');
+        header.className = 'section-header';
+        header.style.cursor = 'pointer';
+        header.innerHTML = this._icon('lt') + ' ' + this._esc(title);
+        header.addEventListener('click', () => this.goBack());
+        return header;
+    },
 
     _createListItem(icon, title, meta, coverPath, onClick) {
         const div = document.createElement('div');
@@ -987,7 +945,7 @@ const App = {
         const cover = document.createElement('div');
         cover.className = 'item-cover';
         if (showTrackNum && track.track_num) {
-            cover.innerHTML = `<span class="item-cover-placeholder" style="font-family:var(--font-mono);font-size:0.7rem">${track.track_num}</span>`;
+            cover.innerHTML = `<span class="item-cover-placeholder">${track.track_num}</span>`;
         } else {
             const img = document.createElement('img');
             img.src = API.coverUrl(track.path, 'small');
@@ -1094,19 +1052,6 @@ const App = {
         }
 
         this._showContextMenu(e, items);
-    },
-
-    // --- User Menu ---
-
-    _showUserMenu() {
-        const btn = document.getElementById('user-menu-btn');
-        const rect = btn.getBoundingClientRect();
-        const items = [
-            { label: `Signed in as ${this.user.username}`, action: () => {} },
-            { label: 'Log Out', action: async () => { await API.logout(); window.location.href = '/login'; } },
-        ];
-
-        this._showContextMenu({ clientX: rect.right - 200, clientY: rect.bottom }, items);
     },
 
     // --- Modals ---

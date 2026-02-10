@@ -25,29 +25,19 @@
         <!-- Header -->
         <header class="app-header">
             <div class="app-title-bar">
-                <div class="app-title" id="header-title">PaperJam</div>
-                <button class="header-action" id="search-toggle" title="Search">Search</button>
-                <button class="app-user-menu" id="user-menu-btn"></button>
+                <div class="app-title">PaperJam</div>
             </div>
             <nav class="app-nav" id="main-nav">
-                <button data-view="library" class="active">Library</button>
-                <button data-view="artists">Artists</button>
-                <button data-view="albums">Albums</button>
-                <button data-view="playlists">Playlists</button>
-                <button data-view="recents">Recents</button>
-                <button data-view="favorites">Favorites</button>
-                <button data-view="settings">Settings</button>
+                <button data-view="library"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_tracks_16.png);mask-image:url(/static/icons/ui/bm_tracks_16.png)"></span> Library</button>
+                <button data-view="artists"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_artist_16.png);mask-image:url(/static/icons/ui/bm_artist_16.png)"></span> Artists</button>
+                <button data-view="albums"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_album_16.png);mask-image:url(/static/icons/ui/bm_album_16.png)"></span> Albums</button>
+                <button data-view="playlists"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_playlist_16.png);mask-image:url(/static/icons/ui/bm_playlist_16.png)"></span> Playlists</button>
+                <button data-view="recents"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_recent_16.png);mask-image:url(/static/icons/ui/bm_recent_16.png)"></span> Recents</button>
+                <button data-view="favorites"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_heart_16.png);mask-image:url(/static/icons/ui/bm_heart_16.png)"></span> Favorites</button>
+                <button data-view="search"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_qmark_16.png);mask-image:url(/static/icons/ui/bm_qmark_16.png)"></span> Search</button>
+                <button data-view="settings"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_eq_16.png);mask-image:url(/static/icons/ui/bm_eq_16.png)"></span> Settings</button>
             </nav>
         </header>
-
-        <!-- Search (toggled) -->
-        <div class="search-bar" id="search-bar" hidden>
-            <input type="text" id="search-input" placeholder="Search tracks, albums, artists...">
-            <button id="search-close" title="Close search"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_x_16.png);mask-image:url(/static/icons/ui/bm_x_16.png)"></span></button>
-        </div>
-
-        <!-- Breadcrumb -->
-        <div class="breadcrumb" id="breadcrumb" hidden></div>
 
         <!-- Main Content -->
         <main class="app-content" id="content">
@@ -71,15 +61,15 @@
                     </div>
                 </div>
                 <div class="player-controls">
-                    <button id="btn-shuffle" title="Shuffle">Shf</button>
+                    <button id="btn-shuffle" title="Shuffle"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_hash_16.png);mask-image:url(/static/icons/ui/bm_hash_16.png)"></span></button>
                     <button id="btn-prev" title="Previous"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_lt_16.png);mask-image:url(/static/icons/ui/bm_lt_16.png)"></span></button>
                     <button id="btn-play" class="btn-play" title="Play"><span class="icon icon-24" style="-webkit-mask-image:url(/static/icons/ui/bm_gt_24.png);mask-image:url(/static/icons/ui/bm_gt_24.png)"></span></button>
                     <button id="btn-next" title="Next"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_gt_16.png);mask-image:url(/static/icons/ui/bm_gt_16.png)"></span></button>
-                    <button id="btn-loop" title="Loop">Loop</button>
+                    <button id="btn-loop" title="Loop"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/ds_endless_16.png);mask-image:url(/static/icons/ui/ds_endless_16.png)"></span></button>
                 </div>
                 <div class="player-actions">
                     <button id="btn-fav" title="Favorite"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_heart_16.png);mask-image:url(/static/icons/ui/bm_heart_16.png)"></span></button>
-                    <button id="btn-queue" title="Queue">Q</button>
+                    <button id="btn-queue" title="Queue"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_playlist_16.png);mask-image:url(/static/icons/ui/bm_playlist_16.png)"></span></button>
                     <div class="volume-control">
                         <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="100">
                     </div>

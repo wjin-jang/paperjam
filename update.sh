@@ -1,59 +1,28 @@
 #!/bin/bash
-# PaperJam Update Script
-# Updates from GitHub and restarts the service if running
+# PaperJam Web — Local update script
+# Pulls latest from GitHub and restarts the service.
+#
+# Usage: /opt/paperjam-web/update.sh
 
-set -e
+set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+REPO_DIR="/opt/paperjam-web"
+WEB_DIR="${REPO_DIR}/web"
+BRANCH="claude/paperjam-web-pwa-gWrkR"
 
-echo "=== PaperJam Updater ==="
+echo "=== PaperJam Web Update ==="
 
-# Check for uncommitted changes
-if ! git diff-index --quiet HEAD -- 2>/dev/null; then
-    echo "Warning: You have uncommitted local changes."
-    read -p "Stash changes and continue? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        git stash
-        STASHED=1
-    else
-        echo "Aborted."
-        exit 1
-    fi
-fi
+cd "${REPO_DIR}"
 
-# Pull latest changes
-echo "Pulling latest changes..."
-git pull origin main
+echo "[1/3] Pulling latest from ${BRANCH}..."
+git pull origin "${BRANCH}"
 
-# Update dependencies if requirements changed
-if [ -f "venv/bin/pip" ]; then
-    echo "Checking dependencies..."
-    venv/bin/pip install --quiet --upgrade pillow mutagen python-vlc smbus2 evdev numpy 2>/dev/null || true
-fi
+echo "[2/3] Installing dependencies..."
+"${WEB_DIR}/venv/bin/pip" install -q -r "${WEB_DIR}/requirements.txt"
 
-# Restore stashed changes if any
-if [ "$STASHED" = "1" ]; then
-    echo "Restoring local changes..."
-    git stash pop || true
-fi
+echo "[3/3] Restarting server..."
+sudo systemctl restart paperjam-web
 
-# Restart service if running
-# Set up environment for user services (needed when running via SSH/script)
-export XDG_RUNTIME_DIR="/run/user/$(id -u)"
-export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
-
-if systemctl --user is-active --quiet paperjam 2>/dev/null; then
-    echo "Restarting user service..."
-    systemctl --user restart paperjam
-    echo "Service restarted."
-elif systemctl is-active --quiet paperjam 2>/dev/null; then
-    echo "Restarting system service..."
-    sudo systemctl restart paperjam
-    echo "Service restarted."
-else
-    echo "No service running. Start manually with: python main.py"
-fi
-
+echo ""
 echo "=== Update complete ==="
+sudo systemctl status paperjam-web --no-pager -l || true
