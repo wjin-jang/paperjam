@@ -1,82 +1,69 @@
 #!/usr/bin/env python3
-"""Extract icon glyphs from BMmini, Nintendo-DS-BIOS, and Icons fonts as PNGs."""
+"""Extract icon glyphs from BMmini and Nintendo-DS-BIOS fonts as PNGs.
 
-import sys
+Uses the actual codepoints present in each font (verified via fontTools cmap).
+BMmini contains circled uppercase letters used as menu/status icons.
+Nintendo-DS-BIOS contains circled letters used for status indicators.
+"""
+
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 ASSETS_DIR = Path(__file__).parent.parent.parent / "assets"
-OUTPUT_DIR = Path(__file__).parent.parent / "static" / "icons" / "extracted"
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR = Path(__file__).parent.parent / "static" / "icons" / "ui"
 
-# Icon glyphs to extract from Icons.ttf (status and menu icons from config.py)
-ICON_GLYPHS = {
-    "playing": "\u24df",      # Ⓟ
-    "paused": "\u24e2",       # Ⓢ
-    "idle": "\u24d8",         # Ⓘ
-    "endless": "\u24d4",      # Ⓔ
-    "artist": "\u24d0",       # Ⓐ
-    "album": "\u24d1",        # Ⓑ
-    "tracks": "\u24e3",       # Ⓣ
-    "playlist": "\u24db",     # Ⓛ
-    "favorite": "\u24bd",     # Ⓗ (lowercase h circled)
-    "queue": "\u24e0",        # Ⓠ
-    "settings": "\u24e2",     # Ⓢ
-    "search": "\u24e2",       # Ⓢ
-}
 
-# Useful characters to extract from BMmini (navigation/UI icons)
+# BMmini circled letters (U+24xx) — used as menu/status icons in non-web version
+# Plus star and useful ASCII symbols
 BMMINI_GLYPHS = {
-    "play": "\u25b6",         # ▶
-    "pause": "\u23f8",        # ⏸
-    "stop": "\u23f9",         # ⏹
-    "next": "\u23ed",         # ⏭
-    "prev": "\u23ee",         # ⏮
-    "shuffle": "\u2928",      # ⤨
-    "repeat": "\u21bb",       # ↻
-    "heart": "\u2665",        # ♥
-    "heart_empty": "\u2661",  # ♡
-    "music_note": "\u266a",   # ♪
-    "music_notes": "\u266b",  # ♫
-    "folder": "\u25a1",       # □
-    "file": "\u25a0",         # ■
-    "arrow_right": "\u25b8",  # ▸
-    "arrow_left": "\u25c2",   # ◂
-    "arrow_up": "\u25b4",     # ▴
-    "arrow_down": "\u25be",   # ▾
-    "check": "\u2713",        # ✓
-    "cross": "\u2717",        # ✗
-    "star": "\u2605",         # ★
-    "star_empty": "\u2606",   # ☆
-    "gear": "\u2699",         # ⚙
-    "volume_up": "\u25b2",    # ▲
-    "volume_down": "\u25bc",  # ▼
-    "user": "\u263a",         # ☺
-    "lock": "\u2302",         # ⌂
+    # Circled letters (menu icons from config.py MENU_ICONS)
+    "artist":       "\u24b6",  # Ⓐ
+    "album":        "\u24b7",  # Ⓑ
+    "folder":       "\u24bb",  # Ⓕ
+    "heart":        "\u24bd",  # Ⓗ
+    "playlist":     "\u24c1",  # Ⓛ
+    "playing":      "\u24c5",  # Ⓟ
+    "recent":       "\u24c7",  # Ⓡ
+    "stopped":      "\u24c8",  # Ⓢ
+    "tracks":       "\u24c9",  # Ⓣ
+    # Star
+    "star":         "\u2605",  # ★
+    # ASCII symbols used as UI controls
+    "gt":           ">",       # > (play / forward)
+    "lt":           "<",       # < (back)
+    "plus":         "+",       # + (add / volume up)
+    "minus":        "-",       # - (volume down)
+    "eq":           "=",       # = (menu / hamburger)
+    "x":            "x",       # x (close)
+    "bar":          "|",       # | (separator)
+    "hash":         "#",       # # (number)
+    "qmark":        "?",       # ? (help/search)
+    "at":           "@",       # @ (user)
 }
 
-# Title/header characters from Nintendo-DS-BIOS
+# Nintendo-DS-BIOS circled letters — used for status in non-web version
 DS_BIOS_GLYPHS = {
-    "logo_p": "P",
-    "logo_a": "A",
-    "logo_e": "E",
-    "logo_r": "R",
-    "logo_j": "J",
-    "logo_m": "M",
+    "idle":         "\u24be",  # Ⓘ
+    "next":         "\u24c3",  # Ⓝ
+    "playing":      "\u24c5",  # Ⓟ
+    "recent":       "\u24c7",  # Ⓡ
+    "stopped":      "\u24c8",  # Ⓢ
+    "endless":      "\u24ca",  # Ⓤ
 }
 
-SIZES = [16, 24, 32, 48, 64]
+# Sizes to extract — 16px for inline icons, 24 for touch targets, 32 for album view
+SIZES = [16, 24, 32]
 
 
 def render_glyph(font_path: Path, char: str, name: str, prefix: str, sizes: list[int]):
     """Render a single glyph at multiple sizes and save as PNG."""
+    rendered = []
     for size in sizes:
         try:
             font = ImageFont.truetype(str(font_path), size)
         except Exception:
             continue
 
-        # Measure the glyph
         bbox = font.getbbox(char)
         if not bbox or (bbox[2] - bbox[0]) == 0 or (bbox[3] - bbox[1]) == 0:
             continue
@@ -84,13 +71,15 @@ def render_glyph(font_path: Path, char: str, name: str, prefix: str, sizes: list
         w = bbox[2] - bbox[0] + 4
         h = bbox[3] - bbox[1] + 4
 
-        # Render on transparent background
         img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
         draw.text((2 - bbox[0], 2 - bbox[1]), char, font=font, fill=(255, 255, 255, 255))
 
         out_path = OUTPUT_DIR / f"{prefix}_{name}_{size}.png"
         img.save(out_path)
+        rendered.append(size)
+
+    return rendered
 
 
 def render_app_icons(font_path: Path):
@@ -120,10 +109,11 @@ def render_app_icons(font_path: Path):
 
 
 def main():
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
     fonts = {
-        "icons": (ASSETS_DIR / "Icons.ttf", ICON_GLYPHS),
-        "bmmini": (ASSETS_DIR / "BMmini.ttf", BMMINI_GLYPHS),
-        "dsbios": (ASSETS_DIR / "Nintendo-DS-BIOS.ttf", DS_BIOS_GLYPHS),
+        "bm": (ASSETS_DIR / "BMmini.ttf", BMMINI_GLYPHS),
+        "ds": (ASSETS_DIR / "Nintendo-DS-BIOS.ttf", DS_BIOS_GLYPHS),
     }
 
     total = 0
@@ -134,9 +124,12 @@ def main():
 
         print(f"Extracting from {font_path.name}:")
         for name, char in glyphs.items():
-            render_glyph(font_path, char, name, prefix, SIZES)
-            total += 1
-            print(f"  {name} ({char})")
+            rendered = render_glyph(font_path, char, name, prefix, SIZES)
+            if rendered:
+                total += 1
+                print(f"  {name} (U+{ord(char):04X}) -> {rendered}")
+            else:
+                print(f"  {name} (U+{ord(char):04X}) -> SKIPPED (not in font)")
 
     # Generate PWA app icons
     ds_font = ASSETS_DIR / "Nintendo-DS-BIOS.ttf"
@@ -144,7 +137,7 @@ def main():
         print("Generating PWA app icons:")
         render_app_icons(ds_font)
 
-    print(f"\nExtracted {total} glyphs at {len(SIZES)} sizes each")
+    print(f"\nExtracted {total} glyphs at sizes {SIZES}")
     print(f"Output: {OUTPUT_DIR}")
 
 

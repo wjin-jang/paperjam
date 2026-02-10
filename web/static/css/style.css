@@ -61,6 +61,25 @@ a { color: var(--link); text-decoration-thickness: 1px; text-underline-offset: 2
 a:visited { color: var(--visited); }
 a:hover { text-decoration-thickness: 2px; }
 
+/* === Icons — CSS mask, inherits currentColor === */
+.icon {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    background: currentColor;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    vertical-align: middle;
+    image-rendering: pixelated;
+}
+
+.icon-24 { width: 24px; height: 24px; }
+.icon-32 { width: 32px; height: 32px; }
+
 /* === Login Page === */
 .login-body {
     display: flex;
@@ -114,13 +133,14 @@ a:hover { text-decoration-thickness: 2px; }
     padding: 0.45rem;
     font-family: var(--font-mono);
     font-size: 0.85rem;
-    border: var(--cell);
+    border: none;
+    border-bottom: var(--cell);
     background: var(--code-bg);
     color: var(--text);
     outline: none;
 }
 
-.form-group input:focus { box-shadow: 3px 3px 0 var(--ink); }
+.form-group input:focus { background: var(--paper); }
 
 .error-message {
     color: var(--red-ink);
@@ -138,13 +158,12 @@ a:hover { text-decoration-thickness: 2px; }
     letter-spacing: 0.08em;
     background: var(--ink);
     color: var(--paper);
-    border: var(--cell);
+    border: none;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+    transition: background 0.15s, color 0.15s;
 }
 
 .btn-primary:hover {
-    box-shadow: 3px 3px 0 var(--ink);
     background: var(--paper);
     color: var(--ink);
 }
@@ -352,7 +371,6 @@ a:hover { text-decoration-thickness: 2px; }
 .item-cover {
     width: 36px;
     height: 36px;
-    border: 1px solid var(--ink);
     flex-shrink: 0;
     background: var(--code-bg);
     display: flex;
@@ -462,8 +480,6 @@ a:hover { text-decoration-thickness: 2px; }
 .album-cover {
     width: 140px;
     height: 140px;
-    border: var(--cell);
-    box-shadow: 4px 4px 0 var(--ink);
     flex-shrink: 0;
     background: var(--code-bg);
     display: flex;
@@ -516,17 +532,17 @@ a:hover { text-decoration-thickness: 2px; }
     text-transform: uppercase;
     letter-spacing: 0.08em;
     padding: 0.25rem 0.5rem;
-    border: var(--cell);
+    border: none;
     cursor: pointer;
     transition: background 0.1s, color 0.1s;
-    background: var(--paper);
-    color: var(--ink);
+    background: var(--ink);
+    color: var(--paper);
 }
 
 .btn-small:hover,
 .btn-small.active {
-    background: var(--ink);
-    color: var(--paper);
+    background: var(--highlight);
+    color: var(--ink);
 }
 
 /* ============================================
@@ -573,7 +589,6 @@ a:hover { text-decoration-thickness: 2px; }
 .player-cover {
     width: 40px;
     height: 40px;
-    border: 1px solid var(--ink);
     flex-shrink: 0;
     background: var(--code-bg);
     cursor: pointer;
@@ -652,7 +667,9 @@ a:hover { text-decoration-thickness: 2px; }
 .player-controls .btn-play {
     width: 2rem;
     height: 2rem;
-    border: var(--cell);
+    border: none;
+    background: var(--ink);
+    color: var(--paper);
     font-size: 0.9rem;
     opacity: 1;
 }
@@ -711,7 +728,7 @@ a:hover { text-decoration-thickness: 2px; }
     -webkit-appearance: none;
     appearance: none;
     background: var(--highlight);
-    border: 1px solid var(--ink);
+    border: none;
     outline: none;
     cursor: pointer;
 }
@@ -742,8 +759,6 @@ a:hover { text-decoration-thickness: 2px; }
     height: 280px;
     max-width: 70vw;
     max-height: 70vw;
-    border: var(--cell);
-    box-shadow: 8px 8px 0 var(--ink);
     background: var(--code-bg);
     overflow: hidden;
     display: flex;
@@ -813,7 +828,7 @@ a:hover { text-decoration-thickness: 2px; }
     font-family: var(--font-mono);
     font-size: 0.72rem;
     padding: 0.2rem 0.35rem;
-    border: var(--cell);
+    border: none;
     background: var(--code-bg);
     color: var(--text);
     cursor: pointer;
@@ -830,13 +845,14 @@ a:hover { text-decoration-thickness: 2px; }
     padding: 0.35rem;
     font-family: var(--font-mono);
     font-size: 0.8rem;
-    border: var(--cell);
+    border: none;
+    border-bottom: var(--cell);
     background: var(--code-bg);
     color: var(--text);
     outline: none;
 }
 
-.admin-form input:focus { box-shadow: 3px 3px 0 var(--ink); }
+.admin-form input:focus { background: var(--paper); }
 
 .admin-form label {
     display: block;
@@ -971,13 +987,14 @@ a:hover { text-decoration-thickness: 2px; }
     padding: 0.4rem;
     font-family: var(--font-mono);
     font-size: 0.8rem;
-    border: var(--cell);
+    border: none;
+    border-bottom: var(--cell);
     background: var(--code-bg);
     color: var(--text);
     outline: none;
 }
 
-.modal-body input:focus { box-shadow: 3px 3px 0 var(--ink); }
+.modal-body input:focus { background: var(--paper); }
 
 .modal-actions {
     display: flex;

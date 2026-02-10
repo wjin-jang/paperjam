@@ -186,7 +186,6 @@ const Player = {
 
         // Update fav button
         API.checkFavorite('track', t.path).then(r => {
-            document.getElementById('btn-fav').textContent = r.favorited ? '♥' : '♡';
             document.getElementById('btn-fav').classList.toggle('active', r.favorited);
         }).catch(() => {});
 
@@ -198,7 +197,8 @@ const Player = {
 
     _updatePlayButton() {
         const btn = document.getElementById('btn-play');
-        btn.textContent = this.audio.paused ? '▶' : '⏸';
+        const name = this.audio.paused ? 'gt' : 'stopped';
+        btn.innerHTML = `<span class="icon icon-24" style="-webkit-mask-image:url(/static/icons/ui/bm_${name}_24.png);mask-image:url(/static/icons/ui/bm_${name}_24.png)"></span>`;
     },
 
     _startProgress() {

@@ -36,7 +36,7 @@
         <!-- Search (toggled) -->
         <div class="search-bar" id="search-bar" hidden>
             <input type="text" id="search-input" placeholder="Search tracks, albums, artists...">
-            <button id="search-close" title="Close search">&times;</button>
+            <button id="search-close" title="Close search"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_x_16.png);mask-image:url(/static/icons/ui/bm_x_16.png)"></span></button>
         </div>
 
         <!-- Breadcrumb -->
@@ -65,13 +65,13 @@
                 </div>
                 <div class="player-controls">
                     <button id="btn-shuffle" title="Shuffle">Shf</button>
-                    <button id="btn-prev" title="Previous">&laquo;</button>
-                    <button id="btn-play" class="btn-play" title="Play">&#9654;</button>
-                    <button id="btn-next" title="Next">&raquo;</button>
+                    <button id="btn-prev" title="Previous"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_lt_16.png);mask-image:url(/static/icons/ui/bm_lt_16.png)"></span></button>
+                    <button id="btn-play" class="btn-play" title="Play"><span class="icon icon-24" style="-webkit-mask-image:url(/static/icons/ui/bm_gt_24.png);mask-image:url(/static/icons/ui/bm_gt_24.png)"></span></button>
+                    <button id="btn-next" title="Next"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_gt_16.png);mask-image:url(/static/icons/ui/bm_gt_16.png)"></span></button>
                     <button id="btn-loop" title="Loop">Loop</button>
                 </div>
                 <div class="player-actions">
-                    <button id="btn-fav" title="Favorite">&hearts;</button>
+                    <button id="btn-fav" title="Favorite"><span class="icon" style="-webkit-mask-image:url(/static/icons/ui/bm_heart_16.png);mask-image:url(/static/icons/ui/bm_heart_16.png)"></span></button>
                     <button id="btn-queue" title="Queue">Q</button>
                     <div class="volume-control">
                         <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="100">

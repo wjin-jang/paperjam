@@ -87,7 +87,6 @@ const App = {
         document.getElementById('btn-fav').addEventListener('click', async () => {
             if (!Player.currentTrack) return;
             const r = await API.toggleFavorite('track', Player.currentTrack.path);
-            document.getElementById('btn-fav').textContent = r.favorited ? '♥' : '♡';
             document.getElementById('btn-fav').classList.toggle('active', r.favorited);
             this.toast(r.favorited ? 'Added to favorites' : 'Removed from favorites');
         });
@@ -231,7 +230,7 @@ const App = {
             }
 
             // All Tracks shortcut
-            const allTracksDiv = this._createListItem('♪', 'All Tracks', `${stats.tracks} tracks`, null, () => this._renderAllTracks(el));
+            const allTracksDiv = this._createListItem(this._icon('tracks'), 'All Tracks', `${stats.tracks} tracks`, null, () => this._renderAllTracks(el));
             el.appendChild(allTracksDiv);
 
             // Recent plays preview
@@ -243,7 +242,7 @@ const App = {
 
                 recents.slice(0, 5).forEach(r => {
                     const filename = r.track_path.split('/').pop();
-                    const div = this._createListItem('⟳', filename, '', null, () => {
+                    const div = this._createListItem(this._icon('recent'), filename, '', null, () => {
                         const track = { path: r.track_path, title: filename, artist: '', album: '' };
                         Player.play(track, [track], 0);
                     });
@@ -277,7 +276,7 @@ const App = {
 
             const playAllBtn = document.createElement('button');
             playAllBtn.className = 'btn-small';
-            playAllBtn.textContent = '▶ Play All';
+            playAllBtn.textContent = 'Play All';
             playAllBtn.addEventListener('click', () => {
                 Player.play(tracks[0], tracks, 0);
             });
@@ -285,7 +284,7 @@ const App = {
 
             const shuffleBtn = document.createElement('button');
             shuffleBtn.className = 'btn-small';
-            shuffleBtn.textContent = '⤨ Shuffle All';
+            shuffleBtn.textContent = 'Shuffle All';
             shuffleBtn.addEventListener('click', () => {
                 const shuffled = [...tracks].sort(() => Math.random() - 0.5);
                 Player.play(shuffled[0], shuffled, 0);
@@ -317,7 +316,7 @@ const App = {
 
             artists.forEach(a => {
                 const div = this._createListItem(
-                    'A', a.name,
+                    this._icon('artist'), a.name,
                     `${a.album_count} albums · ${a.track_count} tracks`,
                     null,
                     () => {
@@ -348,7 +347,7 @@ const App = {
 
             artist.albums.forEach(album => {
                 const albumDiv = this._createListItem(
-                    'B', album.name,
+                    this._icon('album'), album.name,
                     `${album.year || ''} · ${album.track_count} tracks`,
                     null,
                     () => {
@@ -408,7 +407,7 @@ const App = {
             if (album.tracks.length > 0) {
                 const img = document.createElement('img');
                 img.src = API.coverUrl(album.tracks[0].path, 'large');
-                img.onerror = () => { coverDiv.innerHTML = '<span class="item-cover-placeholder">♪</span>'; };
+                img.onerror = () => { coverDiv.innerHTML = this._icon('tracks', 32); };
                 coverDiv.appendChild(img);
             }
             headerDiv.appendChild(coverDiv);
@@ -420,9 +419,9 @@ const App = {
                 <div class="album-artist">${this._esc(album.artist)}</div>
                 <div class="album-meta">${album.year || ''} · ${album.track_count} tracks · ${album.duration}</div>
                 <div class="album-actions">
-                    <button class="btn-small" id="album-play-all">▶ Play</button>
-                    <button class="btn-small" id="album-shuffle">⤨ Shuffle</button>
-                    <button class="btn-small" id="album-fav">♡ Favorite</button>
+                    <button class="btn-small" id="album-play-all">${this._icon('gt')} Play</button>
+                    <button class="btn-small" id="album-shuffle">Shuffle</button>
+                    <button class="btn-small" id="album-fav">${this._icon('heart')} Fav</button>
                 </div>`;
             headerDiv.appendChild(infoDiv);
             el.appendChild(headerDiv);
@@ -439,14 +438,14 @@ const App = {
             // Favorite button
             API.checkFavorite('album', album.name).then(r => {
                 const btn = el.querySelector('#album-fav');
-                btn.textContent = r.favorited ? '♥ Favorited' : '♡ Favorite';
+                btn.innerHTML = `${this._icon('heart')} ${r.favorited ? 'Fav\'d' : 'Fav'}`;
                 btn.classList.toggle('active', r.favorited);
             }).catch(() => {});
 
             el.querySelector('#album-fav').addEventListener('click', async () => {
                 const r = await API.toggleFavorite('album', album.name);
                 const btn = el.querySelector('#album-fav');
-                btn.textContent = r.favorited ? '♥ Favorited' : '♡ Favorite';
+                btn.innerHTML = `${this._icon('heart')} ${r.favorited ? 'Fav\'d' : 'Fav'}`;
                 btn.classList.toggle('active', r.favorited);
                 this.toast(r.favorited ? 'Album added to favorites' : 'Album removed from favorites');
             });
@@ -475,7 +474,7 @@ const App = {
             el.appendChild(header);
 
             // New playlist button
-            const newBtn = this._createListItem('+', 'New Playlist', '', null, () => {
+            const newBtn = this._createListItem(this._icon('plus'), 'New Playlist', '', null, () => {
                 this._showCreatePlaylistModal();
             });
             el.appendChild(newBtn);
@@ -487,7 +486,7 @@ const App = {
 
             playlists.forEach(p => {
                 const div = this._createListItem(
-                    'L', p.name,
+                    this._icon('playlist'), p.name,
                     `${p.track_count} tracks`,
                     null,
                     () => {
@@ -579,7 +578,7 @@ const App = {
             recents.forEach(r => {
                 const filename = r.track_path.split('/').pop();
                 const div = this._createListItem(
-                    '⟳', filename, r.track_path, null,
+                    this._icon('recent'), filename, r.track_path, null,
                     () => {
                         const track = { path: r.track_path, title: filename, artist: '', album: '' };
                         Player.play(track, [track], 0);
@@ -608,7 +607,7 @@ const App = {
                 h.textContent = `Favorite Artists (${artists.length})`;
                 el.appendChild(h);
                 artists.forEach(a => {
-                    const div = this._createListItem('A', a.item_key, '', null, () => {
+                    const div = this._createListItem(this._icon('artist'), a.item_key, '', null, () => {
                         this.viewStack.push('favorites');
                         this.navigate('artist', a.item_key);
                     });
@@ -623,7 +622,7 @@ const App = {
                 h.textContent = `Favorite Albums (${albums.length})`;
                 el.appendChild(h);
                 albums.forEach(a => {
-                    const div = this._createListItem('B', a.item_key, '', null, () => {
+                    const div = this._createListItem(this._icon('album'), a.item_key, '', null, () => {
                         this.viewStack.push('favorites');
                         this.navigate('album', a.item_key);
                     });
@@ -639,7 +638,7 @@ const App = {
                 el.appendChild(h);
                 tracks.forEach(t => {
                     const filename = t.item_key.split('/').pop();
-                    const div = this._createListItem('♥', filename, '', null, () => {
+                    const div = this._createListItem(this._icon('heart'), filename, '', null, () => {
                         const track = { path: t.item_key, title: filename, artist: '', album: '' };
                         Player.play(track, [track], 0);
                     });
@@ -780,7 +779,7 @@ const App = {
             el.appendChild(header);
 
             // Create user button
-            const createBtn = this._createListItem('+', 'Create User', '', null, () => {
+            const createBtn = this._createListItem(this._icon('plus'), 'Create User', '', null, () => {
                 this._showCreateUserModal();
             });
             el.appendChild(createBtn);
@@ -867,15 +866,23 @@ const App = {
         el.innerHTML = '';
         const np = document.createElement('div');
         np.className = 'now-playing-full';
-        np.innerHTML = `
-            <div class="np-cover">
-                <img src="${API.coverUrl(t.path, 'large')}" alt="" onerror="this.parentElement.innerHTML='<span class=np-placeholder>♪</span>'">
-            </div>
-            <div class="np-info">
-                <div class="np-title">${this._esc(t.title)}</div>
-                <div class="np-artist">${this._esc(t.artist)}</div>
-                ${t.album ? `<div class="np-album">${this._esc(t.album)}</div>` : ''}
-            </div>`;
+
+        const coverDiv = document.createElement('div');
+        coverDiv.className = 'np-cover';
+        const coverImg = document.createElement('img');
+        coverImg.src = API.coverUrl(t.path, 'large');
+        coverImg.alt = '';
+        coverImg.onerror = () => { coverDiv.innerHTML = this._icon('tracks', 32); };
+        coverDiv.appendChild(coverImg);
+        np.appendChild(coverDiv);
+
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'np-info';
+        infoDiv.innerHTML = `
+            <div class="np-title">${this._esc(t.title)}</div>
+            <div class="np-artist">${this._esc(t.artist)}</div>
+            ${t.album ? `<div class="np-album">${this._esc(t.album)}</div>` : ''}`;
+        np.appendChild(infoDiv);
         el.appendChild(np);
     },
 
@@ -897,7 +904,7 @@ const App = {
                 h.textContent = `Artists (${results.artists.length})`;
                 el.appendChild(h);
                 results.artists.forEach(a => {
-                    const div = this._createListItem('A', a.name, `${a.track_count} tracks`, null, () => {
+                    const div = this._createListItem(this._icon('artist'), a.name, `${a.track_count} tracks`, null, () => {
                         this.viewStack.push('search');
                         this.navigate('artist', a.name);
                     });
@@ -911,7 +918,7 @@ const App = {
                 h.textContent = `Albums (${results.albums.length})`;
                 el.appendChild(h);
                 results.albums.forEach(a => {
-                    const div = this._createListItem('B', a.name, `${a.artist} · ${a.track_count} tracks`, null, () => {
+                    const div = this._createListItem(this._icon('album'), a.name, `${a.artist} · ${a.track_count} tracks`, null, () => {
                         this.viewStack.push('search');
                         this.navigate('album', a.name);
                     });
@@ -951,13 +958,13 @@ const App = {
             cover.className = 'item-cover';
             const img = document.createElement('img');
             img.src = API.coverUrl(coverPath, 'small');
-            img.onerror = () => { cover.innerHTML = `<span class="item-cover-placeholder">${icon || '♪'}</span>`; };
+            img.onerror = () => { cover.innerHTML = icon || this._icon('tracks'); };
             cover.appendChild(img);
             div.appendChild(cover);
         } else if (icon) {
             const cover = document.createElement('div');
             cover.className = 'item-cover';
-            cover.innerHTML = `<span class="item-cover-placeholder">${icon}</span>`;
+            cover.innerHTML = icon;
             div.appendChild(cover);
         }
 
@@ -983,7 +990,7 @@ const App = {
         } else {
             const img = document.createElement('img');
             img.src = API.coverUrl(track.path, 'small');
-            img.onerror = () => { cover.innerHTML = '<span class="item-cover-placeholder">♪</span>'; };
+            img.onerror = () => { cover.innerHTML = this._icon('tracks'); };
             cover.appendChild(img);
         }
         div.appendChild(cover);
@@ -1286,6 +1293,13 @@ const App = {
 
         // Load playlists for context menu
         API.playlists().then(p => { this.playlists = p; }).catch(() => {});
+    },
+
+    // --- Icon Helper ---
+
+    _icon(name, size = 16) {
+        const url = `/static/icons/ui/bm_${name}_${size}.png`;
+        return `<span class="icon${size !== 16 ? ` icon-${size}` : ''}" style="-webkit-mask-image:url(${url});mask-image:url(${url})"></span>`;
     },
 
     // --- Escape HTML ---
